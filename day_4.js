@@ -1,4 +1,4 @@
-// Spooky Crossy Road - Day 2 Game (standalone, local-storage leaderboard fallback)
+// Spooky Crossy Road - Day 2 Game (fixed: movement, background, enemies, character)
 (() => {
   // DOM
   const canvas = document.getElementById('game-canvas');
@@ -24,9 +24,34 @@
   const fullscreenBtn = document.getElementById('fullscreen-btn');
   const backgroundRoot = document.getElementById('background');
 
-  // Constants
-  const W = canvas.width;
-  const H = canvas.height;
+  // Logical canvas resolution — keep game math in a stable coordinate system
+  const LOG_W = 480;
+  const LOG_H = 720;
+
+  // Keep canvas drawing scaled to fit displayed playbound (so mouse/touch coordinates and visual match)
+  function resizeCanvasToPlaybound() {
+    // compute target pixel size based on playbound display size
+    const rect = playbound.getBoundingClientRect();
+    // maintain logical coordinate system but scale to displayed size
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    // set internal resolution to logical values (so game math remains stable)
+    canvas.width = LOG_W;
+    canvas.height = LOG_H;
+    // optionally scale context to match if you want crisp scaling; here we will draw at LOG_W/LOG_H coords
+  }
+
+  // call resize initially and when window resizes
+  resizeCanvasToPlaybound();
+  window.addEventListener('resize', () => {
+    resizeCanvasToPlaybound();
+    // re-position any background elements to remain within viewport bounds
+    repositionBackgroundElements();
+  });
+
+  // Constants (in logical coords)
+  const W = canvas.width; // LOG_W
+  const H = canvas.height; // LOG_H
   const TILE_SIZE = 48;
   const PLAYER_SIZE = 36;
   const ROWS_VISIBLE = Math.ceil(H / TILE_SIZE) + 2;
@@ -40,10 +65,11 @@
   let running = false;
   let lastTime = performance.now();
   let animationId = null;
-  let moveDelay = 0;
+  let moveDelay = 0; // ms cooldown between grid moves
+  // allow initial setting via localStorage
   let scaryMode = localStorage.getItem('day2Scary') === 'true';
 
-  // Timer setup (ends Oct 28 of current year, local -07 offset interpreted by Date.parse of ISO)
+  // Timer setup (ends Oct 28 of current year)
   const now = new Date();
   const year = now.getFullYear();
   const EVENT_END_ISO = `${year}-10-28T00:00:00-07:00`;
@@ -65,7 +91,7 @@
     gameTimerHeader.textContent = left <= 0 ? 'Game Ended' : formatTimeRemaining(left);
   }
 
-  // Audio
+  // Audio (unchanged)
   function getAudioCtx(){ 
     try { 
       return new (window.AudioContext||window.webkitAudioContext)(); 
@@ -75,18 +101,18 @@
   }
 
   function playScreamLoud(){
-    const ctx = getAudioCtx(); 
-    if(!ctx) return;
-    const o = ctx.createOscillator(), g = ctx.createGain();
+    const ctxAudio = getAudioCtx(); 
+    if(!ctxAudio) return;
+    const o = ctxAudio.createOscillator(), g = ctxAudio.createGain();
     o.type='sawtooth'; 
-    o.frequency.setValueAtTime(220, ctx.currentTime);
-    g.gain.setValueAtTime(0.0001, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.7, ctx.currentTime + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
+    o.frequency.setValueAtTime(220, ctxAudio.currentTime);
+    g.gain.setValueAtTime(0.0001, ctxAudio.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.7, ctxAudio.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, ctxAudio.currentTime + 1.2);
     o.connect(g); 
-    g.connect(ctx.destination);
+    g.connect(ctxAudio.destination);
     o.start(); 
-    o.stop(ctx.currentTime + 1.2);
+    o.stop(ctxAudio.currentTime + 1.2);
   }
 
   function doJumpscare(){
@@ -97,16 +123,19 @@
     setTimeout(()=> dayJumpscare.classList.add('hidden'), 1300);
   }
 
-  // Row generation
+  // Row generation (fixed to guarantee some obstacles initially)
   function createRow(rowIndex) {
-    const difficulty = Math.min(1, rowIndex / 100);
+    const difficulty = Math.min(1, Math.max(0, rowIndex / 100));
+    // slightly bias toward obstacles early so the player sees enemies immediately
+    const bias = Math.max(0, Math.min(0.5, rowIndex / 10));
     const rand = Math.random();
 
     let type = 'grass';
     if (rowIndex > 0) {
-      if (rand < 0.15) type = 'island';
-      else if (rand < 0.45) type = 'road';
-      else if (rand < 0.75) type = 'river';
+      // ensure some obstacles in early positive rows
+      if (rand < 0.18 - bias) type = 'island';
+      else if (rand < 0.47 + bias) type = 'road';
+      else if (rand < 0.8) type = 'river';
       else type = 'grass';
     }
 
@@ -117,15 +146,15 @@
       obstacles: []
     };
 
-    if (type === 'road') {
+    if (row.type === 'road') {
       const direction = Math.random() < 0.5 ? 1 : -1;
-      const baseSpeed = 1.2 + difficulty * 2.5;
+      const baseSpeed = 1.6 + difficulty * 2.5; // slightly faster so they are visible
       const speed = baseSpeed * direction;
-      const spacing = 120 + Math.random() * 160;
-      const count = Math.ceil(W / spacing) + 2;
+      const spacing = 100 + Math.random() * 120;
+      const count = Math.max(1, Math.ceil(W / spacing) + 2);
 
       for (let i = 0; i < count; i++) {
-        const isGhost = Math.random() < 0.4;
+        const isGhost = Math.random() < 0.38;
         row.obstacles.push({
           x: i * spacing + Math.random() * 40,
           speed: speed,
@@ -134,14 +163,14 @@
           type: isGhost ? 'ghost' : 'car'
         });
       }
-    } else if (type === 'river') {
+    } else if (row.type === 'river') {
       const direction = Math.random() < 0.5 ? 1 : -1;
-      const baseSpeed = 0.8 + difficulty * 1.8;
+      const baseSpeed = 0.9 + difficulty * 1.8;
       const speed = baseSpeed * direction;
       const logCount = 2 + Math.floor(Math.random() * 3);
 
       for (let i = 0; i < logCount; i++) {
-        const isBat = Math.random() < 0.3;
+        const isBat = Math.random() < 0.28;
         row.obstacles.push({
           x: (i / logCount) * W + Math.random() * 60,
           speed: speed,
@@ -158,26 +187,37 @@
 
   function initRows() {
     rows = [];
+    // create some positive rows close to player that are likely to include obstacles
     for (let i = -2; i < ROWS_VISIBLE; i++) {
       rows.push(createRow(i));
+    }
+    // guarantee at least a couple of obstacle rows near the player start
+    for (let i = 0; i < 3; i++) {
+      const idx = Math.max(0, Math.floor(i + 1));
+      rows[idx] = createRow(idx);
+      if (rows[idx].type === 'grass') {
+        // force one road row in early area
+        rows[idx].type = (i % 2 === 0) ? 'road' : 'river';
+        rows[idx].obstacles = createRow(idx).obstacles;
+      }
     }
   }
 
   function generateNewRows() {
     if (!player) return;
-    const minRow = Math.min(...rows.map(r => r.index));
+    // find current minimum (lowest-index) row we have
+    let minRow = Math.min(...rows.map(r => r.index));
     const neededRow = Math.floor(player.y / TILE_SIZE) - ROWS_VISIBLE;
 
+    // if we need older rows (smaller index), add them until covered
     while (minRow > neededRow) {
-      rows.push(createRow(minRow - 1));
-      // keep memory bounded
+      const newIdx = minRow - 1;
+      rows.push(createRow(newIdx));
+      minRow = newIdx;
+      // prune very old rows to keep memory bounded
       if (rows.length > ROWS_VISIBLE + 12) {
         rows = rows.filter(r => r.index > Math.floor(player.y / TILE_SIZE) + 6);
       }
-      // recompute
-      const arr = rows.map(r => r.index);
-      if (arr.length) minRow = Math.min(...arr);
-      else break;
     }
   }
 
@@ -195,8 +235,11 @@
     };
   }
 
+  // grid move: dx/dy in tiles
   function movePlayer(dx, dy) {
-    if (!player || !player.alive || moveDelay > 0) return;
+    if (!player || !player.alive) return;
+    // allow movement if cooldown is zero
+    if (moveDelay > 0) return;
 
     const newX = player.x + dx * TILE_SIZE;
     const newY = player.y + dy * TILE_SIZE;
@@ -221,45 +264,60 @@
       }
     }
 
-    moveDelay = 150;
+    // short cooldown so repeated keys don't over-move
+    moveDelay = 140;
   }
 
   // Collision
   function checkCollisions() {
     if (!player || !player.alive) return;
 
-    const playerRow = rows.find(r => Math.abs(r.y - player.y) < TILE_SIZE / 2);
-    if (!playerRow) return;
+    // find the row the player's center is closest to
+    const playerCenterY = player.y + player.height / 2;
+    const playerRow = rows.find(r => Math.abs(r.y + (H - (player.y + player.height/2)) - player.y) < TILE_SIZE*2) // fallback (old calculation)
+      || rows.find(r => Math.abs(r.y - player.y) < TILE_SIZE / 1.5)
+      || rows[Math.floor(rows.length/2)];
+
+    // More robust: compute nearest by index
+    let nearest = null;
+    let best = Infinity;
+    for (const r of rows) {
+      const dy = Math.abs(r.y - player.y);
+      if (dy < best) { best = dy; nearest = r; }
+    }
+
+    const currentRow = nearest;
+    if (!currentRow) return;
 
     player.onLog = null;
 
-    if (playerRow.type === 'road') {
-      for (const obs of playerRow.obstacles) {
+    if (currentRow.type === 'road') {
+      for (const obs of currentRow.obstacles) {
         if (player.x < obs.x + obs.width - 10 &&
             player.x + player.width > obs.x + 10 &&
-            Math.abs(playerRow.y - player.y) < TILE_SIZE / 2) {
+            Math.abs(currentRow.y - player.y) < TILE_SIZE / 1.2) {
           killPlayer();
           return;
         }
       }
-    } else if (playerRow.type === 'river') {
+    } else if (currentRow.type === 'river') {
       let onSomething = false;
-      for (const obs of playerRow.obstacles) {
+      for (const obs of currentRow.obstacles) {
         if (obs.rideable &&
-            player.x + player.width / 2 > obs.x &&
-            player.x + player.width / 2 < obs.x + obs.width &&
-            Math.abs(playerRow.y - player.y) < TILE_SIZE / 2) {
+            (player.x + player.width / 2) > obs.x &&
+            (player.x + player.width / 2) < (obs.x + obs.width) &&
+            Math.abs(currentRow.y - player.y) < TILE_SIZE / 1.2) {
           onSomething = true;
           player.onLog = obs;
           break;
         }
       }
 
-      for (const obs of playerRow.obstacles) {
+      for (const obs of currentRow.obstacles) {
         if (obs.type === 'bat' &&
             player.x < obs.x + obs.width - 8 &&
             player.x + player.width > obs.x + 8 &&
-            Math.abs(playerRow.y - player.y) < TILE_SIZE / 2) {
+            Math.abs(currentRow.y - player.y) < TILE_SIZE / 1.2) {
           killPlayer();
           return;
         }
@@ -289,7 +347,7 @@
 
     setTimeout(() => {
       showModalInPlaybound(gameOverModal);
-    }, 100);
+    }, 120);
 
     if (scaryMode && Math.random() < 0.6) {
       doJumpscare();
@@ -297,17 +355,85 @@
   }
 
   // Drawing
-  function draw() {
-    ctx.clearRect(0, 0, W, H);
+  function clearLogicalCanvas() {
+    // clear the logical canvas
+    ctx.clearRect(0, 0, LOG_W, LOG_H);
+  }
 
-    const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, '#0a0508');
-    bg.addColorStop(1, '#150610');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, H);
+  function drawBackgroundGradient() {
+    const grad = ctx.createLinearGradient(0, 0, 0, LOG_H);
+    grad.addColorStop(0, '#0a0508');
+    grad.addColorStop(1, '#150610');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, LOG_W, LOG_H);
+  }
 
+  // Draw improved pumpkin player (nicer than a plain circle)
+  function drawPlayerSprite() {
+    if (!player) return;
+    const px = player.x;
+    const py = player.y;
+    const w = player.width;
+    const h = player.height;
+    const cx = px + w / 2;
+    const cy = py + h / 2;
+
+    // pumpkin body
+    const bodyRadius = Math.min(w, h) / 2;
+    const grad = ctx.createLinearGradient(cx, cy - bodyRadius, cx, cy + bodyRadius);
+    grad.addColorStop(0, '#ffb86b');
+    grad.addColorStop(0.6, '#ff8c00');
+    grad.addColorStop(1, '#c25a00');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, bodyRadius, bodyRadius * 0.9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ribs
+    ctx.strokeStyle = 'rgba(120,50,0,0.6)';
+    ctx.lineWidth = 2;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(cx + i * (bodyRadius * 0.25), cy - bodyRadius * 0.9);
+      ctx.quadraticCurveTo(cx + i * 2, cy, cx + i * (bodyRadius * 0.25), cy + bodyRadius * 0.9);
+      ctx.stroke();
+    }
+
+    // stem
+    ctx.fillStyle = '#3a2a0d';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - bodyRadius * 0.95, bodyRadius * 0.18, bodyRadius * 0.28, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // face (eyes + mouth)
+    ctx.fillStyle = '#000';
+    // eyes
+    ctx.beginPath();
+    ctx.moveTo(cx - bodyRadius * 0.35, cy - bodyRadius * 0.1);
+    ctx.lineTo(cx - bodyRadius * 0.15, cy - bodyRadius * 0.25);
+    ctx.lineTo(cx - bodyRadius * 0.05, cy - bodyRadius * 0.1);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(cx + bodyRadius * 0.35, cy - bodyRadius * 0.1);
+    ctx.lineTo(cx + bodyRadius * 0.15, cy - bodyRadius * 0.25);
+    ctx.lineTo(cx + bodyRadius * 0.05, cy - bodyRadius * 0.1);
+    ctx.closePath();
+    ctx.fill();
+
+    // mouth
+    ctx.beginPath();
+    ctx.moveTo(cx - bodyRadius * 0.35, cy + bodyRadius * 0.35);
+    ctx.quadraticCurveTo(cx, cy + bodyRadius * 0.6, cx + bodyRadius * 0.35, cy + bodyRadius * 0.35);
+    ctx.lineTo(cx + bodyRadius * 0.18, cy + bodyRadius * 0.25);
+    ctx.quadraticCurveTo(cx, cy + bodyRadius * 0.4, cx - bodyRadius * 0.18, cy + bodyRadius * 0.25);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawRowsAndObstacles() {
     const camY = player ? player.y - H + TILE_SIZE * 3 : 0;
-
     rows.forEach(row => {
       const drawY = row.y - camY;
       if (drawY < -TILE_SIZE || drawY > H + TILE_SIZE) return;
@@ -344,337 +470,4 @@
       } else if (row.type === 'river') {
         const grad = ctx.createLinearGradient(0, drawY, 0, drawY + TILE_SIZE);
         grad.addColorStop(0, '#1a3a4a');
-        grad.addColorStop(1, '#0f2530');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, drawY, W, TILE_SIZE);
-      }
-
-      row.obstacles.forEach(obs => {
-        const obsDrawY = drawY + (TILE_SIZE - obs.height) / 2;
-
-        if (obs.type === 'car') {
-          ctx.fillStyle = '#8b0000';
-          ctx.fillRect(obs.x, obsDrawY, obs.width, obs.height);
-          ctx.fillStyle = '#ff0000';
-          ctx.fillRect(obs.x + 5, obsDrawY + 5, obs.width - 10, obs.height - 10);
-          ctx.fillStyle = '#ffff00';
-          if (obs.speed > 0) {
-            ctx.fillRect(obs.x + obs.width - 8, obsDrawY + 8, 6, 8);
-          } else {
-            ctx.fillRect(obs.x + 2, obsDrawY + 8, 6, 8);
-          }
-        } else if (obs.type === 'ghost') {
-          ctx.fillStyle = 'rgba(240,240,240,0.8)';
-          ctx.beginPath();
-          ctx.arc(obs.x + obs.width / 2, obsDrawY + obs.height / 3, obs.width / 2, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillRect(obs.x, obsDrawY + obs.height / 2, obs.width, obs.height / 2);
-          ctx.fillStyle = '#000';
-          ctx.beginPath();
-          ctx.arc(obs.x + obs.width * 0.35, obsDrawY + obs.height * 0.3, 4, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(obs.x + obs.width * 0.65, obsDrawY + obs.height * 0.3, 4, 0, Math.PI * 2);
-          ctx.fill();
-        } else if (obs.type === 'log') {
-          ctx.fillStyle = '#6b4423';
-          ctx.fillRect(obs.x, obsDrawY, obs.width, obs.height);
-          ctx.fillStyle = '#4a2f15';
-          for (let i = 0; i < obs.width; i += 20) {
-            ctx.fillRect(obs.x + i, obsDrawY + 2, 3, obs.height - 4);
-          }
-        } else if (obs.type === 'bat') {
-          ctx.fillStyle = '#2a0a2a';
-          ctx.beginPath();
-          ctx.ellipse(obs.x + obs.width / 2, obsDrawY + obs.height / 2, obs.width / 2, obs.height / 3, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#4a1a4a';
-          ctx.beginPath();
-          ctx.moveTo(obs.x, obsDrawY + obs.height / 2);
-          ctx.quadraticCurveTo(obs.x + obs.width * 0.25, obsDrawY, obs.x + obs.width / 2, obsDrawY + obs.height / 2);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.moveTo(obs.x + obs.width, obsDrawY + obs.height / 2);
-          ctx.quadraticCurveTo(obs.x + obs.width * 0.75, obsDrawY, obs.x + obs.width / 2, obsDrawY + obs.height / 2);
-          ctx.fill();
-        }
-      });
-    });
-
-    if (player && player.alive) {
-      const playerDrawY = player.y - camY;
-      ctx.fillStyle = '#ffa500';
-      ctx.beginPath();
-      ctx.arc(player.x + player.width / 2, playerDrawY + player.height / 2, player.width / 2, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#000';
-      ctx.beginPath();
-      ctx.arc(player.x + player.width * 0.35, playerDrawY + player.height * 0.35, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(player.x + player.width * 0.65, playerDrawY + player.height * 0.35, 3, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(player.x + player.width / 2, playerDrawY + player.height * 0.65, player.width * 0.2, 0, Math.PI);
-      ctx.stroke();
-    }
-
-    if (scaryMode && Math.random() < 0.003) {
-      ctx.fillStyle = 'rgba(255,0,0,0.06)';
-      ctx.fillRect(0, Math.random() * H, W, 4 + Math.random() * 40);
-    }
-  }
-
-  function update(dt) {
-    if (!running || !player || !player.alive) return;
-
-    if (moveDelay > 0) {
-      moveDelay = Math.max(0, moveDelay - dt);
-    }
-
-    rows.forEach(row => {
-      row.obstacles.forEach(obs => {
-        obs.x += obs.speed;
-        if (obs.speed > 0 && obs.x > W + 100) {
-          obs.x = -obs.width - 50;
-        } else if (obs.speed < 0 && obs.x < -obs.width - 100) {
-          obs.x = W + 50;
-        }
-      });
-    });
-
-    if (player.onLog) {
-      player.x += player.onLog.speed;
-    }
-
-    checkCollisions();
-    generateNewRows();
-  }
-
-  function loop(nowTime) {
-    const dt = Math.min(32, nowTime - lastTime);
-    lastTime = nowTime;
-
-    draw();
-
-    if (running) {
-      update(dt);
-      if (bigScoreEl) bigScoreEl.textContent = `Score: ${score}`;
-      updateTimers();
-    }
-
-    animationId = requestAnimationFrame(loop);
-  }
-
-  function startGame() {
-    if (running) return;
-
-    initRows();
-    player = createPlayer();
-    score = 0;
-    rowsPassed = 0;
-    highestRow = 0;
-    moveDelay = 0;
-    running = true;
-    lastTime = performance.now();
-
-    hideModal(gameOverModal);
-    hideModal(playOverlay);
-
-    if (!animationId) animationId = requestAnimationFrame(loop);
-  }
-
-  function showModalInPlaybound(modalEl) {
-    if (!modalEl || !playbound) return;
-    if (modalEl.parentElement !== playbound) playbound.appendChild(modalEl);
-    modalEl.classList.remove('hidden');
-  }
-
-  function hideModal(modalEl) {
-    if (!modalEl) return;
-    modalEl.classList.add('hidden');
-  }
-
-  function showToast(msg, timeout=2200){
-    if(!playbound) return;
-    let t = playbound.querySelector('.save-toast');
-    if(!t){ t = document.createElement('div'); t.className='save-toast'; playbound.appendChild(t); }
-    t.textContent = msg;
-    clearTimeout(t._timeout);
-    t._timeout = setTimeout(()=> { t && t.remove(); }, timeout);
-  }
-
-  function initBackgroundElements() {
-    if (!backgroundRoot) return;
-    if (backgroundRoot.dataset.initted) return;
-    backgroundRoot.dataset.initted = '1';
-
-    for (let i = 0; i < 20; i++) {
-      const leaf = document.createElement('div');
-      leaf.className = 'leaf';
-      leaf.style.left = `${Math.random() * 100}%`;
-      leaf.style.top = `${-10 - Math.random() * 60}%`;
-      leaf.style.animationDelay = `${Math.random() * 10}s`;
-      backgroundRoot.appendChild(leaf);
-    }
-
-    for (let i = 0; i < 8; i++) {
-      const pk = document.createElement('div');
-      pk.className = 'bg-pumpkin';
-      pk.style.left = `${Math.random() * 100}%`;
-      pk.style.top = `${-20 - Math.random() * 60}%`;
-      pk.style.animationDelay = `${Math.random() * 12}s`;
-      backgroundRoot.appendChild(pk);
-    }
-  }
-
-  // --- Local (localStorage) leaderboard fallback ---
-  function getLocalScores() {
-    try {
-      const raw = localStorage.getItem('day2_scores');
-      const arr = raw ? JSON.parse(raw) : [];
-      return arr.sort((a,b) => b.score - a.score);
-    } catch(e) {
-      return [];
-    }
-  }
-
-  function saveLocalScore(entry) {
-    try {
-      const arr = getLocalScores();
-      arr.push(entry);
-      arr.sort((a,b) => b.score - a.score);
-      localStorage.setItem('day2_scores', JSON.stringify(arr.slice(0,200)));
-      return true;
-    } catch(e) { return false; }
-  }
-
-  async function handleSubmitScore(){
-    // local fallback: ask for a player name and save to localStorage
-    const defaultName = (window.userData && window.userData.username) ? window.userData.username : 'Player';
-    const playerName = prompt('Enter name to save score:', defaultName) || 'Anonymous';
-    const entry = { score, playerName, uid: null, ts: Date.now(), withinEvent: Date.now() <= GAME_END_TS };
-
-    const ok = saveLocalScore(entry);
-    if (!ok) { showToast('Save failed'); return; }
-    showToast('Score saved (local)');
-
-    setTimeout(() => {
-      hideModal(gameOverModal);
-      hideModal(playOverlay);
-      startGame();
-    }, 700);
-  }
-
-  // Input handlers
-  window.addEventListener('keydown', e => {
-    const k = (e.key || '').toLowerCase();
-    if (k === 'arrowup' || k === 'w') { movePlayer(0, -1); e.preventDefault(); }
-    if (k === 'arrowdown' || k === 's') { movePlayer(0, 1); e.preventDefault(); }
-    if (k === 'arrowleft' || k === 'a') { movePlayer(-1, 0); e.preventDefault(); }
-    if (k === 'arrowright' || k === 'd') { movePlayer(1, 0); e.preventDefault(); }
-    if (k === 'f' && document.fullscreenEnabled) toggleFullscreen();
-  });
-
-  let touchStartX = 0;
-  let touchStartY = 0;
-
-  canvas.addEventListener('touchstart', e => {
-    const t = e.touches[0];
-    touchStartX = t.clientX;
-    touchStartY = t.clientY;
-  }, { passive: true });
-
-  canvas.addEventListener('touchend', e => {
-    if (!e.changedTouches || !e.changedTouches[0]) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchStartX;
-    const dy = t.clientY - touchStartY;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-
-    if (absDx > 30 || absDy > 30) {
-      if (absDx > absDy) {
-        movePlayer(dx > 0 ? 1 : -1, 0);
-      } else {
-        movePlayer(0, dy > 0 ? 1 : -1);
-      }
-    }
-  }, { passive: true });
-
-  async function toggleFullscreen() {
-    try {
-      if (!document.fullscreenElement) {
-        await playbound.requestFullscreen();
-        if (fullscreenBtn) fullscreenBtn.textContent = '⤡';
-      } else {
-        await document.exitFullscreen();
-        if (fullscreenBtn) fullscreenBtn.textContent = '⤢';
-      }
-    } catch(e) {}
-  }
-
-  // UI event handlers
-  playBtn && playBtn.addEventListener('click', () => startGame());
-  retryBtn && retryBtn.addEventListener('click', () => startGame());
-  submitScoreBtn && submitScoreBtn.addEventListener('click', handleSubmitScore);
-  fullscreenBtn && fullscreenBtn.addEventListener('click', toggleFullscreen);
-
-  // Leaderboard
-  dayLeaderboardBtn && dayLeaderboardBtn.addEventListener('click', async () => {
-    if (dayLeaderboardModal.parentElement !== document.body && playbound) {
-      // keep leaderboard visually inside playbound for consistent styling
-      playbound.appendChild(dayLeaderboardModal);
-    }
-    dayLeaderboardBody.innerHTML = '<tr><td colspan="5">Loading…</td></tr>';
-    dayLeaderboardModal.classList.remove('hidden');
-
-    // load local scores
-    const remote = getLocalScores().slice(0, 100);
-    const rowsHtml = (remote || []).map((r, idx) => {
-      const when = new Date(r.ts).toLocaleString();
-      const within = r.withinEvent ? 'Yes' : 'No';
-      const name = r.playerName || 'Anonymous';
-      return `<tr class="${idx===0?'rank-1':idx===1?'rank-2':idx===2?'rank-3':''}"><td>${idx+1}</td><td>${escapeHtml(name)}</td><td>${r.score}</td><td>${when}</td><td>${within}</td></tr>`;
-    });
-    dayLeaderboardBody.innerHTML = rowsHtml.length ? rowsHtml.join('') : '<tr><td colspan="5">No scores yet</td></tr>';
-  });
-
-  dayLeaderboardClose && dayLeaderboardClose.addEventListener('click', ()=> {
-    dayLeaderboardModal.classList.add('hidden');
-  });
-
-  // Scary toggle
-  if(scaryToggle){
-    scaryToggle.checked = scaryMode;
-    scaryToggle.addEventListener('change', ()=> {
-      scaryMode = scaryToggle.checked;
-      localStorage.setItem('day2Scary', scaryMode ? 'true' : 'false');
-      if(scaryMode && Math.random() < 0.6) playScreamLoud();
-    });
-  }
-
-  function escapeHtml(str=''){
-    return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
-  }
-
-  // Start loop + initializers
-  initBackgroundElements();
-  lastTime = performance.now();
-  animationId = requestAnimationFrame(loop);
-  updateTimers();
-  setInterval(updateTimers, 1000);
-
-  // ensure initial play overlay lives in playbound for consistent modal behavior
-  if (playOverlay && playOverlay.parentElement !== playbound && playbound) {
-    playbound.appendChild(playOverlay);
-  }
-
-  window.addEventListener('beforeunload', () => {
-    if (animationId) cancelAnimationFrame(animationId);
-  });
-})();
+        grad.addColorStop(1, '#
