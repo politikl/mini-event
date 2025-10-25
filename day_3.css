@@ -67,10 +67,12 @@ html, body {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  /* Fit everything including game-note within available space */
+  /* Constrain to viewport */
+  max-width: calc(100vw - 48px);
   max-height: calc(100vh - 86px);
   box-sizing: border-box;
 }
+
 
 /* playbound keeps visible border and remains visible in fullscreen */
 .playbound {
@@ -102,6 +104,7 @@ html, body {
   width: 100%;
   min-height: 0; /* allow flex item to shrink below content size */
 }
+
 .game-note-muted {
   flex-shrink: 0;
   padding: 6px 12px;
@@ -109,6 +112,7 @@ html, body {
   color: #a88860;
   font-size: 0.85rem;
 }
+
 
 /* ensure the canvas stays centered and keeps correct aspect ratio */
 #game-canvas {
