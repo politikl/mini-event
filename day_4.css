@@ -17,6 +17,7 @@ html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  background: radial-gradient(ellipse at top, #11040a 0%, #050405 40%, #000 100%);
 }
 
 /* Top side controls */
@@ -31,6 +32,16 @@ html, body {
 }
 #left-controls { left: 18px; }
 #right-controls { right: 18px; }
+
+.header-btn {
+  background: rgba(0,0,0,0.55);
+  color: var(--accent);
+  border: 2px solid rgba(255,107,53,0.14);
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+}
 
 /* Small box around countdown */
 .header-box {
@@ -168,9 +179,10 @@ html, body {
 /* Background falling elements */
 #background { 
   pointer-events: none; 
-  z-index: -1; 
+  z-index: -10; 
   position: fixed; 
   inset: 0; 
+  overflow: hidden;
 }
 
 .leaf, .bg-pumpkin {
