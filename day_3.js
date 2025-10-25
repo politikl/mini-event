@@ -62,14 +62,19 @@
   let bombInvincibleUntil = 0;
   let flashUntil = 0;
   let animationId = null;
+  // UI: shield indicator shown when bomb invincibility is active
+  let shieldEl = null;
 
   let wave = { type: 'normal', startedAt: 0, duration: 8000, spawnRate: SPAWN_INTERVAL, allowBombs: true, fromSidesProb: 0.25, burstCount: 0 };
 
   function startNewWave(){
     const t = Math.random(), nowTs = Date.now();
-    if (t < 0.18) wave = { type:'fast', startedAt:nowTs, duration:8000+Math.random()*4000, spawnRate:220, allowBombs:true, fromSidesProb:0.35, burstCount:0 };
-    else if (t < 0.36) wave = { type:'shower', startedAt:nowTs, duration:7000+Math.random()*5000, spawnRate:90, allowBombs:false, fromSidesProb:0.18, burstCount:0 };
-    else if (t < 0.6) wave = { type:'burst', startedAt:nowTs, duration:4200, spawnRate:700, allowBombs:false, fromSidesProb:0.6, burstCount:8 + Math.floor(Math.random()*6) };
+    if (t < 0.12) {
+      // special bomb-only wave: lots of bombs, from sides occasionally
+      wave = { type:'bombs', startedAt:nowTs, duration:6000 + Math.random()*4000, spawnRate:320, allowBombs:true, fromSidesProb:0.45, burstCount:0 };
+    } else if (t < 0.30) wave = { type:'fast', startedAt:nowTs, duration:8000+Math.random()*4000, spawnRate:220, allowBombs:true, fromSidesProb:0.35, burstCount:0 };
+    else if (t < 0.48) wave = { type:'shower', startedAt:nowTs, duration:7000+Math.random()*5000, spawnRate:90, allowBombs:false, fromSidesProb:0.18, burstCount:0 };
+    else if (t < 0.72) wave = { type:'burst', startedAt:nowTs, duration:4200, spawnRate:700, allowBombs:false, fromSidesProb:0.6, burstCount:8 + Math.floor(Math.random()*6) };
     else wave = { type:'normal', startedAt:nowTs, duration:10000+Math.random()*8000, spawnRate:720+Math.random()*320, allowBombs:true, fromSidesProb:0.22, burstCount:0 };
     lastSpawn = 0;
   }
@@ -121,6 +126,21 @@
     // set playbound to visually contain the canvas at the chosen size (helps when entering/exiting fullscreen)
     playbound.style.width = `${displayW}px`;
     playbound.style.height = `${displayH}px`;
+    // ensure parent frame reserves space so the canvas never clips under top controls
+    try {
+      const frame = playbound.closest('.halloween-frame');
+      const gameWrap = document.getElementById('game-wrap');
+      if (frame) {
+        frame.style.maxWidth = `${displayW + 40}px`;
+        frame.style.maxHeight = `${displayH + 80}px`;
+        frame.style.boxSizing = 'border-box';
+      }
+      // set padding-top dynamically so top-controls won't overlap the frame
+      if (gameWrap) {
+        const topBarBottom = Math.max(12, Math.round((document.getElementById('left-controls')||{getBoundingClientRect:()=>({bottom:12})}).getBoundingClientRect().bottom || 12));
+        gameWrap.style.paddingTop = `${topBarBottom + 12}px`;
+      }
+    } catch(e){}
 
     // device pixel ratio for crisp canvas backing store
     dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -267,13 +287,19 @@
     if (!running) return;
     const allowBombs = (typeof opts.allowBomb === 'boolean') ? opts.allowBomb : wave.allowBombs;
     let type = null;
-    if (Math.random() < 0.24) {
+    // bias more towards candies normally, but allow bomb-heavy waves to favor bombs
+    const preferBombs = (wave && wave.type === 'bombs');
+    if (preferBombs) {
+      // during bomb wave, almost always spawn bombs
+      type = 'bomb';
+    } else if (Math.random() < 0.24) {
       const c = CANDY_TYPES[Math.floor(Math.random()*CANDY_TYPES.length)];
       type = c.id;
     } else {
       const types = ['pumpkin','pumpkin_small','ghost'];
       type = types[Math.floor(Math.random() * types.length)];
-      if (allowBombs && Math.random() < 0.10) type = 'bomb';
+      // increase baseline bomb chance so more bombs appear
+      if (allowBombs && Math.random() < 0.25) type = 'bomb';
     }
 
     const fromSide = Math.random() < wave.fromSidesProb;
@@ -644,6 +670,10 @@
     }
 
     if(bigScoreEl) bigScoreEl.textContent = `Score: ${score}`;
+    // show/hide shield indicator for bomb invincibility
+    try{
+      if(shieldEl) shieldEl.style.display = (Date.now() < bombInvincibleUntil) ? 'block' : 'none';
+    }catch(e){}
   }
 
   function loop(nowTs){
@@ -707,6 +737,17 @@
     lastTime = performance.now();
     // ensure canvas matches the current layout (handles un/fullscreen transition)
     resizeCanvasToDisplay();
+    // ensure shield indicator exists in playbound
+    try {
+      if (playbound && !shieldEl) {
+        shieldEl = document.createElement('div');
+        shieldEl.id = 'bomb-shield';
+        shieldEl.className = 'shield-icon';
+        shieldEl.setAttribute('aria-hidden','true');
+        shieldEl.style.display = 'none';
+        playbound.appendChild(shieldEl);
+      }
+    } catch(e){}
     // refresh hearts UI immediately so retry after game over shows correct hearts
     renderHearts();
     if(!animationId) animationId = requestAnimationFrame(loop);
