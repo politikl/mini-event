@@ -1,4 +1,4 @@
-// Spooky Crossy Road - Day 2 Game
+// Spooky Crossy Road - Day 2 Game (standalone, local-storage leaderboard fallback)
 (() => {
   // DOM
   const canvas = document.getElementById('game-canvas');
@@ -30,7 +30,7 @@
   const TILE_SIZE = 48;
   const PLAYER_SIZE = 36;
   const ROWS_VISIBLE = Math.ceil(H / TILE_SIZE) + 2;
-  
+
   // State
   let player = null;
   let rows = [];
@@ -43,7 +43,7 @@
   let moveDelay = 0;
   let scaryMode = localStorage.getItem('day2Scary') === 'true';
 
-  // Timer setup
+  // Timer setup (ends Oct 28 of current year, local -07 offset interpreted by Date.parse of ISO)
   const now = new Date();
   const year = now.getFullYear();
   const EVENT_END_ISO = `${year}-10-28T00:00:00-07:00`;
@@ -73,7 +73,7 @@
       return null; 
     } 
   }
-  
+
   function playScreamLoud(){
     const ctx = getAudioCtx(); 
     if(!ctx) return;
@@ -101,7 +101,7 @@
   function createRow(rowIndex) {
     const difficulty = Math.min(1, rowIndex / 100);
     const rand = Math.random();
-    
+
     let type = 'grass';
     if (rowIndex > 0) {
       if (rand < 0.15) type = 'island';
@@ -123,7 +123,7 @@
       const speed = baseSpeed * direction;
       const spacing = 120 + Math.random() * 160;
       const count = Math.ceil(W / spacing) + 2;
-      
+
       for (let i = 0; i < count; i++) {
         const isGhost = Math.random() < 0.4;
         row.obstacles.push({
@@ -139,7 +139,7 @@
       const baseSpeed = 0.8 + difficulty * 1.8;
       const speed = baseSpeed * direction;
       const logCount = 2 + Math.floor(Math.random() * 3);
-      
+
       for (let i = 0; i < logCount; i++) {
         const isBat = Math.random() < 0.3;
         row.obstacles.push({
@@ -167,12 +167,17 @@
     if (!player) return;
     const minRow = Math.min(...rows.map(r => r.index));
     const neededRow = Math.floor(player.y / TILE_SIZE) - ROWS_VISIBLE;
-    
+
     while (minRow > neededRow) {
       rows.push(createRow(minRow - 1));
-      if (rows.length > ROWS_VISIBLE + 5) {
-        rows = rows.filter(r => r.index > Math.floor(player.y / TILE_SIZE) + 3);
+      // keep memory bounded
+      if (rows.length > ROWS_VISIBLE + 12) {
+        rows = rows.filter(r => r.index > Math.floor(player.y / TILE_SIZE) + 6);
       }
+      // recompute
+      const arr = rows.map(r => r.index);
+      if (arr.length) minRow = Math.min(...arr);
+      else break;
     }
   }
 
@@ -192,19 +197,19 @@
 
   function movePlayer(dx, dy) {
     if (!player || !player.alive || moveDelay > 0) return;
-    
+
     const newX = player.x + dx * TILE_SIZE;
     const newY = player.y + dy * TILE_SIZE;
-    
+
     if (newX >= 0 && newX + player.width <= W) {
       player.x = newX;
       player.gridX += dx;
     }
-    
+
     if (dy !== 0) {
       player.y = newY;
       player.gridY -= dy;
-      
+
       if (dy < 0) {
         if (player.gridY > highestRow) {
           const diff = player.gridY - highestRow;
@@ -215,14 +220,14 @@
         }
       }
     }
-    
+
     moveDelay = 150;
   }
 
   // Collision
   function checkCollisions() {
     if (!player || !player.alive) return;
-    
+
     const playerRow = rows.find(r => Math.abs(r.y - player.y) < TILE_SIZE / 2);
     if (!playerRow) return;
 
@@ -249,7 +254,7 @@
           break;
         }
       }
-      
+
       for (const obs of playerRow.obstacles) {
         if (obs.type === 'bat' &&
             player.x < obs.x + obs.width - 8 &&
@@ -259,7 +264,7 @@
           return;
         }
       }
-      
+
       if (!onSomething) {
         killPlayer();
         return;
@@ -275,17 +280,17 @@
     if (!player || !player.alive) return;
     player.alive = false;
     running = false;
-    
+
     finalScoreEl.textContent = score;
     rowsCrossedEl.textContent = rowsPassed;
     submitNote.textContent = (Date.now() <= GAME_END_TS)
       ? 'This score is within the event window and can be submitted to the main leaderboard.'
       : 'Event window ended — score will be recorded in the day leaderboard only.';
-    
+
     setTimeout(() => {
       showModalInPlaybound(gameOverModal);
     }, 100);
-    
+
     if (scaryMode && Math.random() < 0.6) {
       doJumpscare();
     }
@@ -294,7 +299,7 @@
   // Drawing
   function draw() {
     ctx.clearRect(0, 0, W, H);
-    
+
     const bg = ctx.createLinearGradient(0, 0, 0, H);
     bg.addColorStop(0, '#0a0508');
     bg.addColorStop(1, '#150610');
@@ -346,7 +351,7 @@
 
       row.obstacles.forEach(obs => {
         const obsDrawY = drawY + (TILE_SIZE - obs.height) / 2;
-        
+
         if (obs.type === 'car') {
           ctx.fillStyle = '#8b0000';
           ctx.fillRect(obs.x, obsDrawY, obs.width, obs.height);
@@ -402,7 +407,7 @@
       ctx.beginPath();
       ctx.arc(player.x + player.width / 2, playerDrawY + player.height / 2, player.width / 2, 0, Math.PI * 2);
       ctx.fill();
-      
+
       ctx.fillStyle = '#000';
       ctx.beginPath();
       ctx.arc(player.x + player.width * 0.35, playerDrawY + player.height * 0.35, 3, 0, Math.PI * 2);
@@ -410,7 +415,7 @@
       ctx.beginPath();
       ctx.arc(player.x + player.width * 0.65, playerDrawY + player.height * 0.35, 3, 0, Math.PI * 2);
       ctx.fill();
-      
+
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -453,22 +458,21 @@
   function loop(nowTime) {
     const dt = Math.min(32, nowTime - lastTime);
     lastTime = nowTime;
-    
-    initBackgroundElements();
+
     draw();
-    
+
     if (running) {
       update(dt);
       if (bigScoreEl) bigScoreEl.textContent = `Score: ${score}`;
       updateTimers();
     }
-    
+
     animationId = requestAnimationFrame(loop);
   }
 
   function startGame() {
     if (running) return;
-    
+
     initRows();
     player = createPlayer();
     score = 0;
@@ -477,10 +481,10 @@
     moveDelay = 0;
     running = true;
     lastTime = performance.now();
-    
+
     hideModal(gameOverModal);
     hideModal(playOverlay);
-    
+
     if (!animationId) animationId = requestAnimationFrame(loop);
   }
 
@@ -508,7 +512,7 @@
     if (!backgroundRoot) return;
     if (backgroundRoot.dataset.initted) return;
     backgroundRoot.dataset.initted = '1';
-    
+
     for (let i = 0; i < 20; i++) {
       const leaf = document.createElement('div');
       leaf.className = 'leaf';
@@ -517,7 +521,7 @@
       leaf.style.animationDelay = `${Math.random() * 10}s`;
       backgroundRoot.appendChild(leaf);
     }
-    
+
     for (let i = 0; i < 8; i++) {
       const pk = document.createElement('div');
       pk.className = 'bg-pumpkin';
@@ -528,70 +532,36 @@
     }
   }
 
-  // Firebase save
-  async function submitScoreToFirestoreDocs(entry){
-    try{
-      if(!window.firebaseDb || !window.firebaseDoc || !window.firebaseSetDoc) return { ok:false, reason:'no-firebase' };
-      const id = entry.uid ? entry.uid : `${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
-      const docRef = window.firebaseDoc(window.firebaseDb, 'day2_scores', id);
-      if(entry.uid && window.firebaseGetDoc){
-        const existing = await window.firebaseGetDoc(docRef);
-        if(existing && existing.exists && existing.exists()){
-          const data = existing.data();
-          if((data.score||0) < entry.score){
-            await window.firebaseSetDoc(docRef, entry);
-          }
-        } else {
-          await window.firebaseSetDoc(docRef, entry);
-        }
-      } else {
-        await window.firebaseSetDoc(docRef, entry);
-      }
-      // update user totals
-      if(entry.uid && window.firebaseGetDoc && window.firebaseSetDoc){
-        const userDocRef = window.firebaseDoc(window.firebaseDb, 'users', entry.uid);
-        const snap = await window.firebaseGetDoc(userDocRef);
-        let docData = {};
-        if(snap && snap.exists && snap.exists()) docData = snap.data();
-        else docData = { username: entry.playerName, email:'', createdAt:new Date(), scores:{ day1:0,day2:0,day3:0,day4:0,day5:0, total:0 } };
-        docData.scores = docData.scores || {};
-        docData.scores.day2 = Math.max(docData.scores.day2 || 0, entry.score);
-        const s = docData.scores;
-        docData.scores.total = (s.day1||0)+(s.day2||0)+(s.day3||0)+(s.day4||0)+(s.day5||0);
-        await window.firebaseSetDoc(userDocRef, docData);
-      }
-      return { ok:true };
-    } catch(err){
-      console.error('save error', err);
-      return { ok:false, reason: err && err.message || 'unknown' };
+  // --- Local (localStorage) leaderboard fallback ---
+  function getLocalScores() {
+    try {
+      const raw = localStorage.getItem('day2_scores');
+      const arr = raw ? JSON.parse(raw) : [];
+      return arr.sort((a,b) => b.score - a.score);
+    } catch(e) {
+      return [];
     }
   }
 
+  function saveLocalScore(entry) {
+    try {
+      const arr = getLocalScores();
+      arr.push(entry);
+      arr.sort((a,b) => b.score - a.score);
+      localStorage.setItem('day2_scores', JSON.stringify(arr.slice(0,200)));
+      return true;
+    } catch(e) { return false; }
+  }
+
   async function handleSubmitScore(){
-    const fbUser = (window.firebaseAuth && window.firebaseAuth.currentUser) ? window.firebaseAuth.currentUser : null;
-    let uid = fbUser ? fbUser.uid : null;
-    let playerName = (window.userData && window.userData.username) ? window.userData.username : (fbUser && fbUser.email ? fbUser.email.split('@')[0] : 'Anonymous');
-    const entry = { score, playerName, uid, ts: Date.now(), withinEvent: Date.now() <= GAME_END_TS };
+    // local fallback: ask for a player name and save to localStorage
+    const defaultName = (window.userData && window.userData.username) ? window.userData.username : 'Player';
+    const playerName = prompt('Enter name to save score:', defaultName) || 'Anonymous';
+    const entry = { score, playerName, uid: null, ts: Date.now(), withinEvent: Date.now() <= GAME_END_TS };
 
-    if(!uid){
-      if(window.firebaseSignInWithPopup && window.firebaseAuth && window.googleProvider){
-        try{
-          const res = await window.firebaseSignInWithPopup(window.firebaseAuth, window.googleProvider);
-          const user = res.user;
-          uid = user.uid;
-          playerName = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
-          entry.uid = uid; entry.playerName = playerName;
-        } catch(e){
-          showToast('Sign-in failed'); return;
-        }
-      } else {
-        showToast('Sign-in unavailable'); return;
-      }
-    }
-
-    const r = await submitScoreToFirestoreDocs(entry);
-    if(!r.ok){ showToast('Save failed'); return; }
-    showToast('Score saved');
+    const ok = saveLocalScore(entry);
+    if (!ok) { showToast('Save failed'); return; }
+    showToast('Score saved (local)');
 
     setTimeout(() => {
       hideModal(gameOverModal);
@@ -612,7 +582,7 @@
 
   let touchStartX = 0;
   let touchStartY = 0;
-  
+
   canvas.addEventListener('touchstart', e => {
     const t = e.touches[0];
     touchStartX = t.clientX;
@@ -626,7 +596,7 @@
     const dy = t.clientY - touchStartY;
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
-    
+
     if (absDx > 30 || absDy > 30) {
       if (absDx > absDy) {
         movePlayer(dx > 0 ? 1 : -1, 0);
@@ -656,27 +626,22 @@
 
   // Leaderboard
   dayLeaderboardBtn && dayLeaderboardBtn.addEventListener('click', async () => {
-    if (dayLeaderboardModal.parentElement !== document.body) {
-      document.body.appendChild(dayLeaderboardModal);
+    if (dayLeaderboardModal.parentElement !== document.body && playbound) {
+      // keep leaderboard visually inside playbound for consistent styling
+      playbound.appendChild(dayLeaderboardModal);
     }
     dayLeaderboardBody.innerHTML = '<tr><td colspan="5">Loading…</td></tr>';
     dayLeaderboardModal.classList.remove('hidden');
 
-    let remote = [];
-    if (window.firebaseDb && window.firebaseGetDocs && window.firebaseCollection && window.firebaseQuery && window.firebaseOrderBy) {
-      try {
-        const q = window.firebaseQuery(window.firebaseCollection(window.firebaseDb,'day2_scores'), window.firebaseOrderBy('score','desc'));
-        const snap = await window.firebaseGetDocs(q);
-        snap.forEach(d => remote.push(d.data()));
-      } catch (e) { console.warn(e); }
-    }
-    const rows = (remote || []).slice(0,30).map((r,idx) => {
+    // load local scores
+    const remote = getLocalScores().slice(0, 100);
+    const rowsHtml = (remote || []).map((r, idx) => {
       const when = new Date(r.ts).toLocaleString();
       const within = r.withinEvent ? 'Yes' : 'No';
-      const name = r.playerName || (r.uid ? r.uid : 'Anonymous');
+      const name = r.playerName || 'Anonymous';
       return `<tr class="${idx===0?'rank-1':idx===1?'rank-2':idx===2?'rank-3':''}"><td>${idx+1}</td><td>${escapeHtml(name)}</td><td>${r.score}</td><td>${when}</td><td>${within}</td></tr>`;
     });
-    dayLeaderboardBody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="5">No scores yet</td></tr>';
+    dayLeaderboardBody.innerHTML = rowsHtml.length ? rowsHtml.join('') : '<tr><td colspan="5">No scores yet</td></tr>';
   });
 
   dayLeaderboardClose && dayLeaderboardClose.addEventListener('click', ()=> {
@@ -693,16 +658,21 @@
     });
   }
 
-  function escapeHtml(str=''){ 
-    return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); 
+  function escapeHtml(str=''){
+    return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
   }
 
-  // Start loop
+  // Start loop + initializers
+  initBackgroundElements();
   lastTime = performance.now();
   animationId = requestAnimationFrame(loop);
   updateTimers();
   setInterval(updateTimers, 1000);
-  initBackgroundElements();
+
+  // ensure initial play overlay lives in playbound for consistent modal behavior
+  if (playOverlay && playOverlay.parentElement !== playbound && playbound) {
+    playbound.appendChild(playOverlay);
+  }
 
   window.addEventListener('beforeunload', () => {
     if (animationId) cancelAnimationFrame(animationId);
