@@ -1,4 +1,4 @@
-// Spooky Crossy Road - Day 2 Game (fixed: movement, background, enemies, character)
+// Spooky Crossy Road - Day 2 Game (fixed: movement, background, enemies, character, tuning)
 (() => {
   // DOM
   const canvas = document.getElementById('game-canvas');
@@ -124,12 +124,18 @@
     const bias = Math.max(0, Math.min(0.5, rowIndex / 10));
     const rand = Math.random();
 
+    // Make initial small positive rows more interesting (start closer to enemies)
     let type = 'grass';
     if (rowIndex > 0) {
-      if (rand < 0.18 - bias) type = 'island';
-      else if (rand < 0.47 + bias) type = 'road';
-      else if (rand < 0.8) type = 'river';
-      else type = 'grass';
+      if (rowIndex <= 3) {
+        // force some activity near the start so player isn't too far away
+        type = (rowIndex % 2 === 0) ? 'road' : 'river';
+      } else {
+        if (rand < 0.16 - bias) type = 'island';
+        else if (rand < 0.5 + bias) type = 'road';
+        else if (rand < 0.82) type = 'river';
+        else type = 'grass';
+      }
     }
 
     const row = {
@@ -139,49 +145,53 @@
       obstacles: []
     };
 
+    // Reduced enemy frequency: increased spacing, lower count
     if (row.type === 'road') {
       const direction = Math.random() < 0.5 ? 1 : -1;
-      const baseSpeed = 1.6 + difficulty * 2.5;
+      const baseSpeed = 1.0 + difficulty * 1.8; // slower base speed
       const speed = baseSpeed * direction;
-      const spacing = 100 + Math.random() * 120;
-      const count = Math.max(1, Math.ceil(W / spacing) + 2);
+      const spacing = 160 + Math.random() * 120; // larger spacing
+      const count = Math.max(1, Math.ceil(W / spacing)); // fewer enemies
 
       for (let i = 0; i < count; i++) {
-        const isGhost = Math.random() < 0.38;
+        const isGhost = Math.random() < 0.32;
+        // align initial positions to tile grid to reduce "in-between" positions
+        const baseX = Math.round((i * spacing + Math.random() * 40 - 60) / TILE_SIZE) * TILE_SIZE;
         row.obstacles.push({
-          x: i * spacing + Math.random() * 40 - 60,
+          x: baseX,
           speed: speed,
-          width: isGhost ? 40 : 50,
-          height: isGhost ? 40 : 44,
+          width: isGhost ? TILE_SIZE : Math.round(1.0 * TILE_SIZE),
+          height: isGhost ? TILE_SIZE : Math.round(0.9 * TILE_SIZE),
           type: isGhost ? 'ghost' : 'car'
         });
       }
     } else if (row.type === 'river') {
       const direction = Math.random() < 0.5 ? 1 : -1;
-      const baseSpeed = 0.9 + difficulty * 1.8;
+      const baseSpeed = 0.6 + difficulty * 1.2; // slower water speed
       const speed = baseSpeed * direction;
-      const spacing = 140 + Math.random() * 120;
-      const count = Math.max(1, Math.ceil(W / spacing) + 2);
+      const spacing = 180 + Math.random() * 120; // larger spacing (fewer logs)
+      const count = Math.max(1, Math.ceil(W / spacing));
 
       for (let i = 0; i < count; i++) {
-        const isBat = Math.random() < 0.25;
+        const isBat = Math.random() < 0.18;
+        const baseX = Math.round((i * spacing + Math.random() * 40 - 40) / TILE_SIZE) * TILE_SIZE;
         if (isBat) {
           row.obstacles.push({
-            x: i * spacing + Math.random() * 40 - 40,
+            x: baseX,
             speed: speed * 1.4,
-            width: 36,
-            height: 20,
+            width: Math.round(0.75 * TILE_SIZE),
+            height: Math.round(0.45 * TILE_SIZE),
             type: 'bat',
             rideable: false
           });
         } else {
-          // log
-          const lw = 80 + Math.floor(Math.random() * 80);
+          // log (aligned)
+          const lw = Math.round((80 + Math.floor(Math.random() * 80)) / TILE_SIZE) * TILE_SIZE;
           row.obstacles.push({
-            x: i * spacing + Math.random() * 40 - 40,
+            x: baseX,
             speed: speed,
             width: lw,
-            height: 18 + Math.floor(Math.random() * 8),
+            height: Math.round(0.45 * TILE_SIZE),
             type: 'log',
             rideable: true
           });
@@ -197,13 +207,9 @@
     for (let i = -2; i < ROWS_VISIBLE; i++) {
       rows.push(createRow(i));
     }
-    for (let i = 0; i < 3; i++) {
-      const idx = Math.max(0, Math.floor(i + 1));
-      rows[idx] = createRow(idx);
-      if (rows[idx].type === 'grass') {
-        rows[idx].type = (i % 2 === 0) ? 'road' : 'river';
-        rows[idx].obstacles = createRow(idx).obstacles;
-      }
+    // ensure very near rows are immediate challenge (not long empty safe area)
+    for (let i = 1; i <= 3; i++) {
+      rows[i] = createRow(i);
     }
   }
 
@@ -231,40 +237,43 @@
       width: PLAYER_SIZE,
       height: PLAYER_SIZE,
       alive: true,
-      onLog: null
+      onLog: null,
+      // smooth movement fields
+      moving: false,
+      startX: 0,
+      startY: 0,
+      targetX: 0,
+      targetY: 0,
+      moveStart: 0,
+      moveDuration: 140 // ms
     };
   }
 
   // grid move: dx/dy in tiles
   function movePlayer(dx, dy) {
     if (!player || !player.alive) return;
-    if (moveDelay > 0) return;
+    if (moveDelay > 0 || player.moving) return;
 
+    const newGridX = player.gridX + dx;
+    const newGridY = player.gridY - dy;
     const newX = player.x + dx * TILE_SIZE;
     const newY = player.y + dy * TILE_SIZE;
 
-    if (newX >= 0 && newX + player.width <= W) {
-      player.x = newX;
-      player.gridX += dx;
+    // clamp horizontally
+    if (newX >= -player.width && newX + player.width <= W + player.width) {
+      player.startX = player.x;
+      player.startY = player.y;
+      player.targetX = Math.max(0, Math.min(W - player.width, newX));
+      player.targetY = newY;
+      player.moveStart = performance.now();
+      player.moving = true;
+      // update logical grid immediately so generation/collisions reference correct grid row
+      player.gridX = newGridX;
+      player.gridY = newGridY;
+      // only apply scoring when move completes (handled in step)
     }
 
-    if (dy !== 0) {
-      player.y = newY;
-      player.gridY -= dy;
-
-      if (dy < 0) {
-        if (player.gridY > highestRow) {
-          const diff = player.gridY - highestRow;
-          highestRow = player.gridY;
-          rowsPassed += diff;
-          const pointsPerRow = Math.max(1, Math.floor(rowsPassed / 10));
-          score += diff * pointsPerRow;
-          updateScoreUI();
-        }
-      }
-    }
-
-    moveDelay = 140;
+    moveDelay = player.moveDuration;
   }
 
   function updateScoreUI(){
@@ -279,7 +288,9 @@
     let currentRow = null;
     for (const r of rows) {
       const drawY = r.y - camY;
-      if (Math.abs(drawY - player.y) < TILE_SIZE / 1.2) {
+      // Use player's center for row detection to be robust during smooth moves
+      const playerCenterY = player.y + player.height / 2;
+      if (playerCenterY >= drawY && playerCenterY < drawY + TILE_SIZE) {
         currentRow = r;
         break;
       }
@@ -290,9 +301,8 @@
 
     if (currentRow.type === 'road') {
       for (const obs of currentRow.obstacles) {
-        if (player.x < obs.x + obs.width - 10 &&
-            player.x + player.width > obs.x + 10 &&
-            Math.abs(currentRow.y - player.y) < TILE_SIZE / 1.2) {
+        if (player.x < obs.x + obs.width - 8 &&
+            player.x + player.width > obs.x + 8) {
           killPlayer();
           return;
         }
@@ -302,8 +312,7 @@
       for (const obs of currentRow.obstacles) {
         if (obs.rideable &&
             (player.x + player.width / 2) > obs.x &&
-            (player.x + player.width / 2) < (obs.x + obs.width) &&
-            Math.abs(currentRow.y - player.y) < TILE_SIZE / 1.2) {
+            (player.x + player.width / 2) < (obs.x + obs.width)) {
           onSomething = true;
           player.onLog = obs;
           break;
@@ -313,8 +322,7 @@
       for (const obs of currentRow.obstacles) {
         if (obs.type === 'bat' &&
             player.x < obs.x + obs.width - 8 &&
-            player.x + player.width > obs.x + 8 &&
-            Math.abs(currentRow.y - player.y) < TILE_SIZE / 1.2) {
+            player.x + player.width > obs.x + 8) {
           killPlayer();
           return;
         }
@@ -349,6 +357,75 @@
     if (scaryMode && Math.random() < 0.6) {
       doJumpscare();
     }
+  }
+
+  // Drawing helpers for nicer enemies
+  function drawCar(ox, oy, w, h) {
+    ctx.save();
+    ctx.translate(ox, oy);
+    // body
+    ctx.fillStyle = '#b22222';
+    roundRect(ctx, 0, -h/2, w, h, Math.max(4, h/5));
+    ctx.fill();
+    // window
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillRect(w*0.2, -h*0.35, w*0.45, h*0.3);
+    // wheels
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(w*0.2, h*0.25, h*0.18, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(w*0.8, h*0.25, h*0.18, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawGhost(ox, oy, w, h) {
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.fillStyle = 'rgba(220,240,255,0.95)';
+    ctx.beginPath();
+    ctx.ellipse(w/2, 0, w/2, h/2, 0, Math.PI, 2*Math.PI);
+    // lower wavy tail
+    const tails = 3;
+    for (let i=0;i<tails;i++) {
+      const tx = (i+0.5) * (w / tails);
+      ctx.quadraticCurveTo(tx, h*0.6, tx + w/(tails*2), 0);
+    }
+    ctx.closePath();
+    ctx.fill();
+    // eyes
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(w*0.38, -h*0.08, w*0.06, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(w*0.62, -h*0.08, w*0.06, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBat(ox, oy, w, h) {
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.quadraticCurveTo(w*0.25,-h*0.6, w*0.5,0);
+    ctx.quadraticCurveTo(w*0.75,-h*0.6, w,0);
+    ctx.lineTo(w*0.85,h*0.2);
+    ctx.quadraticCurveTo(w*0.5,-h*0.1, w*0.15,h*0.2);
+    ctx.closePath();
+    ctx.fill();
+    // eyes
+    ctx.fillStyle = '#ffeb8a';
+    ctx.beginPath(); ctx.arc(w*0.4, -h*0.05, w*0.05, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(w*0.6, -h*0.05, w*0.05, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    const rr = Math.min(r, Math.min(w, h)/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr, y);
+    ctx.arcTo(x+w, y, x+w, y+h, rr);
+    ctx.arcTo(x+w, y+h, x, y+h, rr);
+    ctx.arcTo(x, y+h, x, y, rr);
+    ctx.arcTo(x, y, x+w, y, rr);
+    ctx.closePath();
   }
 
   // Drawing
@@ -462,18 +539,9 @@
           const ow = obs.width;
           const oh = obs.height;
           if (obs.type === 'ghost') {
-            ctx.fillStyle = 'rgba(200,240,255,0.9)';
-            ctx.beginPath();
-            ctx.ellipse(ox + ow / 2, drawY + TILE_SIZE / 2, ow / 2, oh / 2, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = 'rgba(0,0,0,0.9)';
-            ctx.fillRect(ox + ow * 0.25, drawY + TILE_SIZE / 2 - 6, 6, 6);
-            ctx.fillRect(ox + ow * 0.6, drawY + TILE_SIZE / 2 - 6, 6, 6);
+            drawGhost(ox, drawY + TILE_SIZE / 2, ow, oh);
           } else {
-            ctx.fillStyle = '#8b0000';
-            ctx.fillRect(ox, drawY + (TILE_SIZE - oh) / 2, ow, oh);
-            ctx.fillStyle = '#c04040';
-            ctx.fillRect(ox + 6, drawY + (TILE_SIZE - oh) / 2 + 4, Math.max(8, ow - 12), Math.max(4, oh - 8));
+            drawCar(ox, drawY + TILE_SIZE / 2, ow, oh);
           }
         }
       } else if (row.type === 'river') {
@@ -504,16 +572,7 @@
             ctx.fillStyle = '#7a553e';
             ctx.fillRect(ox + 6, drawY + (TILE_SIZE - oh) / 2 + 4, Math.max(4, ow - 12), Math.max(4, oh - 8));
           } else if (obs.type === 'bat') {
-            ctx.fillStyle = '#222';
-            ctx.beginPath();
-            const bx = ox + ow / 2;
-            const by = drawY + TILE_SIZE / 2;
-            ctx.moveTo(bx, by);
-            ctx.quadraticCurveTo(bx - 14, by - 8, bx - 30, by);
-            ctx.quadraticCurveTo(bx - 14, by - 6, bx, by);
-            ctx.quadraticCurveTo(bx + 14, by - 6, bx + 30, by);
-            ctx.quadraticCurveTo(bx + 14, by - 8, bx, by);
-            ctx.fill();
+            drawBat(ox, drawY + TILE_SIZE / 2, ow, oh);
           }
         }
       }
@@ -527,9 +586,9 @@
       if (!r.obstacles) continue;
       for (const obs of r.obstacles) {
         obs.x += (obs.speed || 0) * dt * 0.06;
-        // loop obstacles
-        if (obs.x > W + 200) obs.x = -obs.width - 40;
-        if (obs.x < -obs.width - 200) obs.x = W + 40;
+        // loop obstacles — keep loop margins small so they re-enter predictably
+        if (obs.x > W + 240) obs.x = -obs.width - 20;
+        if (obs.x < -obs.width - 240) obs.x = W + 20;
       }
     }
   }
@@ -560,6 +619,27 @@
     const dt = Math.min(40, nowTs - lastTime);
     lastTime = nowTs;
     if (moveDelay > 0) moveDelay = Math.max(0, moveDelay - dt);
+
+    // animate smooth player movement if in motion
+    if (player && player.moving) {
+      const t = Math.min(1, (nowTs - player.moveStart) / player.moveDuration);
+      player.x = lerp(player.startX, player.targetX, t);
+      player.y = lerp(player.startY, player.targetY, t);
+      if (t >= 1) {
+        // movement completed — scoring/row progression should apply here
+        player.moving = false;
+        // If moved up, award points
+        if (player.gridY > highestRow) {
+          const diff = player.gridY - highestRow;
+          highestRow = player.gridY;
+          rowsPassed += diff;
+          const pointsPerRow = Math.max(1, Math.floor(rowsPassed / 10));
+          score += diff * pointsPerRow;
+          updateScoreUI();
+        }
+      }
+    }
+
     if (!running) {
       // still draw static frame
       clearLogicalCanvas();
@@ -572,7 +652,7 @@
 
     updateObstacles(dt);
     // if player is on a log, move with it
-    if (player && player.onLog) {
+    if (player && player.onLog && !player.moving) {
       player.x += player.onLog.speed * dt * 0.06;
     }
 
@@ -679,6 +759,9 @@
       localStorage.setItem('day2Scary', scaryMode ? 'true' : 'false');
     });
   }
+
+  // util
+  function lerp(a,b,t){ return a + (b-a)*t; }
 
   // initial draw
   clearLogicalCanvas();
