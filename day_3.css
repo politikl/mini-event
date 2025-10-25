@@ -53,21 +53,23 @@ html, body {
   justify-content: center;
   align-items: flex-start; /* ensure top controls do not overlap the frame */
   height: 100vh;
-  padding: 64px 24px 40px 24px; /* top padding reserves space for top-controls; increased bottom padding so game-note fits */
+  padding: 70px 24px 16px 24px; /* top padding reserves space for top-controls; bottom padding for breathing room */
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .halloween-frame {
   /* keep the canvas aspect ratio and maximize size within viewport minus top controls */
-  width: min( calc( (var(--canvas-w) / var(--canvas-h)) * (100vh - var(--vh-offset)) ), calc(100vw - 36px) );
-  max-width: 95vw;
-  max-height: calc(100vh - var(--vh-offset));
   background: var(--frame-bg);
   padding: 12px;
   box-shadow: 0 12px 40px rgba(0,0,0,0.7);
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 8px;
+  /* Fit everything including game-note within available space */
+  max-height: calc(100vh - 86px);
+  box-sizing: border-box;
 }
 
 /* playbound keeps visible border and remains visible in fullscreen */
@@ -93,6 +95,19 @@ html, body {
   justify-content: center;
   align-items: center;
   background: #000;
+}
+#game-area {
+  flex: 1;
+  display: flex;
+  width: 100%;
+  min-height: 0; /* allow flex item to shrink below content size */
+}
+.game-note-muted {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  text-align: center;
+  color: #a88860;
+  font-size: 0.85rem;
 }
 
 /* ensure the canvas stays centered and keeps correct aspect ratio */
