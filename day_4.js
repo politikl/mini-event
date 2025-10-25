@@ -30,28 +30,23 @@
 
   // Keep canvas drawing scaled to fit displayed playbound (so mouse/touch coordinates and visual match)
   function resizeCanvasToPlaybound() {
-    // compute target pixel size based on playbound display size
     const rect = playbound.getBoundingClientRect();
-    // maintain logical coordinate system but scale to displayed size
     canvas.style.width = rect.width + 'px';
     canvas.style.height = rect.height + 'px';
-    // set internal resolution to logical values (so game math remains stable)
     canvas.width = LOG_W;
     canvas.height = LOG_H;
-    // optionally scale context to match if you want crisp scaling; here we will draw at LOG_W/LOG_H coords
   }
 
   // call resize initially and when window resizes
   resizeCanvasToPlaybound();
   window.addEventListener('resize', () => {
     resizeCanvasToPlaybound();
-    // re-position any background elements to remain within viewport bounds
     repositionBackgroundElements();
   });
 
   // Constants (in logical coords)
-  const W = canvas.width; // LOG_W
-  const H = canvas.height; // LOG_H
+  const W = LOG_W;
+  const H = LOG_H;
   const TILE_SIZE = 48;
   const PLAYER_SIZE = 36;
   const ROWS_VISIBLE = Math.ceil(H / TILE_SIZE) + 2;
@@ -66,7 +61,6 @@
   let lastTime = performance.now();
   let animationId = null;
   let moveDelay = 0; // ms cooldown between grid moves
-  // allow initial setting via localStorage
   let scaryMode = localStorage.getItem('day2Scary') === 'true';
 
   // Timer setup (ends Oct 28 of current year)
@@ -75,7 +69,6 @@
   const EVENT_END_ISO = `${year}-10-28T00:00:00-07:00`;
   const GAME_END_TS = Date.parse(EVENT_END_ISO);
 
-  // Helpers
   function formatTimeRemaining(ms) {
     if (ms <= 0) return '00:00:00';
     const s = Math.floor(ms / 1000);
@@ -90,8 +83,10 @@
     const left = GAME_END_TS - Date.now();
     gameTimerHeader.textContent = left <= 0 ? 'Game Ended' : formatTimeRemaining(left);
   }
+  updateTimers();
+  setInterval(updateTimers, 1000);
 
-  // Audio (unchanged)
+  // Audio
   function getAudioCtx(){ 
     try { 
       return new (window.AudioContext||window.webkitAudioContext)(); 
@@ -123,16 +118,14 @@
     setTimeout(()=> dayJumpscare.classList.add('hidden'), 1300);
   }
 
-  // Row generation (fixed to guarantee some obstacles initially)
+  // Row generation
   function createRow(rowIndex) {
     const difficulty = Math.min(1, Math.max(0, rowIndex / 100));
-    // slightly bias toward obstacles early so the player sees enemies immediately
     const bias = Math.max(0, Math.min(0.5, rowIndex / 10));
     const rand = Math.random();
 
     let type = 'grass';
     if (rowIndex > 0) {
-      // ensure some obstacles in early positive rows
       if (rand < 0.18 - bias) type = 'island';
       else if (rand < 0.47 + bias) type = 'road';
       else if (rand < 0.8) type = 'river';
@@ -148,7 +141,7 @@
 
     if (row.type === 'road') {
       const direction = Math.random() < 0.5 ? 1 : -1;
-      const baseSpeed = 1.6 + difficulty * 2.5; // slightly faster so they are visible
+      const baseSpeed = 1.6 + difficulty * 2.5;
       const speed = baseSpeed * direction;
       const spacing = 100 + Math.random() * 120;
       const count = Math.max(1, Math.ceil(W / spacing) + 2);
@@ -156,7 +149,7 @@
       for (let i = 0; i < count; i++) {
         const isGhost = Math.random() < 0.38;
         row.obstacles.push({
-          x: i * spacing + Math.random() * 40,
+          x: i * spacing + Math.random() * 40 - 60,
           speed: speed,
           width: isGhost ? 40 : 50,
           height: isGhost ? 40 : 44,
@@ -167,18 +160,32 @@
       const direction = Math.random() < 0.5 ? 1 : -1;
       const baseSpeed = 0.9 + difficulty * 1.8;
       const speed = baseSpeed * direction;
-      const logCount = 2 + Math.floor(Math.random() * 3);
+      const spacing = 140 + Math.random() * 120;
+      const count = Math.max(1, Math.ceil(W / spacing) + 2);
 
-      for (let i = 0; i < logCount; i++) {
-        const isBat = Math.random() < 0.28;
-        row.obstacles.push({
-          x: (i / logCount) * W + Math.random() * 60,
-          speed: speed,
-          width: isBat ? 35 : (80 + Math.random() * 70),
-          height: TILE_SIZE - 8,
-          type: isBat ? 'bat' : 'log',
-          rideable: !isBat
-        });
+      for (let i = 0; i < count; i++) {
+        const isBat = Math.random() < 0.25;
+        if (isBat) {
+          row.obstacles.push({
+            x: i * spacing + Math.random() * 40 - 40,
+            speed: speed * 1.4,
+            width: 36,
+            height: 20,
+            type: 'bat',
+            rideable: false
+          });
+        } else {
+          // log
+          const lw = 80 + Math.floor(Math.random() * 80);
+          row.obstacles.push({
+            x: i * spacing + Math.random() * 40 - 40,
+            speed: speed,
+            width: lw,
+            height: 18 + Math.floor(Math.random() * 8),
+            type: 'log',
+            rideable: true
+          });
+        }
       }
     }
 
@@ -187,16 +194,13 @@
 
   function initRows() {
     rows = [];
-    // create some positive rows close to player that are likely to include obstacles
     for (let i = -2; i < ROWS_VISIBLE; i++) {
       rows.push(createRow(i));
     }
-    // guarantee at least a couple of obstacle rows near the player start
     for (let i = 0; i < 3; i++) {
       const idx = Math.max(0, Math.floor(i + 1));
       rows[idx] = createRow(idx);
       if (rows[idx].type === 'grass') {
-        // force one road row in early area
         rows[idx].type = (i % 2 === 0) ? 'road' : 'river';
         rows[idx].obstacles = createRow(idx).obstacles;
       }
@@ -205,16 +209,12 @@
 
   function generateNewRows() {
     if (!player) return;
-    // find current minimum (lowest-index) row we have
     let minRow = Math.min(...rows.map(r => r.index));
     const neededRow = Math.floor(player.y / TILE_SIZE) - ROWS_VISIBLE;
-
-    // if we need older rows (smaller index), add them until covered
     while (minRow > neededRow) {
       const newIdx = minRow - 1;
       rows.push(createRow(newIdx));
       minRow = newIdx;
-      // prune very old rows to keep memory bounded
       if (rows.length > ROWS_VISIBLE + 12) {
         rows = rows.filter(r => r.index > Math.floor(player.y / TILE_SIZE) + 6);
       }
@@ -238,7 +238,6 @@
   // grid move: dx/dy in tiles
   function movePlayer(dx, dy) {
     if (!player || !player.alive) return;
-    // allow movement if cooldown is zero
     if (moveDelay > 0) return;
 
     const newX = player.x + dx * TILE_SIZE;
@@ -260,33 +259,31 @@
           rowsPassed += diff;
           const pointsPerRow = Math.max(1, Math.floor(rowsPassed / 10));
           score += diff * pointsPerRow;
+          updateScoreUI();
         }
       }
     }
 
-    // short cooldown so repeated keys don't over-move
     moveDelay = 140;
+  }
+
+  function updateScoreUI(){
+    if (bigScoreEl) bigScoreEl.textContent = `Score: ${score}`;
   }
 
   // Collision
   function checkCollisions() {
     if (!player || !player.alive) return;
 
-    // find the row the player's center is closest to
-    const playerCenterY = player.y + player.height / 2;
-    const playerRow = rows.find(r => Math.abs(r.y + (H - (player.y + player.height/2)) - player.y) < TILE_SIZE*2) // fallback (old calculation)
-      || rows.find(r => Math.abs(r.y - player.y) < TILE_SIZE / 1.5)
-      || rows[Math.floor(rows.length/2)];
-
-    // More robust: compute nearest by index
-    let nearest = null;
-    let best = Infinity;
+    const camY = player ? player.y - H + TILE_SIZE * 3 : 0;
+    let currentRow = null;
     for (const r of rows) {
-      const dy = Math.abs(r.y - player.y);
-      if (dy < best) { best = dy; nearest = r; }
+      const drawY = r.y - camY;
+      if (Math.abs(drawY - player.y) < TILE_SIZE / 1.2) {
+        currentRow = r;
+        break;
+      }
     }
-
-    const currentRow = nearest;
     if (!currentRow) return;
 
     player.onLog = null;
@@ -356,7 +353,6 @@
 
   // Drawing
   function clearLogicalCanvas() {
-    // clear the logical canvas
     ctx.clearRect(0, 0, LOG_W, LOG_H);
   }
 
@@ -368,7 +364,6 @@
     ctx.fillRect(0, 0, LOG_W, LOG_H);
   }
 
-  // Draw improved pumpkin player (nicer than a plain circle)
   function drawPlayerSprite() {
     if (!player) return;
     const px = player.x;
@@ -378,7 +373,6 @@
     const cx = px + w / 2;
     const cy = py + h / 2;
 
-    // pumpkin body
     const bodyRadius = Math.min(w, h) / 2;
     const grad = ctx.createLinearGradient(cx, cy - bodyRadius, cx, cy + bodyRadius);
     grad.addColorStop(0, '#ffb86b');
@@ -389,7 +383,6 @@
     ctx.ellipse(cx, cy, bodyRadius, bodyRadius * 0.9, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // ribs
     ctx.strokeStyle = 'rgba(120,50,0,0.6)';
     ctx.lineWidth = 2;
     for (let i = -2; i <= 2; i++) {
@@ -399,15 +392,12 @@
       ctx.stroke();
     }
 
-    // stem
     ctx.fillStyle = '#3a2a0d';
     ctx.beginPath();
     ctx.ellipse(cx, cy - bodyRadius * 0.95, bodyRadius * 0.18, bodyRadius * 0.28, -0.4, 0, Math.PI * 2);
     ctx.fill();
 
-    // face (eyes + mouth)
     ctx.fillStyle = '#000';
-    // eyes
     ctx.beginPath();
     ctx.moveTo(cx - bodyRadius * 0.35, cy - bodyRadius * 0.1);
     ctx.lineTo(cx - bodyRadius * 0.15, cy - bodyRadius * 0.25);
@@ -422,7 +412,6 @@
     ctx.closePath();
     ctx.fill();
 
-    // mouth
     ctx.beginPath();
     ctx.moveTo(cx - bodyRadius * 0.35, cy + bodyRadius * 0.35);
     ctx.quadraticCurveTo(cx, cy + bodyRadius * 0.6, cx + bodyRadius * 0.35, cy + bodyRadius * 0.35);
@@ -467,7 +456,234 @@
         ctx.lineTo(W, drawY + TILE_SIZE / 2);
         ctx.stroke();
         ctx.setLineDash([]);
+
+        for (const obs of row.obstacles) {
+          const ox = obs.x;
+          const ow = obs.width;
+          const oh = obs.height;
+          if (obs.type === 'ghost') {
+            ctx.fillStyle = 'rgba(200,240,255,0.9)';
+            ctx.beginPath();
+            ctx.ellipse(ox + ow / 2, drawY + TILE_SIZE / 2, ow / 2, oh / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(0,0,0,0.9)';
+            ctx.fillRect(ox + ow * 0.25, drawY + TILE_SIZE / 2 - 6, 6, 6);
+            ctx.fillRect(ox + ow * 0.6, drawY + TILE_SIZE / 2 - 6, 6, 6);
+          } else {
+            ctx.fillStyle = '#8b0000';
+            ctx.fillRect(ox, drawY + (TILE_SIZE - oh) / 2, ow, oh);
+            ctx.fillStyle = '#c04040';
+            ctx.fillRect(ox + 6, drawY + (TILE_SIZE - oh) / 2 + 4, Math.max(8, ow - 12), Math.max(4, oh - 8));
+          }
+        }
       } else if (row.type === 'river') {
         const grad = ctx.createLinearGradient(0, drawY, 0, drawY + TILE_SIZE);
         grad.addColorStop(0, '#1a3a4a');
-        grad.addColorStop(1, '#
+        grad.addColorStop(1, '#0f2430');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, drawY, W, TILE_SIZE);
+
+        ctx.fillStyle = 'rgba(255,255,255,0.03)';
+        for (let x = 0; x < W; x += 24) {
+          ctx.beginPath();
+          ctx.ellipse(
+            x + (Math.sin((Date.now() + x) / 800) * 6),
+            drawY + TILE_SIZE / 2 + (Math.cos((Date.now() + x) / 700) * 3),
+            8, 2, 0, 0, Math.PI * 2
+          );
+          ctx.fill();
+        }
+
+        for (const obs of row.obstacles) {
+          const ox = obs.x;
+          const ow = obs.width;
+          const oh = obs.height;
+          if (obs.type === 'log') {
+            ctx.fillStyle = '#5b3e2b';
+            ctx.fillRect(ox, drawY + (TILE_SIZE - oh) / 2, ow, oh);
+            ctx.fillStyle = '#7a553e';
+            ctx.fillRect(ox + 6, drawY + (TILE_SIZE - oh) / 2 + 4, Math.max(4, ow - 12), Math.max(4, oh - 8));
+          } else if (obs.type === 'bat') {
+            ctx.fillStyle = '#222';
+            ctx.beginPath();
+            const bx = ox + ow / 2;
+            const by = drawY + TILE_SIZE / 2;
+            ctx.moveTo(bx, by);
+            ctx.quadraticCurveTo(bx - 14, by - 8, bx - 30, by);
+            ctx.quadraticCurveTo(bx - 14, by - 6, bx, by);
+            ctx.quadraticCurveTo(bx + 14, by - 6, bx + 30, by);
+            ctx.quadraticCurveTo(bx + 14, by - 8, bx, by);
+            ctx.fill();
+          }
+        }
+      }
+    });
+
+    drawPlayerSprite();
+  }
+
+  function updateObstacles(dt) {
+    for (const r of rows) {
+      if (!r.obstacles) continue;
+      for (const obs of r.obstacles) {
+        obs.x += (obs.speed || 0) * dt * 0.06;
+        // loop obstacles
+        if (obs.x > W + 200) obs.x = -obs.width - 40;
+        if (obs.x < -obs.width - 200) obs.x = W + 40;
+      }
+    }
+  }
+
+  // Simple background element reposition (keeps falling leaves inside viewport)
+  function repositionBackgroundElements() {
+    // no-op placeholder, keep for compatibility with resize handler
+  }
+
+  // Modal helpers — move into playbound for correct style scope while visible
+  function showModalInPlaybound(modal) {
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    if (modal.parentElement !== playbound) {
+      playbound.appendChild(modal);
+    }
+  }
+  function hideModal(modal) {
+    if (!modal) return;
+    modal.classList.add('hidden');
+    if (modal.parentElement === playbound) {
+      document.body.appendChild(modal);
+    }
+  }
+
+  // Game loop
+  function step(nowTs) {
+    const dt = Math.min(40, nowTs - lastTime);
+    lastTime = nowTs;
+    if (moveDelay > 0) moveDelay = Math.max(0, moveDelay - dt);
+    if (!running) {
+      // still draw static frame
+      clearLogicalCanvas();
+      drawBackgroundGradient();
+      drawRowsAndObstacles();
+      updateScoreUI();
+      animationId = requestAnimationFrame(step);
+      return;
+    }
+
+    updateObstacles(dt);
+    // if player is on a log, move with it
+    if (player && player.onLog) {
+      player.x += player.onLog.speed * dt * 0.06;
+    }
+
+    checkCollisions();
+    clearLogicalCanvas();
+    drawBackgroundGradient();
+    drawRowsAndObstacles();
+    updateScoreUI();
+
+    generateNewRows();
+
+    animationId = requestAnimationFrame(step);
+  }
+
+  function startGame() {
+    // reset state
+    player = createPlayer();
+    score = 0;
+    rowsPassed = 0;
+    highestRow = 0;
+    running = true;
+    moveDelay = 0;
+    initRows();
+    lastTime = performance.now();
+    if (animationId) cancelAnimationFrame(animationId);
+    animationId = requestAnimationFrame(step);
+    updateScoreUI();
+  }
+
+  function stopGame() {
+    running = false;
+    if (animationId) cancelAnimationFrame(animationId);
+    animationId = null;
+  }
+
+  // Input
+  window.addEventListener('keydown', (e) => {
+    if (!player || !player.alive) return;
+    const k = e.key.toLowerCase();
+    if (k === 'arrowleft' || k === 'a') movePlayer(-1, 0);
+    if (k === 'arrowright' || k === 'd') movePlayer(1, 0);
+    if (k === 'arrowup' || k === 'w') movePlayer(0, -1);
+    if (k === 'arrowdown' || k === 's') movePlayer(0, 1);
+  });
+
+  // UI handlers
+  if (playBtn) {
+    playBtn.addEventListener('click', () => {
+      hideModal(playOverlay);
+      startGame();
+    });
+  }
+
+  if (fullscreenBtn) {
+    fullscreenBtn.addEventListener('click', async () => {
+      try {
+        if (!document.fullscreenElement) {
+          await playbound.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (e) {
+        // ignore
+      }
+    });
+  }
+
+  if (dayLeaderboardBtn) {
+    dayLeaderboardBtn.addEventListener('click', () => {
+      showModalInPlaybound(dayLeaderboardModal);
+    });
+  }
+
+  if (dayLeaderboardClose) {
+    dayLeaderboardClose.addEventListener('click', () => {
+      hideModal(dayLeaderboardModal);
+    });
+  }
+
+  if (submitScoreBtn) {
+    submitScoreBtn.addEventListener('click', () => {
+      // stub: implement server submit later
+      submitScoreBtn.disabled = true;
+      submitScoreBtn.textContent = 'Saving...';
+      setTimeout(() => {
+        submitScoreBtn.textContent = 'Saved';
+        submitScoreBtn.disabled = false;
+        hideModal(gameOverModal);
+      }, 700);
+    });
+  }
+
+  if (retryBtn) {
+    retryBtn.addEventListener('click', () => {
+      hideModal(gameOverModal);
+      startGame();
+    });
+  }
+
+  if (scaryToggle) {
+    scaryToggle.checked = scaryMode;
+    scaryToggle.addEventListener('change', () => {
+      scaryMode = !!scaryToggle.checked;
+      localStorage.setItem('day2Scary', scaryMode ? 'true' : 'false');
+    });
+  }
+
+  // initial draw
+  clearLogicalCanvas();
+  drawBackgroundGradient();
+  initRows();
+  drawRowsAndObstacles();
+  updateScoreUI();
+})();
