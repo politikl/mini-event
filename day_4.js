@@ -173,29 +173,18 @@
       const count = Math.max(1, Math.ceil(W / spacing));
 
       for (let i = 0; i < count; i++) {
-        const isBat = Math.random() < 0.18;
+        // remove airborne/bat hazards from rivers so rivers are only rideable (logs)
         const baseX = Math.round((i * spacing + Math.random() * 40 - 40) / TILE_SIZE) * TILE_SIZE;
-        if (isBat) {
-          row.obstacles.push({
-            x: baseX,
-            speed: speed * 1.4,
-            width: Math.round(0.75 * TILE_SIZE),
-            height: Math.round(0.45 * TILE_SIZE),
-            type: 'bat',
-            rideable: false
-          });
-        } else {
-          // log (aligned)
-          const lw = Math.round((80 + Math.floor(Math.random() * 80)) / TILE_SIZE) * TILE_SIZE;
-          row.obstacles.push({
-            x: baseX,
-            speed: speed,
-            width: lw,
-            height: Math.round(0.45 * TILE_SIZE),
-            type: 'log',
-            rideable: true
-          });
-        }
+        // log (aligned)
+        const lw = Math.round((80 + Math.floor(Math.random() * 80)) / TILE_SIZE) * TILE_SIZE;
+        row.obstacles.push({
+          x: baseX,
+          speed: speed,
+          width: lw,
+          height: Math.round(0.45 * TILE_SIZE),
+          type: 'log',
+          rideable: true
+        });
       }
     }
 
@@ -204,19 +193,24 @@
 
   function initRows() {
     rows = [];
-    for (let i = -2; i < ROWS_VISIBLE; i++) {
+    // create a short band of rows around the start so enemies are not far away
+    const startSpanBefore = 2;
+    const startSpanAfter = ROWS_VISIBLE;
+    for (let i = -startSpanBefore; i < startSpanAfter; i++) {
       rows.push(createRow(i));
     }
-    // ensure very near rows are immediate challenge (not long empty safe area)
+
+    // ensure the rows just ahead are active (close challenge)
     for (let i = 1; i <= 3; i++) {
       rows[i] = createRow(i);
     }
 
-    // Start the player on an island tile (row 0) so the visual looks like an island
-    // right before the enemies, and remove the deep green "grass" start feeling.
+    // Start the player visually on an island tile (row 0) so the visual looks like
+    // an island right before the enemies. Keep that island decorative and don't
+    // place the pumpkin on the starting island.
     rows[0] = createRow(0);
     rows[0].type = 'island';
-    rows[0].obstacles = []; // keep it clear / decorative
+    rows[0].obstacles = []; // decorative only
   }
 
   function generateNewRows() {
@@ -282,6 +276,9 @@
     player.targetY = targetY;
     player.moveStart = performance.now();
     player.moving = true;
+
+    // clear ride state immediately when the player initiates a move
+    player.onLog = null;
 
     // update logical grid immediately (so generation/collisions use correct row)
     player.gridX = clampedGridX;
