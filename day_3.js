@@ -6,6 +6,13 @@
    - fullscreen resizes canvas to occupy almost the full screen
    - candies leave stains in their own color
    - background init preserved (copied from day_1)
+
+   Modified resizeCanvasToDisplay() to ensure the entire .halloween-frame (playbound + game-note)
+   fits into the viewport below the top-controls by:
+   - reading the CSS --vh-offset and reserving that much vertical space
+   - computing the canvas display size in CSS pixels (logical -> CSS px)
+   - computing playbound outer size using its computed border+padding so the outer box does not overflow
+   - clamping the frame maxWidth/maxHeight to the visible viewport
 */
 (() => {
   const canvas = document.getElementById('game-canvas');
@@ -112,27 +119,54 @@
       topBarBottom = 64;
     }
 
+    // read CSS var for reserved vertical space (fallback to 112)
+    let vhOffset = 112;
+    try {
+      const v = getComputedStyle(document.documentElement).getPropertyValue('--vh-offset');
+      if (v) vhOffset = parseInt(v.trim().replace('px','')) || vhOffset;
+    } catch(e){}
+
     // compute available width/height inside the window while keeping a small page margin
     const availW = Math.max(120, window.innerWidth - 36);
-    const availH = Math.max(120, window.innerHeight - Math.round(topBarBottom) - 12);
+    // We use window.innerHeight minus the reserved vhOffset (which includes top controls + desired bottom gap).
+    // That ensures the whole frame (playbound + game-note + padding) fits.
+    const maxFrameH = Math.max(120, window.innerHeight - vhOffset);
 
-    // choose the largest scale that fits LOGICAL into availW x availH
-    const scaleCss = Math.min(availW / LOGICAL_W, availH / LOGICAL_H);
+    // choose the largest scale that fits LOGICAL into availW x maxFrameH
+    const scaleCss = Math.min(availW / LOGICAL_W, maxFrameH / LOGICAL_H);
 
-    // compute final display size in CSS pixels (rounded to avoid blurriness)
-    const displayW = Math.max(64, Math.round(LOGICAL_W * scaleCss));
-    const displayH = Math.max(64, Math.round(LOGICAL_H * scaleCss));
+    // compute final display size in CSS pixels for the canvas (rounded to avoid blurriness)
+    const canvasCssW = Math.max(64, Math.round(LOGICAL_W * scaleCss));
+    const canvasCssH = Math.max(64, Math.round(LOGICAL_H * scaleCss));
 
-    // set playbound to visually contain the canvas at the chosen size (helps when entering/exiting fullscreen)
-    playbound.style.width = `${displayW}px`;
-    playbound.style.height = `${displayH}px`;
+    // compute playbound outer size by adding its computed border/padding so outer box will fit properly
+    let pbStyle = window.getComputedStyle(playbound);
+    const borderHoriz = (parseFloat(pbStyle.borderLeftWidth) || 0) + (parseFloat(pbStyle.borderRightWidth) || 0);
+    const borderVert = (parseFloat(pbStyle.borderTopWidth) || 0) + (parseFloat(pbStyle.borderBottomWidth) || 0);
+    const padHoriz = (parseFloat(pbStyle.paddingLeft) || 0) + (parseFloat(pbStyle.paddingRight) || 0);
+    const padVert = (parseFloat(pbStyle.paddingTop) || 0) + (parseFloat(pbStyle.paddingBottom) || 0);
+
+    const playboundOuterW = canvasCssW + borderHoriz + padHoriz;
+    const playboundOuterH = canvasCssH + borderVert + padVert;
+
+    // apply the CSS size to the canvas (CSS pixels)
+    canvas.style.width = `${canvasCssW}px`;
+    canvas.style.height = `${canvasCssH}px`;
+
+    // set playbound outer size so it encloses the canvas exactly
+    playbound.style.width = `${playboundOuterW}px`;
+    playbound.style.height = `${playboundOuterH}px`;
+
     // ensure parent frame reserves space so the canvas never clips under top controls
     try {
       const frame = playbound.closest('.halloween-frame');
       const gameWrap = document.getElementById('game-wrap');
       if (frame) {
-        frame.style.maxWidth = `${displayW + 40}px`;
-        frame.style.maxHeight = `${displayH + 80}px`;
+        // constrain frame max sizes to viewport minus a small margin
+        const maxWidthClamp = Math.max(120, window.innerWidth - 48);
+        const maxHeightClamp = Math.max(120, window.innerHeight - 24);
+        frame.style.maxWidth = `${Math.min(maxWidthClamp, playboundOuterW + 40)}px`;
+        frame.style.maxHeight = `${Math.min(maxHeightClamp, playboundOuterH + 100)}px`;
         frame.style.boxSizing = 'border-box';
       }
       // set padding-top dynamically so top-controls won't overlap the frame
@@ -144,13 +178,9 @@
 
     // device pixel ratio for crisp canvas backing store
     dpr = Math.max(1, window.devicePixelRatio || 1);
-    // backing store size in device pixels
-    canvas.width = Math.max(1, Math.round(displayW * dpr));
-    canvas.height = Math.max(1, Math.round(displayH * dpr));
-
-    // set CSS size on canvas to match playbound area exactly
-    canvas.style.width = `${displayW}px`;
-    canvas.style.height = `${displayH}px`;
+    // backing store size in device pixels (match the canvas CSS size)
+    canvas.width = Math.max(1, Math.round(canvasCssW * dpr));
+    canvas.height = Math.max(1, Math.round(canvasCssH * dpr));
 
     // set transform so drawing commands operate in logical (LOGICAL_W x LOGICAL_H) coordinates
     const deviceScale = canvas.width / LOGICAL_W; // should equal canvas.height / LOGICAL_H
@@ -391,7 +421,7 @@
   function endGame(){
     running = false;
     if(finalScoreEl) finalScoreEl.textContent = score;
-    if(submitNote) submitNote.textContent = (Date.now() <= GAME_END_TS) ? 'This score is within the event window and can be submitted to the main leaderboard.' : 'Event window ended — score will be recorded in the day leaderboard only.';
+    if(submitNote) submitNote.textContent = (Date.now() <= GAME_END_TS) ? 'This score is within the event window and can be submitted to the main leaderboard.' : 'Event window ended — score will be [...]
     if(gameOverContent && playbound){
       if(gameOverContent.parentElement !== playbound) playbound.appendChild(gameOverContent);
       gameOverContent.style.position = 'absolute';
@@ -559,14 +589,14 @@
           case 'circle': ctx.fillStyle = c; ctx.beginPath(); ctx.arc(0,0,o.r,0,Math.PI*2); ctx.fill(); break;
           case 'twist': ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(0,0,o.r*1.1,o.r*0.65, Math.PI/6,0,Math.PI*2); ctx.fill(); break;
           case 'square': ctx.fillStyle = c; ctx.fillRect(-o.r,-o.r,o.r*2,o.r*2); break;
-          case 'star': { ctx.fillStyle = c; ctx.beginPath(); for(let i=0;i<5;i++){ ctx.lineTo(Math.cos((18+72*i)/180*Math.PI)*o.r, -Math.sin((18+72*i)/180*Math.PI)*o.r); ctx.lineTo(Math.cos((54+72*i)/180*Math.PI)*(o.r*0.5), -Math.sin((54+72*i)/180*Math.PI)*(o.r*0.5)); } ctx.closePath(); ctx.fill(); } break;
+          case 'star': { ctx.fillStyle = c; ctx.beginPath(); for(let i=0;i<5;i++){ ctx.lineTo(Math.cos((18+72*i)/180*Math.PI)*o.r, -Math.sin((18+72*i)/180*Math.PI)*o.r); ctx.lineTo(Math.cos((54+72*i)/180*Math.PI)*o.r*0.45, -Math.sin((54+72*i)/180*Math.PI)*o.r*0.45); } ctx.fill(); break; }
           case 'bite': ctx.fillStyle = c; ctx.beginPath(); ctx.arc(0,0,o.r,Math.PI*0.1,Math.PI*1.9); ctx.fill(); break;
           case 'stick': ctx.fillStyle = c; ctx.fillRect(-o.r*0.5, -o.r*2, o.r, o.r*4); break;
           case 'gummy': ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(0,0,o.r*0.9,o.r*0.7,0,0,Math.PI*2); ctx.fill(); break;
           case 'choco': ctx.fillStyle = c; ctx.beginPath(); ctx.arc(0,0,o.r,0,Math.PI*2); ctx.fill(); break;
           case 'ring': ctx.fillStyle = c; ctx.beginPath(); ctx.arc(0,0,o.r,0,Math.PI*2); ctx.fill(); ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(0,0,o.r*0.45,0,Math.PI*2); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; break;
-          case 'spike': { ctx.fillStyle = c; ctx.beginPath(); for(let i=0;i<6;i++){ const a=(i/6)*Math.PI*2; ctx.lineTo(Math.cos(a)*o.r, Math.sin(a)*o.r); ctx.lineTo(Math.cos(a+Math.PI/6)*(o.r*0.4), Math.sin(a+Math.PI/6)*(o.r*0.4)); } ctx.closePath(); ctx.fill(); } break;
-          case 'hex': { ctx.fillStyle = c; ctx.beginPath(); for(let i=0;i<6;i++){ const a=(i/6)*Math.PI*2; const px=Math.cos(a)*o.r, py=Math.sin(a)*o.r; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); } ctx.closePath(); ctx.fill(); } break;
+          case 'spike': { ctx.fillStyle = c; ctx.beginPath(); for(let i=0;i<6;i++){ const a=(i/6)*Math.PI*2; ctx.lineTo(Math.cos(a)*o.r, Math.sin(a)*o.r); ctx.lineTo(Math.cos(a+Math.PI/6)*(o.r*0.4), Math.sin(a+Math.PI/6)*(o.r*0.4)); } ctx.fill(); break; }
+          case 'hex': { ctx.fillStyle = c; ctx.beginPath(); for(let i=0;i<6;i++){ const a=(i/6)*Math.PI*2; const px=Math.cos(a)*o.r, py=Math.sin(a)*o.r; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); } ctx.closePath(); ctx.fill(); break; }
           default: ctx.fillStyle = c; ctx.beginPath(); ctx.arc(0,0,o.r,0,Math.PI*2); ctx.fill();
         }
         ctx.restore();
@@ -909,4 +939,3 @@
   setTimeout(init, 16);
 
 })();
-
