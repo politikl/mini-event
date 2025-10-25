@@ -50,6 +50,8 @@
   const TILE_SIZE = 48;
   const PLAYER_SIZE = 36;
   const ROWS_VISIBLE = Math.ceil(H / TILE_SIZE) + 2;
+  // how many tile rows the camera leaves above the player (look-ahead)
+  const CAMERA_LOOKAHEAD_ROWS = 3;
 
   // State
   let player = null;
@@ -236,10 +238,17 @@
     return -gridY * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
   }
 
+  // Camera helper to keep player near bottom and allow looking ahead
+  function getCamY() {
+    if (!player) return 0;
+    // keep player visually near bottom of view and leave CAMERA_LOOKAHEAD_ROWS above
+    return player.y - (H - TILE_SIZE * CAMERA_LOOKAHEAD_ROWS);
+  }
+
   // Player
   function createPlayer() {
-    const startGridX = Math.floor(W / 2 / TILE_SIZE);
-    const startGridY = 0;
+    const startGridX = Math.floor((W / TILE_SIZE) / 2);
+    const startGridY = 0; // spawn on the row before enemies (row 0)
     // align player's x to center of the grid cell (so player snaps to tile columns)
     const alignedX = startGridX * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
     // set player's world y from gridY so player is centered inside tile vertically
@@ -264,14 +273,14 @@
     };
   }
 
-  // grid move: dx/dy in tiles
+  // grid move: dx/dy in tiles. dy positive = up one row, negative = down one row.
   function movePlayer(dx, dy) {
     if (!player || !player.alive) return;
     // prevent rapid repeats and don't start a new grid move while moving
     if (moveDelay > 0 || player.moving) return;
 
     const newGridX = player.gridX + dx;
-    const newGridY = player.gridY - dy;
+    const newGridY = player.gridY + dy;
 
     // clamp to grid bounds (based on tile columns)
     const maxGridX = Math.floor((W - PLAYER_SIZE) / TILE_SIZE);
@@ -307,7 +316,7 @@
   function checkCollisions() {
     if (!player || !player.alive) return;
 
-    const camY = player ? player.y - H + TILE_SIZE * 3 : 0;
+    const camY = getCamY();
     let currentRow = null;
     for (const r of rows) {
       const drawY = r.y - camY;
@@ -522,7 +531,7 @@
   }
 
   function drawRowsAndObstacles() {
-    const camY = player ? player.y - H + TILE_SIZE * 3 : 0;
+    const camY = getCamY();
     rows.forEach(row => {
       const drawY = row.y - camY;
       if (drawY < -TILE_SIZE || drawY > H + TILE_SIZE) return;
@@ -733,10 +742,12 @@
     // ignore auto-repeats — treat each key press as a single move
     if (e.repeat) return;
     const k = e.key.toLowerCase();
+    // left/right unchanged (dx: -1 / +1)
     if (k === 'arrowleft' || k === 'a' || k === 'j') { e.preventDefault(); movePlayer(-1, 0); }
     if (k === 'arrowright' || k === 'd' || k === 'l') { e.preventDefault(); movePlayer(1, 0); }
-    if (k === 'arrowup' || k === 'w' || k === 'i') { e.preventDefault(); movePlayer(0, -1); }
-    if (k === 'arrowdown' || k === 's' || k === 'k') { e.preventDefault(); movePlayer(0, 1); }
+    // vertical: dy positive = move up one row, dy negative = move down one row
+    if (k === 'arrowup' || k === 'w' || k === 'i') { e.preventDefault(); movePlayer(0, 1); }
+    if (k === 'arrowdown' || k === 's' || k === 'k') { e.preventDefault(); movePlayer(0, -1); }
   });
 
   // UI handlers
