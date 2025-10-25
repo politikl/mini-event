@@ -216,15 +216,24 @@
   function generateNewRows() {
     if (!player) return;
     let minRow = Math.min(...rows.map(r => r.index));
-    const neededRow = Math.floor(player.y / TILE_SIZE) - ROWS_VISIBLE;
+    // use player's gridY directly so generation is stable and not tied to world y precision
+    const neededRow = player.gridY - ROWS_VISIBLE;
     while (minRow > neededRow) {
       const newIdx = minRow - 1;
       rows.push(createRow(newIdx));
       minRow = newIdx;
       if (rows.length > ROWS_VISIBLE + 12) {
-        rows = rows.filter(r => r.index > Math.floor(player.y / TILE_SIZE) + 6);
+        // trim based on gridY rather than player.y to avoid "black screen" with wrong row math
+        rows = rows.filter(r => r.index > player.gridY + 6);
       }
     }
+  }
+
+  // util mapping between grid row index and world Y so player is centered inside tiles
+  function gridYToWorldY(gridY) {
+    // place player's world y so their center aligns with row center when drawn
+    // formula derived so player stays visually inside the tile (not on corners)
+    return -gridY * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
   }
 
   // Player
@@ -233,7 +242,8 @@
     const startGridY = 0;
     // align player's x to center of the grid cell (so player snaps to tile columns)
     const alignedX = startGridX * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
-    const alignedY = H - TILE_SIZE - 10; // keep visual offset at bottom like before
+    // set player's world y from gridY so player is centered inside tile vertically
+    const alignedY = gridYToWorldY(startGridY);
     return {
       x: alignedX,
       y: alignedY,
@@ -266,9 +276,10 @@
     // clamp to grid bounds (based on tile columns)
     const maxGridX = Math.floor((W - PLAYER_SIZE) / TILE_SIZE);
     const clampedGridX = Math.max(0, Math.min(maxGridX, newGridX));
+    // don't clamp gridY; allow negative rows behind the player, but you can limit if desired
 
     const targetX = clampedGridX * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
-    const targetY = player.y + dy * TILE_SIZE;
+    const targetY = gridYToWorldY(newGridY);
 
     player.startX = player.x;
     player.startY = player.y;
