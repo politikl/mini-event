@@ -67,9 +67,9 @@ html, body {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  /* Constrain to viewport */
+  /* Constrain to viewport: use the CSS variable so JS and CSS align */
   max-width: calc(100vw - 48px);
-  max-height: calc(100vh - 86px);
+  max-height: calc(100vh - var(--vh-offset));
   box-sizing: border-box;
 }
 
@@ -87,6 +87,7 @@ html, body {
   display: flex;
   justify-content: center;
   align-items: center;
+  box-sizing: content-box; /* we compute outer size in JS using computed border/padding */
 }
 
 /* fullscreen: maintain aspect and scale by height to avoid squish */
@@ -321,4 +322,3 @@ html, body {
   10% { opacity: 1; }
   100% { transform: translateY(120vh) rotate(360deg); opacity: 0.9; }
 }
-
