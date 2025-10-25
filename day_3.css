@@ -61,10 +61,8 @@ html, body {
   max-width: 95vw;
   max-height: calc(100vh - 96px);
   background: var(--frame-bg);
-  border-radius: 12px;
   padding: 12px;
   box-shadow: 0 12px 40px rgba(0,0,0,0.7);
-  border: 6px solid rgba(255,107,53,0.12);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -166,19 +164,32 @@ html, body {
 }
 
 /* make leaderboard full page when opened */
-#day-leaderboard-modal {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 600;
+#day-leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #e7b37a;
+  backdrop-filter: blur(2px);
 }
-#day-leaderboard-modal .modal-content {
-  width: min(1000px, 94vw);
-  max-height: 90vh;
-  overflow: auto;
+#day-leaderboard-table th, #day-leaderboard-table td {
+  padding: 12px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,107,53,0.06);
+  font-size: 0.95rem;
 }
+#day-leaderboard-table th {
+  background: linear-gradient(90deg, rgba(50,20,15,0.6), rgba(40,10,10,0.55));
+  font-weight: 700;
+  color: #ffd8a8;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+/* top ranks */
+#day-leaderboard-table .rank-1 { background: linear-gradient(90deg, rgba(60,40,8,0.7), rgba(40,20,6,0.6)); color:#ffdca8; font-weight:800; }
+#day-leaderboard-table .rank-2 { background: linear-gradient(90deg, rgba(40,40,40,0.55), rgba(30,30,30,0.5)); color:#f0e0c8; font-weight:700; }
+#day-leaderboard-table .rank-3 { background: linear-gradient(90deg, rgba(60,36,24,0.55), rgba(40,26,16,0.5)); color:#f3d7b0; font-weight:700; }
+
 
 /* badges for powerups (on-screen icons) */
 .powerup-icon {
@@ -188,6 +199,27 @@ html, body {
   box-shadow: 0 4px 12px rgba(0,0,0,0.5);
   display: block;
 }
+
+/* shield indicator for bomb-invincible state */
+.shield-icon {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  width: 28px;
+  height: 28px;
+  z-index: 260;
+  pointer-events: none;
+  display: none; /* toggled via JS */
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: linear-gradient(180deg,#ffffff11,#ffffff06);
+  border: 2px solid rgba(127,191,255,0.12);
+  color: #7fbfff;
+  font-weight: 700;
+  font-family: monospace;
+}
+.shield-icon::after { content: '🛡'; display:block; font-size:18px; line-height:28px; text-align:center; }
 
 /* save toast */
 .save-toast {
