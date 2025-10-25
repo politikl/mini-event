@@ -211,6 +211,12 @@
     for (let i = 1; i <= 3; i++) {
       rows[i] = createRow(i);
     }
+
+    // Start the player on an island tile (row 0) so the visual looks like an island
+    // right before the enemies, and remove the deep green "grass" start feeling.
+    rows[0] = createRow(0);
+    rows[0].type = 'island';
+    rows[0].obstacles = []; // keep it clear / decorative
   }
 
   function generateNewRows() {
@@ -229,11 +235,16 @@
 
   // Player
   function createPlayer() {
+    const startGridX = Math.floor(W / 2 / TILE_SIZE);
+    const startGridY = 0;
+    // align player's x to center of the grid cell (so player snaps to tile columns)
+    const alignedX = startGridX * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
+    const alignedY = H - TILE_SIZE - 10; // keep visual offset at bottom like before
     return {
-      x: W / 2 - PLAYER_SIZE / 2,
-      y: H - TILE_SIZE - 10,
-      gridX: Math.floor(W / 2 / TILE_SIZE),
-      gridY: 0,
+      x: alignedX,
+      y: alignedY,
+      gridX: startGridX,
+      gridY: startGridY,
       width: PLAYER_SIZE,
       height: PLAYER_SIZE,
       alive: true,
@@ -252,28 +263,32 @@
   // grid move: dx/dy in tiles
   function movePlayer(dx, dy) {
     if (!player || !player.alive) return;
+    // prevent rapid repeats and don't start a new grid move while moving
     if (moveDelay > 0 || player.moving) return;
 
     const newGridX = player.gridX + dx;
     const newGridY = player.gridY - dy;
-    const newX = player.x + dx * TILE_SIZE;
-    const newY = player.y + dy * TILE_SIZE;
 
-    // clamp horizontally
-    if (newX >= -player.width && newX + player.width <= W + player.width) {
-      player.startX = player.x;
-      player.startY = player.y;
-      player.targetX = Math.max(0, Math.min(W - player.width, newX));
-      player.targetY = newY;
-      player.moveStart = performance.now();
-      player.moving = true;
-      // update logical grid immediately so generation/collisions reference correct grid row
-      player.gridX = newGridX;
-      player.gridY = newGridY;
-      // only apply scoring when move completes (handled in step)
-    }
+    // clamp to grid bounds (based on tile columns)
+    const maxGridX = Math.floor((W - PLAYER_SIZE) / TILE_SIZE);
+    const clampedGridX = Math.max(0, Math.min(maxGridX, newGridX));
 
-    moveDelay = player.moveDuration;
+    const targetX = clampedGridX * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
+    const targetY = player.y + dy * TILE_SIZE;
+
+    player.startX = player.x;
+    player.startY = player.y;
+    player.targetX = targetX;
+    player.targetY = targetY;
+    player.moveStart = performance.now();
+    player.moving = true;
+
+    // update logical grid immediately (so generation/collisions use correct row)
+    player.gridX = clampedGridX;
+    player.gridY = newGridY;
+
+    // enforce a slightly longer delay so key repeats don't cause double moves
+    moveDelay = player.moveDuration + 40;
   }
 
   function updateScoreUI(){
@@ -505,9 +520,11 @@
       if (drawY < -TILE_SIZE || drawY > H + TILE_SIZE) return;
 
       if (row.type === 'grass') {
-        ctx.fillStyle = '#2d4a2f';
+        // Replace strong green grass with an island / sand-like color so the
+        // starting area feels like an island rather than bright green fields.
+        ctx.fillStyle = '#483522'; // muted island brown
         ctx.fillRect(0, drawY, W, TILE_SIZE);
-        ctx.fillStyle = '#1a3a1f';
+        ctx.fillStyle = '#3b2c1f';
         for (let x = 0; x < W; x += TILE_SIZE) {
           ctx.fillRect(x + 2, drawY + 2, TILE_SIZE - 4, TILE_SIZE - 4);
         }
@@ -518,10 +535,13 @@
         for (let x = 0; x < W; x += TILE_SIZE * 2) {
           ctx.fillRect(x + 4, drawY + 4, TILE_SIZE - 8, TILE_SIZE - 8);
         }
+        // align the decorative pumpkin to the grid center so it lines up with player
+        const centerTileCol = Math.floor((W / 2) / TILE_SIZE);
+        const pumpkinX = centerTileCol * TILE_SIZE + TILE_SIZE / 2;
         ctx.fillStyle = '#ff8c00';
         ctx.font = '24px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('🎃', W / 2, drawY + TILE_SIZE / 2 + 8);
+        ctx.fillText('🎃', pumpkinX, drawY + TILE_SIZE / 2 + 8);
       } else if (row.type === 'road') {
         ctx.fillStyle = '#2a2a2a';
         ctx.fillRect(0, drawY, W, TILE_SIZE);
@@ -628,6 +648,9 @@
       if (t >= 1) {
         // movement completed — scoring/row progression should apply here
         player.moving = false;
+        // align to target exactly to avoid fractional drift
+        player.x = player.targetX;
+        player.y = player.targetY;
         // If moved up, award points
         if (player.gridY > highestRow) {
           const diff = player.gridY - highestRow;
@@ -654,6 +677,14 @@
     // if player is on a log, move with it
     if (player && player.onLog && !player.moving) {
       player.x += player.onLog.speed * dt * 0.06;
+      // if after being carried the player is no longer on that log, drop the reference
+      const playerCenterX = player.x + player.width / 2;
+      if (!(playerCenterX > player.onLog.x && playerCenterX < (player.onLog.x + player.onLog.width))) {
+        player.onLog = null;
+      }
+      // also snap to grid column if drifted too far (prevents double-step when next move)
+      const approxGridX = Math.round((player.x - (TILE_SIZE - PLAYER_SIZE) / 2) / TILE_SIZE);
+      player.gridX = Math.max(0, Math.min(Math.floor((W - PLAYER_SIZE) / TILE_SIZE), approxGridX));
     }
 
     checkCollisions();
@@ -691,11 +722,13 @@
   // Input
   window.addEventListener('keydown', (e) => {
     if (!player || !player.alive) return;
+    // ignore auto-repeats — treat each key press as a single move
+    if (e.repeat) return;
     const k = e.key.toLowerCase();
-    if (k === 'arrowleft' || k === 'a') movePlayer(-1, 0);
-    if (k === 'arrowright' || k === 'd') movePlayer(1, 0);
-    if (k === 'arrowup' || k === 'w') movePlayer(0, -1);
-    if (k === 'arrowdown' || k === 's') movePlayer(0, 1);
+    if (k === 'arrowleft' || k === 'a' || k === 'j') { e.preventDefault(); movePlayer(-1, 0); }
+    if (k === 'arrowright' || k === 'd' || k === 'l') { e.preventDefault(); movePlayer(1, 0); }
+    if (k === 'arrowup' || k === 'w' || k === 'i') { e.preventDefault(); movePlayer(0, -1); }
+    if (k === 'arrowdown' || k === 's' || k === 'k') { e.preventDefault(); movePlayer(0, 1); }
   });
 
   // UI handlers
