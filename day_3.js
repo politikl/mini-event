@@ -421,7 +421,7 @@
   function endGame(){
     running = false;
     if(finalScoreEl) finalScoreEl.textContent = score;
-    if(submitNote) submitNote.textContent = (Date.now() <= GAME_END_TS) ? 'This score is within the event window and can be submitted to the main leaderboard.' : 'Event window ended — score will be [...]
+    if(submitNote) submitNote.textContent = (Date.now() <= GAME_END_TS) ? 'This score is within the event window and can be submitted to the main leaderboard.' : 'Event window ended — score will not be counted'
     if(gameOverContent && playbound){
       if(gameOverContent.parentElement !== playbound) playbound.appendChild(gameOverContent);
       gameOverContent.style.position = 'absolute';
