@@ -7,6 +7,8 @@
   --frame-bg: linear-gradient(135deg, rgba(10,5,5,0.9), rgba(20,8,8,0.95));
   --canvas-w: 640;
   --canvas-h: 480;
+  /* viewport offset used when sizing the frame (top controls + desired bottom gap) */
+  --vh-offset: 112px; /* adjust if you need more/less bottom padding */
 }
 
 /* ensure page fits without scrolling */
@@ -51,15 +53,15 @@ html, body {
   justify-content: center;
   align-items: flex-start; /* ensure top controls do not overlap the frame */
   height: 100vh;
-  padding: 64px 24px 24px 24px; /* top padding reserves space for top-controls */
+  padding: 64px 24px 40px 24px; /* top padding reserves space for top-controls; increased bottom padding so game-note fits */
   box-sizing: border-box;
 }
 
 .halloween-frame {
   /* keep the canvas aspect ratio and maximize size within viewport minus top controls */
-  width: min( calc( (var(--canvas-w) / var(--canvas-h)) * (100vh - 96px) ), calc(100vw - 36px) );
+  width: min( calc( (var(--canvas-w) / var(--canvas-h)) * (100vh - var(--vh-offset)) ), calc(100vw - 36px) );
   max-width: 95vw;
-  max-height: calc(100vh - 96px);
+  max-height: calc(100vh - var(--vh-offset));
   background: var(--frame-bg);
   padding: 12px;
   box-shadow: 0 12px 40px rgba(0,0,0,0.7);
