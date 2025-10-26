@@ -1,1 +1,111 @@
 
+body {
+    font-family: 'Shadows Into Light', cursive;
+    background: radial-gradient(1200px 600px at 20% 10%, rgba(40,10,10,0.25), transparent 20%),
+                radial-gradient(1000px 500px at 80% 80%, rgba(20,6,6,0.18), transparent 18%),
+                linear-gradient(180deg, #0b0202 0%, #1a0a0a 45%, #0a0606 100%);
+    color: #ff6b35;
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+h1 {
+    margin-bottom: 5px;
+    font-family: 'Creepster', cursive;
+    color: #ffaa00;
+}
+
+p {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #ff6b35;
+}
+
+#game-stats {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-radius: 10px;
+    border: 2px solid #ff6b35;
+}
+
+#charts-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.chart-wrapper {
+    margin-bottom: 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 15px;
+    border-radius: 10px;
+    border: 2px solid #ff6b35;
+}
+
+.chart-wrapper h3 {
+    margin-top: 0;
+    margin-bottom: 5px;
+    color: #ffaa00;
+}
+
+.price-label {
+    color: #00ff9d;
+    margin-bottom: 5px;
+}
+
+canvas {
+    background-color: black;
+    width: 100%;
+    height: 150px;
+    max-width: 100%;
+    max-height: 150px;
+    border: 1px solid #ff6b35;
+}
+
+.shares-display {
+    margin-top: 5px;
+    color: #ff6b35;
+}
+
+.profit-display {
+    color: #00ff9d;
+    margin-top: 5px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.buy-btn {
+    background-color: #ff6b35;
+    color: #000000;
+    border: none;
+    padding: 5px 20px;
+    cursor: pointer;
+    border-radius: 5px;
+    font-family: 'Shadows Into Light', cursive;
+    font-weight: bold;
+}
+
+.sell-btn {
+    background-color: #ffaa00;
+    color: #000000;
+    border: none;
+    padding: 5px 20px;
+    cursor: pointer;
+    border-radius: 5px;
+    font-family: 'Shadows Into Light', cursive;
+    font-weight: bold;
+}
+
+/* Hide elements we don't need */
+#trading-panel, #portfolio-panel, #news-ticker, #instructions-panel, #score-submission {
+    display: none;
+}
