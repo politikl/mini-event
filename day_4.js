@@ -221,7 +221,7 @@
 
   // util mapping between grid row index and world Y so player is centered inside tiles
   function gridYToWorldY(gridY) {
-    return -gridY * (TILE_SIZE/2) + (TILE_SIZE - PLAYER_SIZE) / 2;
+    return -gridY * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
   }
 
   // Camera helper to keep player near bottom and allow looking ahead
@@ -257,6 +257,7 @@
 
   // grid move: dx/dy in tiles. dy positive = forward/up, negative = backward/down
   function movePlayer(dx, dy) {
+    console.log('movePlayer called - dx:', dx, 'dy:', dy, 'current gridY:', player?.gridY); // Add this debug line
     if (!player || !player.alive) return;
     if (moveDelay > 0 || player.moving) return;
 
