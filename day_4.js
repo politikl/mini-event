@@ -105,11 +105,11 @@
     const speedVariation = Math.random();
     let baseSpeed;
     if (speedVariation < 0.2) {
-      baseSpeed = 0.8 + Math.random() * 0.4; // Very fast (20%)
+      baseSpeed = 0.8 + Math.random() * 0.4;
     } else if (speedVariation < 0.5) {
-      baseSpeed = 0.5 + Math.random() * 0.3; // Medium fast (30%)
+      baseSpeed = 0.5 + Math.random() * 0.3;
     } else {
-      baseSpeed = 0.3 + Math.random() * 0.3; // Normal (50%)
+      baseSpeed = 0.3 + Math.random() * 0.3;
     }
     
     const speed = (baseSpeed + difficulty * 0.6) * direction;
@@ -133,11 +133,11 @@
     const speedVariation = Math.random();
     let baseSpeed;
     if (speedVariation < 0.3) {
-      baseSpeed = 0.5 + Math.random() * 0.3; // Fast (30%)
+      baseSpeed = 0.5 + Math.random() * 0.3;
     } else if (speedVariation < 0.6) {
-      baseSpeed = 0.3 + Math.random() * 0.2; // Medium (30%)
+      baseSpeed = 0.3 + Math.random() * 0.2;
     } else {
-      baseSpeed = 0.1 + Math.random() * 0.2; // Slow (40%)
+      baseSpeed = 0.1 + Math.random() * 0.2;
     }
     
     const speed = (baseSpeed + difficulty * 0.4) * direction;
@@ -231,38 +231,40 @@
     ensureRowsExist();
   }
 
-  // WORKING: Raft movement - player moves automatically with rafts
+  // FIXED: Working raft movement
   function updateRaftMovement(dt) {
     if (!player || !player.alive || !player.ridingLog) return;
 
+    // Store the current log we're riding
+    const currentLog = player.ridingLog;
+    
     // Move player with the raft
-    player.x += player.ridingLog.speed * dt * 0.1;
+    player.x += currentLog.speed * dt * 0.1;
     
     // Update grid position based on new x position
-    const newCol = Math.floor(player.x / TILE_SIZE);
-    player.col = Math.max(0, Math.min(GRID_COLS - 1, newCol));
+    player.col = Math.floor(player.x / TILE_SIZE);
+    player.col = Math.max(0, Math.min(GRID_COLS - 1, player.col));
     
     // Update visual position
     updatePlayerPosition();
     
-    // Check if player is still on the raft
+    // Check if player is still on the same log
     const currentRow = rows.get(player.row);
-    if (!currentRow) return;
-    
-    let stillOnRaft = false;
-    for (const obs of currentRow.obstacles) {
-      const playerCenterX = player.x + player.size / 2;
-      const obstacleY = getRowY(player.row) + (TILE_SIZE - obs.height) / 2;
-      
-      if (playerCenterX > obs.x && playerCenterX < obs.x + obs.width &&
-          player.y < obstacleY + obs.height && player.y + player.size > obstacleY) {
-        stillOnRaft = true;
-        player.ridingLog = obs; // Update to current obstacle
-        break;
-      }
+    if (!currentRow) {
+      player.ridingLog = null;
+      return;
     }
+
+    // Check if we're still on the same log
+    const playerCenterX = player.x + player.size / 2;
+    const obstacleY = getRowY(player.row) + (TILE_SIZE - currentLog.height) / 2;
     
-    if (!stillOnRaft) {
+    const stillOnLog = playerCenterX > currentLog.x && 
+                       playerCenterX < currentLog.x + currentLog.width &&
+                       player.y < obstacleY + currentLog.height && 
+                       player.y + player.size > obstacleY;
+
+    if (!stillOnLog) {
       player.ridingLog = null;
     }
   }
@@ -300,7 +302,7 @@
     if (scoreEl) scoreEl.textContent = `Score: ${score}`;
   }
 
-  // Collision detection - IMPROVED: Better raft detection
+  // FIXED: Collision detection with proper raft handling
   function checkCollisions() {
     if (!player || !player.alive) return;
 
@@ -310,8 +312,10 @@
       return;
     }
 
-    // Don't reset ridingLog here - let updateRaftMovement handle it
-    let onSafeSurface = false;
+    // If we're already riding a log, don't check for new ones
+    if (player.ridingLog) {
+      return;
+    }
 
     if (currentRow.type === 'road') {
       for (const obs of currentRow.obstacles) {
@@ -323,7 +327,6 @@
           return;
         }
       }
-      onSafeSurface = false; // Roads are never safe
     } else if (currentRow.type === 'river') {
       let onLog = false;
       for (const obs of currentRow.obstacles) {
@@ -337,17 +340,10 @@
           break;
         }
       }
-      onSafeSurface = onLog;
-    } else {
-      // Grass or island are safe
-      onSafeSurface = true;
-      player.ridingLog = null;
-    }
-
-    // Only die if not on a safe surface
-    if (!onSafeSurface) {
-      endGame();
-      return;
+      if (!onLog) {
+        endGame();
+        return;
+      }
     }
 
     if (player.x < -player.size || player.x > CANVAS_W) {
@@ -377,8 +373,10 @@
       }
     }
 
-    // WORKING: Call raft movement every frame
-    updateRaftMovement(dt);
+    // FIXED: Always call raft movement if we're on a raft
+    if (player && player.ridingLog) {
+      updateRaftMovement(dt);
+    }
   }
 
   // Input handling
@@ -414,7 +412,7 @@
     }
   });
 
-  // Drawing functions (unchanged - with speed visual indicators)
+  // Drawing functions
   function drawBackground() {
     const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
     grad.addColorStop(0, '#0a0508');
