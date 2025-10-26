@@ -19,6 +19,7 @@
   const GRID_COLS = 8;
   const VISIBLE_ROWS = 14;
   const SAFE_START_ROWS = 8; // Increased safe area
+  const CAMERA_LEAD = 4; // Rows above player to show
 
   canvas.width = CANVAS_W;
   canvas.height = CANVAS_H;
@@ -31,6 +32,7 @@
   let running = false;
   let gameLoop = null;
   let keys = {};
+  let cameraY = 0; // Camera position
 
   // Player object
   function createPlayer() {
@@ -120,6 +122,7 @@
     rows = [];
     score = 0;
     highestRow = 0;
+    cameraY = 0;
     
     // Create initial rows
     for (let i = 0; i < VISIBLE_ROWS + 5; i++) {
@@ -147,11 +150,26 @@
     showModal(gameOverModal);
   }
 
-  // Update player visual position from grid position
+  // Update camera to follow player
+  function updateCamera() {
+    if (!player) return;
+    
+    // Target camera position keeps player near the bottom with some look-ahead
+    const targetCameraY = player.row * TILE_SIZE - (CANVAS_H - TILE_SIZE * CAMERA_LEAD);
+    
+    // Smooth camera movement (optional - remove for instant camera)
+    cameraY = targetCameraY;
+    
+    // Alternative: Smooth camera follow (uncomment if you want smooth movement)
+    // cameraY += (targetCameraY - cameraY) * 0.1;
+  }
+
+  // Update player visual position from grid position (relative to camera)
   function updatePlayerPosition() {
     if (!player) return;
     player.x = player.col * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
-    player.y = CANVAS_H - (player.row + 1) * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
+    // Player Y is fixed relative to camera - near the bottom
+    player.y = CANVAS_H - TILE_SIZE * (CAMERA_LEAD + 1) + (TILE_SIZE - PLAYER_SIZE) / 2;
   }
 
   // Movement
@@ -165,6 +183,7 @@
     player.row = newRow;
     player.ridingLog = null;
 
+    updateCamera(); // Update camera when player moves
     updatePlayerPosition();
 
     // Score for moving forward
@@ -236,9 +255,9 @@
            y1 < y2 + h2 - 5 && y1 + h1 > y2 + 5;
   }
 
-  // Get Y position for a row
+  // Get Y position for a row (relative to camera)
   function getRowY(rowNum) {
-    return CANVAS_H - (rowNum + 1) * TILE_SIZE;
+    return CANVAS_H - (rowNum * TILE_SIZE - cameraY) - TILE_SIZE;
   }
 
   function getObstacleY(rowNum) {
@@ -314,6 +333,8 @@
   function drawRows() {
     for (const row of rows) {
       const y = getRowY(row.num);
+      
+      // Only draw rows that are visible on screen
       if (y < -TILE_SIZE || y > CANVAS_H + TILE_SIZE) continue;
 
       // Draw terrain
@@ -459,6 +480,7 @@
     if (running && player && player.alive) {
       updateObstacles(dt);
       checkCollisions();
+      updateCamera(); // Continuous camera updates for smooth following
     }
 
     // Draw
