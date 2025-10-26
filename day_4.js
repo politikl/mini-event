@@ -123,101 +123,122 @@
 
   // Row generation
   function createRow(rowIndex) {
-    const difficulty = Math.min(1, Math.max(0, rowIndex / 100));
-    const bias = Math.max(0, Math.min(0.5, rowIndex / 10));
-    const rand = Math.random();
+  const difficulty = Math.min(1, Math.max(0, (rowIndex - 10) / 100)); // Start difficulty at row 10
+  const bias = Math.max(0, Math.min(0.5, (rowIndex - 5) / 10)); // Start bias at row 5
+  const rand = Math.random();
 
-    // Starting area (negative rows) should be safe
-    let type = 'grass';
-    if (rowIndex < 0) {
-      type = 'grass';
-    } else if (rowIndex === 0) {
-      type = 'island'; // Safe spawn area
-    } else if (rowIndex <= 3) {
-      // First few rows with enemies
-      type = (rowIndex % 2 === 0) ? 'road' : 'river';
-    } else {
-      if (rand < 0.16 - bias) type = 'island';
-      else if (rand < 0.5 + bias) type = 'road';
-      else if (rand < 0.82) type = 'river';
-      else type = 'grass';
-    }
+  // Extended safe starting area
+  let type = 'grass';
+  if (rowIndex < 0) {
+    type = 'grass';
+  } else if (rowIndex === 0) {
+    type = 'island'; // Safe spawn area
+  } else if (rowIndex <= 8) { // Extended safe area to row 8
+    // First few rows should be safe - only grass and islands
+    if (rowIndex % 3 === 0) type = 'island';
+    else type = 'grass';
+  } else {
+    if (rand < 0.16 - bias) type = 'island';
+    else if (rand < 0.5 + bias) type = 'road';
+    else if (rand < 0.82) type = 'river';
+    else type = 'grass';
+  }
 
-    const row = {
-      index: rowIndex,
-      y: -rowIndex * TILE_SIZE,
-      type: type,
-      obstacles: []
-    };
+  const row = {
+    index: rowIndex,
+    y: -rowIndex * TILE_SIZE,
+    type: type,
+    obstacles: []
+  };
 
-    // Only add obstacles to positive rows (enemies start at row 1+)
-    if (rowIndex >= 1) {
-      if (row.type === 'road') {
-        const direction = Math.random() < 0.5 ? 1 : -1;
-        const baseSpeed = 1.0 + difficulty * 1.8;
-        const speed = baseSpeed * direction;
-        const spacing = 160 + Math.random() * 120;
-        const count = Math.max(1, Math.ceil(W / spacing));
+  // Only add obstacles to rows beyond the safe starting area
+  if (rowIndex >= 9) { // Start enemies at row 9
+    if (row.type === 'road') {
+      const direction = Math.random() < 0.5 ? 1 : -1;
+      const baseSpeed = 1.0 + difficulty * 1.8;
+      const speed = baseSpeed * direction;
+      const spacing = 160 + Math.random() * 120;
+      const count = Math.max(1, Math.ceil(W / spacing));
 
-        for (let i = 0; i < count; i++) {
-          const isGhost = Math.random() < 0.32;
-          const baseX = Math.round((i * spacing + Math.random() * 40 - 60) / TILE_SIZE) * TILE_SIZE;
-          row.obstacles.push({
-            x: baseX,
-            speed: speed,
-            width: isGhost ? TILE_SIZE : Math.round(1.0 * TILE_SIZE),
-            height: isGhost ? TILE_SIZE : Math.round(0.9 * TILE_SIZE),
-            type: isGhost ? 'ghost' : 'car'
-          });
-        }
-      } else if (row.type === 'river') {
-        const direction = Math.random() < 0.5 ? 1 : -1;
-        const baseSpeed = 0.6 + difficulty * 1.2;
-        const speed = baseSpeed * direction;
-        const spacing = 180 + Math.random() * 120;
-        const count = Math.max(1, Math.ceil(W / spacing));
+      for (let i = 0; i < count; i++) {
+        const isGhost = Math.random() < 0.32;
+        const baseX = Math.round((i * spacing + Math.random() * 40 - 60) / TILE_SIZE) * TILE_SIZE;
+        row.obstacles.push({
+          x: baseX,
+          speed: speed,
+          width: isGhost ? TILE_SIZE : Math.round(1.0 * TILE_SIZE),
+          height: isGhost ? TILE_SIZE : Math.round(0.9 * TILE_SIZE),
+          type: isGhost ? 'ghost' : 'car'
+        });
+      }
+    } else if (row.type === 'river') {
+      const direction = Math.random() < 0.5 ? 1 : -1;
+      const baseSpeed = 0.6 + difficulty * 1.2;
+      const speed = baseSpeed * direction;
+      const spacing = 180 + Math.random() * 120;
+      const count = Math.max(1, Math.ceil(W / spacing));
 
-        for (let i = 0; i < count; i++) {
-          const baseX = Math.round((i * spacing + Math.random() * 40 - 40) / TILE_SIZE) * TILE_SIZE;
-          const lw = Math.round((80 + Math.floor(Math.random() * 80)) / TILE_SIZE) * TILE_SIZE;
-          row.obstacles.push({
-            x: baseX,
-            speed: speed,
-            width: lw,
-            height: Math.round(0.45 * TILE_SIZE),
-            type: 'log',
-            rideable: true
-          });
-        }
+      for (let i = 0; i < count; i++) {
+        const baseX = Math.round((i * spacing + Math.random() * 40 - 40) / TILE_SIZE) * TILE_SIZE;
+        const lw = Math.round((80 + Math.floor(Math.random() * 80)) / TILE_SIZE) * TILE_SIZE;
+        row.obstacles.push({
+          x: baseX,
+          speed: speed,
+          width: lw,
+          height: Math.round(0.45 * TILE_SIZE),
+          type: 'log',
+          rideable: true
+        });
       }
     }
-
-    return row;
   }
 
-  function initRows() {
-    rows = [];
-    // Create rows from starting position up to visible area
-    const startSpanBefore = 2;
-    const startSpanAfter = ROWS_VISIBLE;
-    for (let i = STARTING_ROW - startSpanBefore; i < STARTING_ROW + startSpanAfter; i++) {
-      rows.push(createRow(i));
-    }
+  return row;
+}
+
+ function initRows() {
+  rows = [];
+  // Create more rows initially to ensure smooth generation
+  const startSpanBefore = 5;
+  const startSpanAfter = ROWS_VISIBLE + 10;
+  for (let i = STARTING_ROW - startSpanBefore; i < STARTING_ROW + startSpanAfter; i++) {
+    rows.push(createRow(i));
   }
+  // Sort by index to ensure proper order
+  rows.sort((a, b) => a.index - b.index);
+}
 
   function generateNewRows() {
-    if (!player) return;
-    let minRow = Math.min(...rows.map(r => r.index));
-    const neededRow = player.gridY - ROWS_VISIBLE;
-    while (minRow > neededRow) {
-      const newIdx = minRow - 1;
-      rows.push(createRow(newIdx));
-      minRow = newIdx;
-      if (rows.length > ROWS_VISIBLE + 12) {
-        rows = rows.filter(r => r.index > player.gridY + 6);
-      }
-    }
+  if (!player) return;
+  
+  // Generate rows above the player (lower index numbers)
+  let minRow = Math.min(...rows.map(r => r.index));
+  const neededRowAbove = player.gridY - ROWS_VISIBLE;
+  
+  while (minRow > neededRowAbove) {
+    const newIdx = minRow - 1;
+    rows.unshift(createRow(newIdx)); // Add to beginning to maintain order
+    minRow = newIdx;
   }
+  
+  // Generate rows below the player (higher index numbers)  
+  let maxRow = Math.max(...rows.map(r => r.index));
+  const neededRowBelow = player.gridY + ROWS_VISIBLE;
+  
+  while (maxRow < neededRowBelow) {
+    const newIdx = maxRow + 1;
+    rows.push(createRow(newIdx));
+    maxRow = newIdx;
+  }
+  
+  // More conservative culling - only remove rows far from player
+  if (rows.length > ROWS_VISIBLE * 3) {
+    rows = rows.filter(r => 
+      r.index >= player.gridY - ROWS_VISIBLE - 5 && 
+      r.index <= player.gridY + ROWS_VISIBLE + 5
+    );
+  }
+}
 
   // util mapping between grid row index and world Y so player is centered inside tiles
   function gridYToWorldY(gridY) {
@@ -227,70 +248,72 @@
   // Camera helper to keep player near bottom and allow looking ahead
   function getCamY() {
   if (!player) return 0;
-  // Keep player near bottom by subtracting less from player.y
-  return -player.gridY * TILE_SIZE - TILE_SIZE * CAMERA_LOOKAHEAD_ROWS;
+  // Camera follows player's grid position exactly
+  return -player.gridY * TILE_SIZE;
 }
 
   // Player
-  function createPlayer() {
-    const startGridX = Math.floor((W / TILE_SIZE) / 2);
-    const startGridY = STARTING_ROW;
-    const alignedX = startGridX * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
-    const alignedY = gridYToWorldY(startGridY);
-    return {
-      x: alignedX,
-      y: alignedY,
-      gridX: startGridX,
-      gridY: startGridY,
-      width: PLAYER_SIZE,
-      height: PLAYER_SIZE,
-      alive: true,
-      onLog: null,
-      moving: false,
-      startX: 0,
-      startY: 0,
-      targetX: 0,
-      targetY: 0,
-      moveStart: 0,
-      moveDuration: 140
-    };
+  // Remove the gridYToWorldY function and replace with direct calculation
+function createPlayer() {
+  const startGridX = Math.floor((W / TILE_SIZE) / 2);
+  const startGridY = STARTING_ROW;
+  const alignedX = startGridX * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
+  // Remove the gridYToWorldY call and use direct calculation
+  const alignedY = -startGridY * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
+  
+  return {
+    x: alignedX,
+    y: alignedY,
+    gridX: startGridX,
+    gridY: startGridY,
+    width: PLAYER_SIZE,
+    height: PLAYER_SIZE,
+    alive: true,
+    onLog: null,
+    moving: false,
+    startX: 0,
+    startY: 0,
+    targetX: 0,
+    targetY: 0,
+    moveStart: 0,
+    moveDuration: 140
+  };
+}
+
+// Update the movePlayer function to use direct calculation
+function movePlayer(dx, dy) {
+  console.log('movePlayer called - dx:', dx, 'dy:', dy, 'current gridY:', player?.gridY);
+  if (!player || !player.alive) return;
+  if (moveDelay > 0 || player.moving) return;
+
+  const newGridX = player.gridX + dx;
+  const newGridY = player.gridY + dy;
+
+  // Prevent moving backwards past starting position
+  if (newGridY < STARTING_ROW) {
+    return;
   }
 
-  // grid move: dx/dy in tiles. dy positive = forward/up, negative = backward/down
-  function movePlayer(dx, dy) {
-    console.log('movePlayer called - dx:', dx, 'dy:', dy, 'current gridY:', player?.gridY); // Add this debug line
-    if (!player || !player.alive) return;
-    if (moveDelay > 0 || player.moving) return;
+  // clamp to grid bounds
+  const maxGridX = Math.floor((W - PLAYER_SIZE) / TILE_SIZE);
+  const clampedGridX = Math.max(0, Math.min(maxGridX, newGridX));
 
-    const newGridX = player.gridX + dx;
-    const newGridY = player.gridY + dy;
+  const targetX = clampedGridX * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
+  // Use direct calculation instead of gridYToWorldY
+  const targetY = -newGridY * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
 
-    // Prevent moving backwards past starting position
-    if (newGridY < STARTING_ROW) {
-      return;
-    }
+  player.startX = player.x;
+  player.startY = player.y;
+  player.targetX = targetX;
+  player.targetY = targetY;
+  player.moveStart = performance.now();
+  player.moving = true;
+  player.onLog = null;
+  player.gridX = clampedGridX;
+  player.gridY = newGridY;
+  moveDelay = player.moveDuration + 80;
+}
 
-    // clamp to grid bounds
-    const maxGridX = Math.floor((W - PLAYER_SIZE) / TILE_SIZE);
-    const clampedGridX = Math.max(0, Math.min(maxGridX, newGridX));
-
-    const targetX = clampedGridX * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
-    const targetY = gridYToWorldY(newGridY);
-
-    player.startX = player.x;
-    player.startY = player.y;
-    player.targetX = targetX;
-    player.targetY = targetY;
-    player.moveStart = performance.now();
-    player.moving = true;
-
-    player.onLog = null;
-
-    player.gridX = clampedGridX;
-    player.gridY = newGridY;
-
-    moveDelay = player.moveDuration + 80;
-  }
 
   function updateScoreUI(){
     if (bigScoreEl) bigScoreEl.textContent = `Score: ${score}`;
