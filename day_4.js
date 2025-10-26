@@ -18,7 +18,7 @@
   const PLAYER_SIZE = 40;
   const GRID_COLS = 8;
   const VISIBLE_ROWS = 14;
-  const SAFE_START_ROWS = 8; // Increased safe area
+  const SAFE_START_ROWS = 8;
   const CAMERA_LEAD = 4; // Rows above player to show
 
   canvas.width = CANVAS_W;
@@ -32,7 +32,7 @@
   let running = false;
   let gameLoop = null;
   let keys = {};
-  let cameraY = 0; // Camera position
+  let cameraY = 0;
 
   // Player object
   function createPlayer() {
@@ -66,11 +66,11 @@
     
     // Generate terrain with easier probabilities at start
     const rand = Math.random();
-    if (rand < 0.25) { // More grass/island, less roads/rivers
+    if (rand < 0.25) {
       row.type = 'grass';
     } else if (rand < 0.45) {
       row.type = 'island';
-    } else if (rand < 0.7) { // Reduced road probability
+    } else if (rand < 0.7) {
       row.type = 'road';
       generateRoadObstacles(row, rowNum, difficulty);
     } else {
@@ -83,12 +83,12 @@
 
   function generateRoadObstacles(row, rowNum, difficulty) {
     const direction = Math.random() < 0.5 ? 1 : -1;
-    const speed = (0.6 + Math.random() * 0.4 + difficulty * 0.4) * direction; // Slower initial speed
-    const spacing = 180 + Math.random() * 120; // More spacing between obstacles
-    const count = Math.max(1, Math.ceil(CANVAS_W / spacing)); // Fewer obstacles
+    const speed = (0.6 + Math.random() * 0.4 + difficulty * 0.4) * direction;
+    const spacing = 180 + Math.random() * 120;
+    const count = Math.max(1, Math.ceil(CANVAS_W / spacing));
 
     for (let i = 0; i < count; i++) {
-      const isGhost = Math.random() < (0.2 + difficulty * 0.3); // Fewer ghosts initially
+      const isGhost = Math.random() < (0.2 + difficulty * 0.3);
       row.obstacles.push({
         x: i * spacing + Math.random() * 60,
         speed: speed,
@@ -101,15 +101,15 @@
 
   function generateRiverObstacles(row, rowNum, difficulty) {
     const direction = Math.random() < 0.5 ? 1 : -1;
-    const speed = (0.4 + Math.random() * 0.3 + difficulty * 0.3) * direction; // Slower initial speed
-    const spacing = 200 + Math.random() * 100; // More spacing between logs
-    const count = Math.max(1, Math.ceil(CANVAS_W / spacing)); // Fewer logs
+    const speed = (0.4 + Math.random() * 0.3 + difficulty * 0.3) * direction;
+    const spacing = 200 + Math.random() * 100;
+    const count = Math.max(1, Math.ceil(CANVAS_W / spacing));
 
     for (let i = 0; i < count; i++) {
       row.obstacles.push({
         x: i * spacing + Math.random() * 50,
         speed: speed,
-        width: 120 + Math.random() * 80, // Wider logs for easier landing
+        width: 120 + Math.random() * 80,
         height: 30,
         type: 'log'
       });
@@ -138,7 +138,7 @@
     running = true;
     player.alive = true;
     hideModal(playOverlay);
-    hideModal(gameOverModal); // Ensure game over modal is hidden
+    hideModal(gameOverModal);
     if (gameLoop) cancelAnimationFrame(gameLoop);
     gameLoop = requestAnimationFrame(update);
   }
@@ -154,21 +154,15 @@
   function updateCamera() {
     if (!player) return;
     
-    // Target camera position keeps player near the bottom with some look-ahead
-    const targetCameraY = player.row * TILE_SIZE - (CANVAS_H - TILE_SIZE * CAMERA_LEAD);
-    
-    // Smooth camera movement (optional - remove for instant camera)
-    cameraY = targetCameraY;
-    
-    // Alternative: Smooth camera follow (uncomment if you want smooth movement)
-    // cameraY += (targetCameraY - cameraY) * 0.1;
+    // Camera follows player's row position
+    cameraY = player.row * TILE_SIZE;
   }
 
-  // Update player visual position from grid position (relative to camera)
+  // Update player visual position (fixed at bottom of screen)
   function updatePlayerPosition() {
     if (!player) return;
     player.x = player.col * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
-    // Player Y is fixed relative to camera - near the bottom
+    // Player is fixed at the bottom with some look-ahead space
     player.y = CANVAS_H - TILE_SIZE * (CAMERA_LEAD + 1) + (TILE_SIZE - PLAYER_SIZE) / 2;
   }
 
@@ -183,7 +177,7 @@
     player.row = newRow;
     player.ridingLog = null;
 
-    updateCamera(); // Update camera when player moves
+    updateCamera();
     updatePlayerPosition();
 
     // Score for moving forward
@@ -197,7 +191,7 @@
         rows.push(createRow(rows.length));
       }
       
-      // Remove old rows (more conservative)
+      // Remove old rows
       if (rows.length > VISIBLE_ROWS + 25) {
         rows = rows.filter(r => r.num >= player.row - 8);
       }
@@ -208,7 +202,7 @@
     if (scoreEl) scoreEl.textContent = `Score: ${score}`;
   }
 
-  // Collision detection
+  // Collision detection - FIXED: Use player's actual row, not visual position
   function checkCollisions() {
     if (!player || !player.alive) return;
 
@@ -218,17 +212,22 @@
     player.ridingLog = null;
 
     if (currentRow.type === 'road') {
-      // Check car/ghost collision
+      // Check car/ghost collision - use player's actual grid position
       for (const obs of currentRow.obstacles) {
-        if (boxCollision(player.x, player.y, player.size, player.size,
-                         obs.x, getObstacleY(player.row) + (TILE_SIZE - obs.height) / 2, 
-                         obs.width, obs.height)) {
+        // Calculate collision based on player's actual row, not visual position
+        const playerVisualY = player.y; // This is fixed at bottom
+        const obstacleY = getRowY(player.row) + (TILE_SIZE - obs.height) / 2;
+        
+        // Use the obstacle's actual Y position (which moves with camera)
+        // and player's fixed Y position for collision
+        if (boxCollision(player.x, playerVisualY, player.size, player.size,
+                         obs.x, obstacleY, obs.width, obs.height)) {
           endGame();
           return;
         }
       }
     } else if (currentRow.type === 'river') {
-      // Must be on a log
+      // Must be on a log - check based on actual row
       let onLog = false;
       for (const obs of currentRow.obstacles) {
         const playerCenterX = player.x + player.size / 2;
@@ -257,6 +256,7 @@
 
   // Get Y position for a row (relative to camera)
   function getRowY(rowNum) {
+    // Convert row number to screen position using camera
     return CANVAS_H - (rowNum * TILE_SIZE - cameraY) - TILE_SIZE;
   }
 
@@ -282,7 +282,6 @@
     // Move player with log
     if (player && player.ridingLog && player.alive) {
       player.x += player.ridingLog.speed * dt * 0.1;
-      // Update grid position based on new x position
       player.col = Math.floor(player.x / TILE_SIZE);
       player.col = Math.max(0, Math.min(GRID_COLS - 1, player.col));
     }
@@ -480,7 +479,7 @@
     if (running && player && player.alive) {
       updateObstacles(dt);
       checkCollisions();
-      updateCamera(); // Continuous camera updates for smooth following
+      updateCamera();
     }
 
     // Draw
