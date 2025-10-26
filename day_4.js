@@ -20,7 +20,7 @@
   const VISIBLE_ROWS = 16;
   const SAFE_START_ROWS = 4;
   const ROW_BUFFER = 8;
-  const START_ROW = 3; // Player starts at row 3 instead of 0
+  const START_ROW = 0; // Reset to 0 for proper alignment
 
   canvas.width = CANVAS_W;
   canvas.height = CANVAS_H;
@@ -35,13 +35,12 @@
   let keys = {};
   let cameraY = 0;
   let nextRowId = 0;
-  let hasMoved = false; // Track if player has moved yet
 
   // Player object
   function createPlayer() {
     return {
       col: Math.floor(GRID_COLS / 2),
-      row: START_ROW, // Start at row 3 instead of 0
+      row: START_ROW,
       x: 0,
       y: 0,
       size: PLAYER_SIZE,
@@ -50,7 +49,7 @@
     };
   }
 
-  // Row types and generation
+  // Row types and generation - FIXED: Proper start row alignment
   function createRow(rowNum) {
     const row = {
       id: rowNum,
@@ -59,20 +58,22 @@
       obstacles: []
     };
 
-    // Safe starting area - adjusted for new start position
-    if (rowNum < START_ROW + 1) {
-      row.type = rowNum === START_ROW ? 'island' : 'grass';
+    // Safe starting area - row 0 is safe island, rows 1-3 are safe grass
+    if (rowNum === 0) {
+      row.type = 'island';
+    } else if (rowNum < SAFE_START_ROWS) {
+      row.type = 'grass';
       return row;
     }
 
     // Faster difficulty progression
-    const difficulty = Math.min(1, (rowNum - START_ROW - 1) / 20);
+    const difficulty = Math.min(1, (rowNum - SAFE_START_ROWS) / 20);
     
-    // Generate terrain - MORE ROADS, FEWER RIVERS
+    // Generate terrain
     const rand = Math.random();
     
-    if (rowNum < START_ROW + SAFE_START_ROWS) {
-      // Early game: Mostly roads with some variety
+    if (rowNum < SAFE_START_ROWS + 2) {
+      // Early game after safe area
       if (rand < 0.4) {
         row.type = 'road';
         generateRoadObstacles(row, rowNum, difficulty);
@@ -85,7 +86,7 @@
         generateRiverObstacles(row, rowNum, difficulty);
       }
     } else {
-      // Normal game: Heavy road focus
+      // Normal game
       if (rand < 0.5) {
         row.type = 'road';
         generateRoadObstacles(row, rowNum, difficulty);
@@ -104,15 +105,14 @@
 
   function generateRoadObstacles(row, rowNum, difficulty) {
     const direction = Math.random() < 0.5 ? 1 : -1;
-    // VARIABLE SPEEDS: Some enemies much faster than others
     const speedVariation = Math.random();
     let baseSpeed;
     if (speedVariation < 0.2) {
-      baseSpeed = 0.8 + Math.random() * 0.4; // Very fast (20%)
+      baseSpeed = 0.8 + Math.random() * 0.4;
     } else if (speedVariation < 0.5) {
-      baseSpeed = 0.5 + Math.random() * 0.3; // Medium fast (30%)
+      baseSpeed = 0.5 + Math.random() * 0.3;
     } else {
-      baseSpeed = 0.3 + Math.random() * 0.3; // Normal (50%)
+      baseSpeed = 0.3 + Math.random() * 0.3;
     }
     
     const speed = (baseSpeed + difficulty * 0.6) * direction;
@@ -133,15 +133,14 @@
 
   function generateRiverObstacles(row, rowNum, difficulty) {
     const direction = Math.random() < 0.5 ? 1 : -1;
-    // VARIABLE SPEEDS: Some logs much faster than others
     const speedVariation = Math.random();
     let baseSpeed;
     if (speedVariation < 0.3) {
-      baseSpeed = 0.5 + Math.random() * 0.3; // Fast (30%)
+      baseSpeed = 0.5 + Math.random() * 0.3;
     } else if (speedVariation < 0.6) {
-      baseSpeed = 0.3 + Math.random() * 0.2; // Medium (30%)
+      baseSpeed = 0.3 + Math.random() * 0.2;
     } else {
-      baseSpeed = 0.1 + Math.random() * 0.2; // Slow (40%)
+      baseSpeed = 0.1 + Math.random() * 0.2;
     }
     
     const speed = (baseSpeed + difficulty * 0.4) * direction;
@@ -159,7 +158,7 @@
     }
   }
 
-  // Initialize game
+  // Initialize game - FIXED: Proper camera initialization
   function initGame() {
     player = createPlayer();
     rows = new Map();
@@ -167,15 +166,16 @@
     highestRow = START_ROW;
     cameraY = 0;
     nextRowId = 0;
-    hasMoved = false;
     
-    // Create initial rows around player's start position
+    // Create initial rows around player
     for (let i = START_ROW - ROW_BUFFER; i < START_ROW + VISIBLE_ROWS + ROW_BUFFER; i++) {
       const row = createRow(i);
       rows.set(i, row);
       nextRowId = Math.max(nextRowId, i + 1);
     }
     
+    // FIXED: Update camera BEFORE player position for proper alignment
+    updateCamera();
     updatePlayerPosition();
     updateScore();
   }
@@ -197,15 +197,16 @@
     showModal(gameOverModal);
   }
 
-  // Update camera to center on player's row
+  // Update camera to center on player's row - FIXED: Better centering
   function updateCamera() {
     if (!player) return;
     
-    const targetY = player.row * TILE_SIZE - (CANVAS_H / 2 - TILE_SIZE);
+    // Center player vertically in the screen
+    const targetY = player.row * TILE_SIZE - (CANVAS_H / 2) + (TILE_SIZE / 2);
     cameraY = targetY;
   }
 
-  // Update player visual position - FIXED: Proper initial positioning
+  // Update player visual position
   function updatePlayerPosition() {
     if (!player) return;
     player.x = player.col * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
@@ -219,19 +220,13 @@
     const newCol = Math.max(0, Math.min(GRID_COLS - 1, player.col + dcol));
     const newRow = Math.max(0, player.row + drow);
 
-    // Mark that player has moved for the first time
-    if (!hasMoved) {
-      hasMoved = true;
-    }
-
     player.col = newCol;
     player.row = newRow;
-    player.ridingLog = null;
+    player.ridingLog = null; // Reset when player moves manually
 
     updateCamera();
     updatePlayerPosition();
 
-    // Score for moving forward
     if (newRow > highestRow) {
       score += (newRow - highestRow) * 10;
       highestRow = newRow;
@@ -241,46 +236,38 @@
     ensureRowsExist();
   }
 
-  // FIXED: Auto movement when on raft - player moves with raft automatically
+  // FIXED: Working raft movement
   function updateRaftMovement(dt) {
     if (!player || !player.alive || !player.ridingLog) return;
 
+    // Move player with the raft
+    player.x += player.ridingLog.speed * dt * 0.1;
+    
+    // Update grid position based on new x position
+    const newCol = Math.floor(player.x / TILE_SIZE);
+    player.col = Math.max(0, Math.min(GRID_COLS - 1, newCol));
+    
+    // Update visual position
+    updatePlayerPosition();
+    
+    // Check if player is still on the raft
     const currentRow = rows.get(player.row);
     if (!currentRow) return;
-
-    // Find the current log the player is on (in case it changed)
-    let currentLog = null;
+    
+    let stillOnRaft = false;
     for (const obs of currentRow.obstacles) {
       const playerCenterX = player.x + player.size / 2;
       const obstacleY = getRowY(player.row) + (TILE_SIZE - obs.height) / 2;
       
       if (playerCenterX > obs.x && playerCenterX < obs.x + obs.width &&
           player.y < obstacleY + obs.height && player.y + player.size > obstacleY) {
-        currentLog = obs;
+        stillOnRaft = true;
+        player.ridingLog = obs; // Update to current obstacle
         break;
       }
     }
-
-    if (currentLog) {
-      // AUTO MOVEMENT: Player moves with the raft automatically
-      player.x += currentLog.speed * dt * 0.1;
-      
-      // Update grid position based on new x position
-      const newCol = Math.floor(player.x / TILE_SIZE);
-      player.col = Math.max(0, Math.min(GRID_COLS - 1, newCol));
-      
-      // Update visual position
-      updatePlayerPosition();
-      
-      // Check if player is still on the log after movement
-      const playerCenterX = player.x + player.size / 2;
-      if (!(playerCenterX > currentLog.x && playerCenterX < currentLog.x + currentLog.width)) {
-        // Player fell off the log
-        player.ridingLog = null;
-      } else {
-        player.ridingLog = currentLog;
-      }
-    } else {
+    
+    if (!stillOnRaft) {
       player.ridingLog = null;
     }
   }
@@ -318,7 +305,7 @@
     if (scoreEl) scoreEl.textContent = `Score: ${score}`;
   }
 
-  // Collision detection
+  // Collision detection - FIXED: Better raft detection
   function checkCollisions() {
     if (!player || !player.alive) return;
 
@@ -328,8 +315,8 @@
       return;
     }
 
-    // Reset riding log - we'll check if player is still on one
-    player.ridingLog = null;
+    // Don't reset ridingLog here - let updateRaftMovement handle it
+    let onSafeSurface = false;
 
     if (currentRow.type === 'road') {
       for (const obs of currentRow.obstacles) {
@@ -341,6 +328,7 @@
           return;
         }
       }
+      onSafeSurface = false; // Roads are never safe
     } else if (currentRow.type === 'river') {
       let onLog = false;
       for (const obs of currentRow.obstacles) {
@@ -350,14 +338,21 @@
         if (playerCenterX > obs.x && playerCenterX < obs.x + obs.width &&
             player.y < obstacleY + obs.height && player.y + player.size > obstacleY) {
           onLog = true;
-          player.ridingLog = obs;
+          player.ridingLog = obs; // Set the raft we're on
           break;
         }
       }
-      if (!onLog) {
-        endGame();
-        return;
-      }
+      onSafeSurface = onLog;
+    } else {
+      // Grass or island are safe
+      onSafeSurface = true;
+      player.ridingLog = null;
+    }
+
+    // Only die if not on a safe surface
+    if (!onSafeSurface) {
+      endGame();
+      return;
     }
 
     if (player.x < -player.size || player.x > CANVAS_W) {
@@ -387,7 +382,7 @@
       }
     }
 
-    // Handle raft movement automatically
+    // FIXED: Call raft movement every frame
     updateRaftMovement(dt);
   }
 
@@ -478,7 +473,6 @@
         const oy = y + (TILE_SIZE - obs.height) / 2;
         
         if (obs.type === 'car') {
-          // Color code cars by speed
           const speedRatio = Math.abs(obs.speed) / 1.5;
           const red = Math.min(255, 180 + speedRatio * 75);
           const color = `rgb(${red}, 30, 58)`;
@@ -489,7 +483,6 @@
           ctx.fillStyle = 'rgba(255,255,255,0.3)';
           ctx.fillRect(obs.x + 10, oy + 5, obs.width * 0.4, obs.height * 0.4);
         } else if (obs.type === 'ghost') {
-          // Ghosts get more transparent when faster
           const speedRatio = Math.abs(obs.speed) / 1.5;
           const alpha = Math.min(0.95, 0.7 + speedRatio * 0.25);
           
@@ -503,7 +496,6 @@
           ctx.arc(obs.x + obs.width * 0.65, oy + obs.height * 0.4, 4, 0, Math.PI * 2);
           ctx.fill();
         } else if (obs.type === 'log') {
-          // Logs get darker when faster
           const speedRatio = Math.abs(obs.speed) / 0.8;
           const darken = Math.min(80, speedRatio * 40);
           
