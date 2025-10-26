@@ -6,7 +6,7 @@
   <title>Midnight Crossing</title>
   <link rel="stylesheet" href="index.css">
   <link rel="stylesheet" href="day_5.css">
-  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Shadows+Into+Light&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.googleapis.com/css2?family=Creepster&family=Shadows+Into+Light&display=swap" rel="stylesheet">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌙</text></svg>">
 </head>
 <body>
@@ -49,11 +49,14 @@
     </div>
   </main>
 
-  <!-- Play overlay -->
+  <!-- Play overlay (also used for initial ability pick and level-up) -->
   <div id="play-overlay" class="modal play-overlay">
     <div class="modal-content">
-      <h2>Midnight Crossing</h2>
-      <p>Press Play to start. (Gameplay removed — scaffold only)</p>
+      <h2 id="overlay-title">Midnight Crossing</h2>
+      <div id="overlay-body">
+        <p id="overlay-desc">Press Play to start. (Gameplay will begin and you'll pick an ability.)</p>
+        <div id="choice-area" class="choice-grid" style="display:none;"></div>
+      </div>
       <div class="modal-buttons">
         <button id="play-btn" class="btn-primary">Play</button>
       </div>
@@ -96,36 +99,43 @@
     </div>
   </div>
 
+  <div id="hud" class="hud" aria-hidden="false" style="display:none;">
+    <div id="hp-text">HP: 100 / 100</div>
+    <div class="xp-bar"><i id="xp-fill"></i></div>
+    <div style="margin-top:6px;">Level: <span id="lvl">1</span></div>
+    <div class="ability-list" id="ability-pills"></div>
+  </div>
+
+  <!-- only Firebase imports/initialization live here -->
   <script type="module">
-    // Firebase init kept in HTML module as before (unchanged) if needed by leaderboard/save.
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
-    import { 
-        getAuth, 
-        GoogleAuthProvider, 
-        signInWithPopup, 
-        signOut, 
-        onAuthStateChanged 
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged
     } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
-    import { 
-        getFirestore, 
-        doc, 
-        setDoc, 
-        getDoc,
-        collection,
-        getDocs,
-        orderBy,
-        query 
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      getDoc,
+      collection,
+      getDocs,
+      orderBy,
+      query
     } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
     const firebaseConfig = {
-        apiKey: "AIzaSyARY96nrH2Aio8rOiLkewSXtTS40TZLrAw",
-        authDomain: "nerd-mini-events.firebaseapp.com",
-        projectId: "nerd-mini-events",
-        storageBucket: "nerd-mini-events.firebasestorage.app",
-        messagingSenderId: "974357416633",
-        appId: "1:974357416633:web:e190de60553a685d03e968",
-        measurementId: "G-V9NGCSEY8J"
+      apiKey: "AIzaSyARY96nrH2Aio8rOiLkewSXtTS40TZLrAw",
+      authDomain: "nerd-mini-events.firebaseapp.com",
+      projectId: "nerd-mini-events",
+      storageBucket: "nerd-mini-events.firebasestorage.app",
+      messagingSenderId: "974357416633",
+      appId: "1:974357416633:web:e190de60553a685d03e968",
+      measurementId: "G-V9NGCSEY8J"
     };
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
@@ -150,6 +160,7 @@
     window.firebaseReady = true;
   </script>
 
+  <!-- main game code (moved to day_5.js) -->
   <script src="day_5.js"></script>
 </body>
 </html>

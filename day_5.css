@@ -1,5 +1,4 @@
-
-/* Standalone CSS for Day 3 (copied necessary frame/playbound rules; removed day_1.css reference) */
+/* Complete CSS used by day_5.html (UI, modal, buttons, HUD, frame, background) */
 
 :root {
   --accent: #ff6b35;
@@ -8,8 +7,7 @@
   --frame-bg: linear-gradient(135deg, rgba(10,5,5,0.9), rgba(20,8,8,0.95));
   --canvas-w: 640;
   --canvas-h: 480;
-  /* viewport offset used when sizing the frame (top controls + desired bottom gap) */
-  --vh-offset: 112px; /* adjust if you need more/less bottom padding */
+  --vh-offset: 112px;
 }
 
 /* ensure page fits without scrolling */
@@ -36,7 +34,18 @@ html, body {
 #left-controls { left: 18px; }
 #right-controls { right: 18px; }
 
-/* small box around countdown */
+.header-btn {
+  background: rgba(0,0,0,0.6);
+  color: #ffdca8;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* small label & box */
+.small-label { font-size: 0.75rem; color:#ffd8a8; opacity:0.9; }
 .header-box {
   background: rgba(0,0,0,0.72);
   padding: 8px 12px;
@@ -47,20 +56,18 @@ html, body {
   font-weight: 700;
 }
 
-/* frame and game area sized to viewport so no scrolling */
-/* Make the game area as large as possible while leaving room for top controls */
+/* frame and game area */
 #game-wrap {
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* ensure top controls do not overlap the frame */
+  align-items: flex-start;
   height: 100vh;
-  padding: 70px 24px 16px 24px; /* top padding reserves space for top-controls; bottom padding for breathing room */
+  padding: 70px 24px 16px 24px;
   box-sizing: border-box;
   overflow: hidden;
 }
 
 .halloween-frame {
-  /* keep the canvas aspect ratio and maximize size within viewport minus top controls */
   background: var(--frame-bg);
   padding: 12px;
   box-shadow: 0 12px 40px rgba(0,0,0,0.7);
@@ -68,14 +75,11 @@ html, body {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  /* Constrain to viewport: use the CSS variable so JS and CSS align */
   max-width: calc(100vw - 48px);
   max-height: calc(100vh - var(--vh-offset));
   box-sizing: border-box;
 }
 
-
-/* playbound keeps visible border and remains visible in fullscreen */
 .playbound {
   width: 100%;
   aspect-ratio: var(--canvas-w) / var(--canvas-h);
@@ -88,10 +92,9 @@ html, body {
   display: flex;
   justify-content: center;
   align-items: center;
-  box-sizing: content-box; /* we compute outer size in JS using computed border/padding */
+  box-sizing: content-box;
 }
 
-/* fullscreen: maintain aspect and scale by height to avoid squish */
 .playbound:fullscreen {
   border: 6px solid rgba(255,107,53,1);
   box-shadow: 0 0 40px rgba(255,107,53,0.18);
@@ -100,23 +103,10 @@ html, body {
   align-items: center;
   background: #000;
 }
-#game-area {
-  flex: 1;
-  display: flex;
-  width: 100%;
-  min-height: 0; /* allow flex item to shrink below content size */
-}
 
-.game-note-muted {
-  flex-shrink: 0;
-  padding: 6px 12px;
-  text-align: center;
-  color: #a88860;
-  font-size: 0.85rem;
-}
+#game-area { flex: 1; display: flex; width: 100%; min-height: 0; }
+.game-note-muted { flex-shrink: 0; padding: 6px 12px; text-align: center; color: #a88860; font-size: 0.85rem; }
 
-
-/* ensure the canvas stays centered and keeps correct aspect ratio */
 #game-canvas {
   width: 100%;
   height: 100%;
@@ -125,16 +115,8 @@ html, body {
   box-shadow: inset 0 12px 40px rgba(0,0,0,0.6), 0 12px 30px rgba(0,0,0,0.6);
   image-rendering: optimizeQuality;
 }
+.playbound:fullscreen #game-canvas { height: calc(100vh - 24px); width: auto; max-width: unset; max-height: 100vh; }
 
-/* In fullscreen keep canvas aspect ratio: scale by height and center */
-.playbound:fullscreen #game-canvas {
-  height: calc(100vh - 24px);
-  width: auto;
-  max-width: unset;
-  max-height: 100vh;
-}
-
-/* fullscreen button placed over playbound */
 .fullscreen-btn {
   position: absolute;
   right: 8px;
@@ -149,73 +131,7 @@ html, body {
   font-size: 1.0rem;
 }
 
-/* move and style score below hearts */
-.center-score {
-  position: absolute;
-  z-index: 210;
-  left: 50%;
-  top: 46px;
-  transform: translateX(-50%);
-  pointer-events: none;
-  font-family: 'Creepster', cursive;
-  font-size: 1.4rem;
-  color: #ffcf6b;
-  background: rgba(0,0,0,0.65);
-  padding: 8px 14px;
-  border-radius: 12px;
-  border: 2px solid var(--accent);
-}
-
-/* trail stroke */
-.slice-trail {
-  position: absolute;
-  pointer-events: none;
-}
-
-/* make leaderboard full page when opened */
-#day-leaderboard-table {
-  width: 100%;
-  border-collapse: collapse;
-  color: #e7b37a;
-  backdrop-filter: blur(2px);
-}
-#day-leaderboard-table th, #day-leaderboard-table td {
-  padding: 12px;
-  text-align: center;
-  border-bottom: 1px solid rgba(255,107,53,0.06);
-  font-size: 0.95rem;
-}
-#day-leaderboard-table th {
-  background: linear-gradient(90deg, rgba(50,20,15,0.6), rgba(40,10,10,0.55));
-  font-weight: 700;
-  color: #ffd8a8;
-  position: sticky;
-  top: 0;
-  z-index: 5;
-}
-
-/* top ranks */
-#day-leaderboard-table .rank-1 { background: linear-gradient(90deg, rgba(60,40,8,0.7), rgba(40,20,6,0.6)); color:#ffdca8; font-weight:800; }
-#day-leaderboard-table .rank-2 { background: linear-gradient(90deg, rgba(40,40,40,0.55), rgba(30,30,30,0.5)); color:#f0e0c8; font-weight:700; }
-#day-leaderboard-table .rank-3 { background: linear-gradient(90deg, rgba(60,36,24,0.55), rgba(40,26,16,0.5)); color:#f3d7b0; font-weight:700; }
-
-/* save toast */
-.save-toast {
-  position: absolute;
-  left: 50%;
-  top: 8%;
-  transform: translateX(-50%);
-  background: rgba(0,0,0,0.8);
-  color: #ffdca8;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 2px solid var(--accent);
-  z-index: 400;
-  font-weight: 700;
-  font-family: monospace;
-}
-
-/* modal inside playbound */
+/* modal / content */
 .playbound .modal {
   position: absolute;
   left: 50%;
@@ -232,49 +148,62 @@ html, body {
 }
 .modal.hidden { display: none; }
 
+.modal-content { padding: 16px; color: #ffdca8; }
+.modal-content h2 { margin: 0 0 8px 0; font-size: 1.4rem; }
+.modal-content p { margin: 8px 0; color:#e6c79b; }
+.modal-buttons { display:flex; gap:8px; justify-content:center; margin-top:12px; }
+.btn-primary, .btn-secondary {
+  padding: 8px 12px; border-radius:8px; border:2px solid var(--accent); cursor:pointer;
+}
+.btn-primary { background: linear-gradient(180deg,var(--accent), var(--accent-light)); color: #150606; font-weight:800; }
+.btn-secondary { background: rgba(0,0,0,0.6); color: #ffdca8; border-color: rgba(255,107,53,0.7); }
+
+/* HUD */
+.hud { position:absolute; left:12px; top:12px; z-index:260; font-family:monospace; background:rgba(0,0,0,0.6); padding:8px 10px; border-radius:8px; border:2px solid rgba(255,107,53,0.9); color:#ffdca8; }
+.xp-bar { height:8px; background:#2b1a12; border-radius:8px; overflow:hidden; margin-top:6px; width:160px; }
+.xp-bar > i { display:block; height:100%; background:linear-gradient(90deg,#ffd84d,#ff6bcb); width:0%; }
+.ability-list { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+.ability-pill { background:rgba(0,0,0,0.5); padding:6px 8px; border-radius:6px; border:1px solid rgba(255,107,53,0.6); color:#ffdca8; font-size:0.85rem; }
+
+/* small UI specifics */
+.center-score {
+  position: absolute;
+  z-index: 210;
+  left: 50%;
+  top: 46px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-family: 'Creepster', cursive;
+  font-size: 1.4rem;
+  color: #ffcf6b;
+  background: rgba(0,0,0,0.65);
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 2px solid var(--accent);
+}
+
+/* leaderboard table */
+#day-leaderboard-table { width: 100%; border-collapse: collapse; color: #e7b37a; backdrop-filter: blur(2px); }
+#day-leaderboard-table th, #day-leaderboard-table td { padding: 12px; text-align: center; border-bottom: 1px solid rgba(255,107,53,0.06); font-size: 0.95rem; }
+#day-leaderboard-table th { background: linear-gradient(90deg, rgba(50,20,15,0.6), rgba(40,10,10,0.55)); font-weight: 700; color: #ffd8a8; position: sticky; top: 0; z-index: 5; }
+
+/* background elements */
+#background { pointer-events: none; z-index: -1; position: fixed; inset: 0; }
+.leaf, .bg-pumpkin { position: absolute; width: 28px; height: 28px; pointer-events: none; animation-name: fall; animation-duration: 12s; animation-timing-function: linear; animation-iteration-count: infinite; }
+.leaf { background: radial-gradient(circle at 35% 30%, #ffa94d, #7a3a00); border-radius: 6px; transform-origin: center; opacity: 0.9; }
+.bg-pumpkin { width: 36px; height: 28px; background: radial-gradient(circle at 50% 40%, #ff8c00, #c25a00); border-radius: 50% 50% 40% 40%; box-shadow: 0 3px 6px rgba(0,0,0,0.4); opacity: 0.95; }
+@keyframes fall { 0% { transform: translateY(-20vh) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(120vh) rotate(360deg); opacity: 0.9; } }
+
+/* choice cards */
+.choice-grid { display:flex; gap:12px; justify-content:center; margin-top:12px; flex-wrap:wrap; }
+.choice-card { cursor:pointer; min-width:200px; background:linear-gradient(180deg,#151212,#2a1c1c); border:2px solid rgba(255,107,53,0.9); padding:12px; border-radius:8px; color:#ffdca8; text-align:left; }
+.choice-card h3 { margin:0 0 6px 0; font-size:1.05rem; }
+.choice-card p { margin:0; font-size:0.9rem; color:#e0b57f; }
+
 /* responsive tweaks */
 @media (max-width: 720px) {
   .halloween-frame { width: 92vw; padding: 8px; }
   .center-score { font-size: 1.0rem; padding: 6px 10px; top: 54px; }
   #hearts { font-size: 18px; top: 6px; letter-spacing: 4px; }
   .fullscreen-btn { font-size: 0.9rem; padding: 5px 7px; }
-}
-
-/* --- Background elements from day_1.css (exact) --- */
-#background { pointer-events: none; z-index: -1; position: fixed; inset: 0; }
-
-.leaf, .bg-pumpkin {
-  position: absolute;
-  width: 28px;
-  height: 28px;
-  pointer-events: none;
-  animation-name: fall;
-  animation-duration: 12s;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-}
-
-/* leaf visuals */
-.leaf {
-  background: radial-gradient(circle at 35% 30%, #ffa94d, #7a3a00);
-  border-radius: 6px;
-  transform-origin: center;
-  opacity: 0.9;
-}
-
-/* pumpkin visuals bigger */
-.bg-pumpkin {
-  width: 36px;
-  height: 28px;
-  background: radial-gradient(circle at 50% 40%, #ff8c00, #c25a00);
-  border-radius: 50% 50% 40% 40%;
-  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
-  opacity: 0.95;
-}
-
-/* falling animation */
-@keyframes fall {
-  0% { transform: translateY(-20vh) rotate(0deg); opacity: 0; }
-  10% { opacity: 1; }
-  100% { transform: translateY(120vh) rotate(360deg); opacity: 0.9; }
 }
