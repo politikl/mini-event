@@ -17,22 +17,23 @@
   const TILE_SIZE = 60;
   const PLAYER_SIZE = 40;
   const GRID_COLS = 8;
-  const VISIBLE_ROWS = 14;
-  const SAFE_START_ROWS = 6; // Reduced safe area for more roads early
-  const PLAYER_ROW_OFFSET = 3; // Player appears 3 rows from bottom
+  const VISIBLE_ROWS = 16; // Increased for better buffer
+  const SAFE_START_ROWS = 6;
+  const ROW_BUFFER = 8; // Rows to keep ahead/behind player
 
   canvas.width = CANVAS_W;
   canvas.height = CANVAS_H;
 
   // Game state
   let player = null;
-  let rows = [];
+  let rows = new Map(); // Use Map for reliable row storage
   let score = 0;
   let highestRow = 0;
   let running = false;
   let gameLoop = null;
   let keys = {};
   let cameraY = 0;
+  let nextRowId = 0;
 
   // Player object
   function createPlayer() {
@@ -47,15 +48,16 @@
     };
   }
 
-  // Row types and generation - FIXED: More roads early
+  // Row types and generation - FIXED: Consistent row generation
   function createRow(rowNum) {
     const row = {
+      id: rowNum, // Use consistent ID
       num: rowNum,
       type: 'grass',
       obstacles: []
     };
 
-    // Safe starting area - but allow some roads earlier
+    // Safe starting area
     if (rowNum < 2) {
       row.type = rowNum === 0 ? 'island' : 'grass';
       return row;
@@ -64,7 +66,7 @@
     // Gradual difficulty with more roads early
     const difficulty = Math.min(1, (rowNum - 2) / 25);
     
-    // Generate terrain - increased road probability, especially early
+    // Generate terrain - increased road probability
     const rand = Math.random();
     
     if (rowNum < SAFE_START_ROWS) {
@@ -73,7 +75,7 @@
         row.type = 'grass';
       } else if (rand < 0.5) {
         row.type = 'island';
-      } else if (rand < 0.8) { // 30% chance for roads early
+      } else if (rand < 0.8) {
         row.type = 'road';
         generateRoadObstacles(row, rowNum, difficulty);
       } else {
@@ -86,7 +88,7 @@
         row.type = 'grass';
       } else if (rand < 0.35) {
         row.type = 'island';
-      } else if (rand < 0.65) { // 30% chance for roads
+      } else if (rand < 0.65) {
         row.type = 'road';
         generateRoadObstacles(row, rowNum, difficulty);
       } else {
@@ -100,13 +102,12 @@
 
   function generateRoadObstacles(row, rowNum, difficulty) {
     const direction = Math.random() < 0.5 ? 1 : -1;
-    // Much slower speeds early on
     const speed = (0.4 + Math.random() * 0.3 + difficulty * 0.5) * direction;
-    const spacing = 200 + Math.random() * 100; // More spacing
-    const count = Math.max(1, Math.ceil(CANVAS_W / spacing) - 1); // Fewer obstacles
+    const spacing = 200 + Math.random() * 100;
+    const count = Math.max(1, Math.ceil(CANVAS_W / spacing) - 1);
 
     for (let i = 0; i < count; i++) {
-      const isGhost = Math.random() < (0.1 + difficulty * 0.3); // Fewer ghosts initially
+      const isGhost = Math.random() < (0.1 + difficulty * 0.3);
       row.obstacles.push({
         x: i * spacing + Math.random() * 80,
         speed: speed,
@@ -127,24 +128,27 @@
       row.obstacles.push({
         x: i * spacing + Math.random() * 40,
         speed: speed,
-        width: 140 + Math.random() * 60, // Wider logs
+        width: 140 + Math.random() * 60,
         height: 30,
         type: 'log'
       });
     }
   }
 
-  // Initialize game
+  // Initialize game - FIXED: Better row initialization
   function initGame() {
     player = createPlayer();
-    rows = [];
+    rows = new Map();
     score = 0;
     highestRow = 0;
     cameraY = 0;
+    nextRowId = 0;
     
-    // Create initial rows
-    for (let i = 0; i < VISIBLE_ROWS + 5; i++) {
-      rows.push(createRow(i));
+    // Create initial rows around player
+    for (let i = -ROW_BUFFER; i < VISIBLE_ROWS + ROW_BUFFER; i++) {
+      const row = createRow(i);
+      rows.set(i, row);
+      nextRowId = Math.max(nextRowId, i + 1);
     }
     
     updatePlayerPosition();
@@ -172,21 +176,21 @@
   function updateCamera() {
     if (!player) return;
     
-    // Camera centers on the player's row (with offset for visual position)
-    cameraY = player.row * TILE_SIZE;
+    // Camera centers on the player's row (adjusted for visual position)
+    const targetY = player.row * TILE_SIZE - (CANVAS_H / 2 - TILE_SIZE);
+    cameraY = targetY;
   }
 
-  // Update player visual position - FIXED: Player appears at their actual row
+  // Update player visual position
   function updatePlayerPosition() {
     if (!player) return;
     player.x = player.col * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
     
     // Player Y is based on their actual row, adjusted for camera
-    // This ensures visual position matches logical position for collisions
     player.y = getRowY(player.row) + (TILE_SIZE - PLAYER_SIZE) / 2;
   }
 
-  // Movement
+  // Movement - FIXED: Better row management
   function movePlayer(dcol, drow) {
     if (!player || !player.alive) return;
 
@@ -205,15 +209,41 @@
       score += (newRow - highestRow) * 10;
       highestRow = newRow;
       updateScore();
-      
-      // Generate new rows ahead
-      while (rows.length <= player.row + VISIBLE_ROWS) {
-        rows.push(createRow(rows.length));
+    }
+
+    // Generate new rows as needed - FIXED: Proper row generation
+    ensureRowsExist();
+  }
+
+  // FIXED: Proper row management to prevent corruption
+  function ensureRowsExist() {
+    if (!player) return;
+
+    const minRow = player.row - ROW_BUFFER;
+    const maxRow = player.row + VISIBLE_ROWS + ROW_BUFFER;
+
+    // Generate missing rows ahead
+    for (let rowNum = player.row; rowNum <= maxRow; rowNum++) {
+      if (!rows.has(rowNum)) {
+        const row = createRow(rowNum);
+        rows.set(rowNum, row);
+        nextRowId = Math.max(nextRowId, rowNum + 1);
       }
-      
-      // Remove old rows
-      if (rows.length > VISIBLE_ROWS + 25) {
-        rows = rows.filter(r => r.num >= player.row - 8);
+    }
+
+    // Generate missing rows behind (for going backwards)
+    for (let rowNum = player.row - 1; rowNum >= minRow; rowNum--) {
+      if (!rows.has(rowNum)) {
+        const row = createRow(rowNum);
+        rows.set(rowNum, row);
+      }
+    }
+
+    // Clean up rows that are too far away (conservative cleanup)
+    const cleanupThreshold = 30; // Only remove rows very far away
+    for (let [rowNum, row] of rows) {
+      if (rowNum < player.row - cleanupThreshold || rowNum > player.row + cleanupThreshold) {
+        rows.delete(rowNum);
       }
     }
   }
@@ -222,17 +252,19 @@
     if (scoreEl) scoreEl.textContent = `Score: ${score}`;
   }
 
-  // Collision detection - SIMPLIFIED: Player visual position IS their logical position
+  // Collision detection
   function checkCollisions() {
     if (!player || !player.alive) return;
 
-    const currentRow = rows.find(r => r.num === player.row);
-    if (!currentRow) return;
+    const currentRow = rows.get(player.row);
+    if (!currentRow) {
+      console.warn('Missing row for player:', player.row);
+      return;
+    }
 
     player.ridingLog = null;
 
     if (currentRow.type === 'road') {
-      // Check car/ghost collision - player visual position matches logical position
       for (const obs of currentRow.obstacles) {
         const obstacleY = getRowY(player.row) + (TILE_SIZE - obs.height) / 2;
         
@@ -243,13 +275,11 @@
         }
       }
     } else if (currentRow.type === 'river') {
-      // Must be on a log
       let onLog = false;
       for (const obs of currentRow.obstacles) {
         const playerCenterX = player.x + player.size / 2;
         const obstacleY = getRowY(player.row) + (TILE_SIZE - obs.height) / 2;
         
-        // Check if player is visually on the log
         if (playerCenterX > obs.x && playerCenterX < obs.x + obs.width &&
             player.y < obstacleY + obs.height && player.y + player.size > obstacleY) {
           onLog = true;
@@ -274,15 +304,14 @@
            y1 < y2 + h2 - 8 && y1 + h1 > y2 + 8;
   }
 
-  // Get Y position for a row (relative to camera) - FIXED: Proper camera math
+  // Get Y position for a row (relative to camera)
   function getRowY(rowNum) {
-    // Row appears at its actual position minus camera offset
     return rowNum * TILE_SIZE - cameraY;
   }
 
   // Update obstacles
   function updateObstacles(dt) {
-    for (const row of rows) {
+    for (const [rowNum, row] of rows) {
       for (const obs of row.obstacles) {
         obs.x += obs.speed * dt * 0.1;
         
@@ -300,7 +329,7 @@
       player.x += player.ridingLog.speed * dt * 0.1;
       player.col = Math.floor(player.x / TILE_SIZE);
       player.col = Math.max(0, Math.min(GRID_COLS - 1, player.col));
-      updatePlayerPosition(); // Update visual position when moving with log
+      updatePlayerPosition();
     }
   }
 
@@ -317,16 +346,16 @@
     const key = e.key.toLowerCase();
     let moved = false;
 
-    if (key === 'arrowleft' || key === 'a' || key === 'j') {
+    if (key === 'arrowleft' || key === 'a') {
       movePlayer(-1, 0);
       moved = true;
-    } else if (key === 'arrowright' || key === 'd' || key === 'l') {
+    } else if (key === 'arrowright' || key === 'd') {
       movePlayer(1, 0);
       moved = true;
-    } else if (key === 'arrowdown' || key === 's' || key === 'k') {
+    } else if (key === 'arrowup' || key === 'w') {
       movePlayer(0, 1);
       moved = true;
-    } else if (key === 'arrowup' || key === 'w' || key === 'i') {
+    } else if (key === 'arrowdown' || key === 's') {
       movePlayer(0, -1);
       moved = true;
     }
@@ -347,7 +376,10 @@
   }
 
   function drawRows() {
-    for (const row of rows) {
+    // Convert Map to array and sort by row number for proper drawing order
+    const sortedRows = Array.from(rows.values()).sort((a, b) => a.num - b.num);
+    
+    for (const row of sortedRows) {
       const y = getRowY(row.num);
       
       // Only draw rows that are visible on screen
@@ -495,6 +527,7 @@
 
     if (running && player && player.alive) {
       updateObstacles(dt);
+      ensureRowsExist(); // Ensure rows exist before collision check
       checkCollisions();
       updateCamera();
     }
