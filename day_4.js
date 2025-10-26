@@ -47,7 +47,7 @@
   // Constants (in logical coords)
   const W = LOG_W;
   const H = LOG_H;
-  const TILE_SIZE = 24;
+  const TILE_SIZE = 48;
   const PLAYER_SIZE = 36;
   const ROWS_VISIBLE = Math.ceil(H / TILE_SIZE) + 2;
   // how many tile rows the camera leaves above the player (look-ahead)
@@ -221,7 +221,7 @@
 
   // util mapping between grid row index and world Y so player is centered inside tiles
   function gridYToWorldY(gridY) {
-    return -gridY * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
+    return -gridY * (TILE_SIZE/2) + (TILE_SIZE - PLAYER_SIZE) / 2;
   }
 
   // Camera helper to keep player near bottom and allow looking ahead
