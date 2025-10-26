@@ -1,16 +1,14 @@
-/* Complete CSS used by day_5.html (UI, modal, buttons, HUD, frame, background) */
+/* Updated styles: game area expanded, HUD moved inside playbound, same decorative style & fonts used earlier */
 
 :root {
   --accent: #ff6b35;
   --accent-light: #ff9a3d;
   --dark: #0a0606;
-  --frame-bg: linear-gradient(135deg, rgba(10,5,5,0.9), rgba(20,8,8,0.95));
-  --canvas-w: 640;
-  --canvas-h: 480;
-  --vh-offset: 112px;
+  --frame-bg: linear-gradient(135deg, rgba(10,5,5,0.95), rgba(20,8,8,0.98));
+  --vh-offset: 92px;
 }
 
-/* ensure page fits without scrolling */
+/* page layout */
 html, body {
   height: 100%;
   margin: 0;
@@ -21,189 +19,100 @@ html, body {
   font-family: 'Shadows Into Light', system-ui, sans-serif;
 }
 
-/* Top side controls */
-.top-controls {
-  position: fixed;
-  top: 12px;
-  z-index: 220;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  pointer-events: auto;
-}
-#left-controls { left: 18px; }
-#right-controls { right: 18px; }
+/* top controls */
+.top-controls { position: fixed; top: 12px; z-index: 400; display:flex; gap:10px; align-items:center; pointer-events:auto; }
+#left-controls { left: 18px; } #right-controls { right: 18px; }
 
-.header-btn {
-  background: rgba(0,0,0,0.6);
-  color: #ffdca8;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 2px solid var(--accent);
-  text-decoration: none;
-  cursor: pointer;
-}
+.header-btn { background: rgba(0,0,0,0.6); color:#ffdca8; padding:8px 10px; border-radius:10px; border:2px solid var(--accent); cursor:pointer; }
 
-/* small label & box */
-.small-label { font-size: 0.75rem; color:#ffd8a8; opacity:0.9; }
-.header-box {
-  background: rgba(0,0,0,0.72);
-  padding: 8px 12px;
-  border-radius: 12px;
-  border: 2px solid var(--accent);
-  color: #ffd8a8;
-  font-family: monospace;
-  font-weight: 700;
-}
-
-/* frame and game area */
-#game-wrap {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  height: 100vh;
-  padding: 70px 24px 16px 24px;
-  box-sizing: border-box;
-  overflow: hidden;
-}
+/* game wrap: maximize play area */
+#game-wrap { display:flex; justify-content:center; align-items:center; height:100vh; padding:48px 12px 12px 12px; box-sizing:border-box; overflow:hidden; }
 
 .halloween-frame {
+  width: calc(100vw - 24px);
+  height: calc(100vh - var(--vh-offset));
   background: var(--frame-bg);
-  padding: 12px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.7);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  max-width: calc(100vw - 48px);
-  max-height: calc(100vh - var(--vh-offset));
+  padding: 8px;
+  box-shadow: 0 14px 50px rgba(0,0,0,0.75);
+  border-radius: 10px;
   box-sizing: border-box;
+  display:flex; flex-direction:column; gap:8px; align-items:center;
 }
 
+/* playbound fills frame area */
 .playbound {
   width: 100%;
-  aspect-ratio: var(--canvas-w) / var(--canvas-h);
+  height: 100%;
   position: relative;
   overflow: hidden;
   border-radius: 8px;
-  background: linear-gradient(180deg,#050405 0%, #0f0507 100%);
+  background: linear-gradient(180deg,#071017 0%, #0d0708 100%);
   border: 6px solid rgba(255,107,53,0.95);
-  box-shadow: 0 0 30px rgba(255,107,53,0.06), inset 0 0 20px rgba(0,0,0,0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  box-sizing: content-box;
+  display:flex; align-items:center; justify-content:center;
 }
 
-.playbound:fullscreen {
-  border: 6px solid rgba(255,107,53,1);
-  box-shadow: 0 0 40px rgba(255,107,53,0.18);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: #000;
-}
+/* canvas: stretch to playbound while keeping logical resolution */
+#game-canvas { width:100%; height:100%; display:block; border-radius:6px; image-rendering: optimizeQuality; }
 
-#game-area { flex: 1; display: flex; width: 100%; min-height: 0; }
-.game-note-muted { flex-shrink: 0; padding: 6px 12px; text-align: center; color: #a88860; font-size: 0.85rem; }
-
-#game-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-  border-radius: 6px;
-  box-shadow: inset 0 12px 40px rgba(0,0,0,0.6), 0 12px 30px rgba(0,0,0,0.6);
-  image-rendering: optimizeQuality;
-}
-.playbound:fullscreen #game-canvas { height: calc(100vh - 24px); width: auto; max-width: unset; max-height: 100vh; }
-
-.fullscreen-btn {
+/* HUD sits inside playbound bottom-left */
+.hud {
   position: absolute;
-  right: 8px;
-  top: 8px;
-  z-index: 50;
-  background: rgba(0,0,0,0.75);
-  color: var(--accent);
-  border: 2px solid var(--accent);
+  left: 12px;
+  bottom: 12px;
+  z-index: 500;
+  font-family: monospace;
+  background: rgba(0,0,0,0.6);
+  padding: 8px 10px;
   border-radius: 8px;
-  padding: 6px 8px;
-  cursor: pointer;
-  font-size: 1.0rem;
+  border: 2px solid rgba(255,107,53,0.95);
+  color: #ffdca8;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
 }
 
-/* modal / content */
-.playbound .modal {
-  position: absolute;
-  left: 50%;
-  top: 52%;
-  transform: translate(-50%, -50%);
-  width: min(92%, 420px);
-  max-width: calc(100% - 24px);
-  z-index: 320;
-  background: linear-gradient(180deg, rgba(10,8,6,0.96), rgba(20,10,10,0.98));
-  border-radius: 10px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.7);
-  border: 2px solid rgba(255,107,53,0.9);
-  pointer-events: auto;
-}
-.modal.hidden { display: none; }
-
-.modal-content { padding: 16px; color: #ffdca8; }
-.modal-content h2 { margin: 0 0 8px 0; font-size: 1.4rem; }
-.modal-content p { margin: 8px 0; color:#e6c79b; }
-.modal-buttons { display:flex; gap:8px; justify-content:center; margin-top:12px; }
-.btn-primary, .btn-secondary {
-  padding: 8px 12px; border-radius:8px; border:2px solid var(--accent); cursor:pointer;
-}
-.btn-primary { background: linear-gradient(180deg,var(--accent), var(--accent-light)); color: #150606; font-weight:800; }
-.btn-secondary { background: rgba(0,0,0,0.6); color: #ffdca8; border-color: rgba(255,107,53,0.7); }
-
-/* HUD */
-.hud { position:absolute; left:12px; top:12px; z-index:260; font-family:monospace; background:rgba(0,0,0,0.6); padding:8px 10px; border-radius:8px; border:2px solid rgba(255,107,53,0.9); color:#ffdca8; }
-.xp-bar { height:8px; background:#2b1a12; border-radius:8px; overflow:hidden; margin-top:6px; width:160px; }
+/* XP bar */
+.xp-bar { height:8px; background:#2b1a12; border-radius:8px; overflow:hidden; width:160px; }
 .xp-bar > i { display:block; height:100%; background:linear-gradient(90deg,#ffd84d,#ff6bcb); width:0%; }
-.ability-list { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
-.ability-pill { background:rgba(0,0,0,0.5); padding:6px 8px; border-radius:6px; border:1px solid rgba(255,107,53,0.6); color:#ffdca8; font-size:0.85rem; }
 
-/* small UI specifics */
+/* ability pills */
+.ability-list { display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; max-width:300px; }
+.ability-pill { background:rgba(0,0,0,0.45); padding:6px 8px; border-radius:6px; border:1px solid rgba(255,107,53,0.6); color:#ffdca8; font-size:0.85rem; }
+
+/* center score */
 .center-score {
   position: absolute;
-  z-index: 210;
+  z-index: 480;
   left: 50%;
-  top: 46px;
+  top: 14px;
   transform: translateX(-50%);
-  pointer-events: none;
+  pointer-events:none;
   font-family: 'Creepster', cursive;
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   color: #ffcf6b;
-  background: rgba(0,0,0,0.65);
-  padding: 8px 14px;
-  border-radius: 12px;
+  background: rgba(0,0,0,0.6);
+  padding: 6px 12px;
+  border-radius: 10px;
   border: 2px solid var(--accent);
 }
 
-/* leaderboard table */
-#day-leaderboard-table { width: 100%; border-collapse: collapse; color: #e7b37a; backdrop-filter: blur(2px); }
-#day-leaderboard-table th, #day-leaderboard-table td { padding: 12px; text-align: center; border-bottom: 1px solid rgba(255,107,53,0.06); font-size: 0.95rem; }
-#day-leaderboard-table th { background: linear-gradient(90deg, rgba(50,20,15,0.6), rgba(40,10,10,0.55)); font-weight: 700; color: #ffd8a8; position: sticky; top: 0; z-index: 5; }
+/* choice / modal styles (kept) */
+.playbound .modal { position:absolute; left:50%; top:50%; transform: translate(-50%,-50%); width:min(92%,560px); z-index:520; background:linear-gradient(180deg,rgba(10,8,6,0.96),rgba(20,10,10,0.98)); border-radius:10px; box-shadow:0 10px 40px rgba(0,0,0,0.7); border:2px solid rgba(255,107,53,0.9); }
+.modal.hidden { display:none; }
+.modal-content { padding:16px; color:#ffdca8; }
+.modal-buttons { display:flex; gap:8px; justify-content:center; margin-top:12px; }
 
-/* background elements */
-#background { pointer-events: none; z-index: -1; position: fixed; inset: 0; }
-.leaf, .bg-pumpkin { position: absolute; width: 28px; height: 28px; pointer-events: none; animation-name: fall; animation-duration: 12s; animation-timing-function: linear; animation-iteration-count: infinite; }
-.leaf { background: radial-gradient(circle at 35% 30%, #ffa94d, #7a3a00); border-radius: 6px; transform-origin: center; opacity: 0.9; }
-.bg-pumpkin { width: 36px; height: 28px; background: radial-gradient(circle at 50% 40%, #ff8c00, #c25a00); border-radius: 50% 50% 40% 40%; box-shadow: 0 3px 6px rgba(0,0,0,0.4); opacity: 0.95; }
-@keyframes fall { 0% { transform: translateY(-20vh) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(120vh) rotate(360deg); opacity: 0.9; } }
+/* background visuals */
+#background { pointer-events:none; z-index:100; position:fixed; inset:0; opacity:0.6; }
 
-/* choice cards */
+/* choice card */
 .choice-grid { display:flex; gap:12px; justify-content:center; margin-top:12px; flex-wrap:wrap; }
-.choice-card { cursor:pointer; min-width:200px; background:linear-gradient(180deg,#151212,#2a1c1c); border:2px solid rgba(255,107,53,0.9); padding:12px; border-radius:8px; color:#ffdca8; text-align:left; }
+.choice-card { cursor:pointer; min-width:200px; background:linear-gradient(180deg,#151212,#2a1c1c); border:2px solid rgba(255,107,53,0.95); padding:12px; border-radius:8px; color:#ffdca8; text-align:left; }
 .choice-card h3 { margin:0 0 6px 0; font-size:1.05rem; }
 .choice-card p { margin:0; font-size:0.9rem; color:#e0b57f; }
 
-/* responsive tweaks */
-@media (max-width: 720px) {
-  .halloween-frame { width: 92vw; padding: 8px; }
-  .center-score { font-size: 1.0rem; padding: 6px 10px; top: 54px; }
-  #hearts { font-size: 18px; top: 6px; letter-spacing: 4px; }
-  .fullscreen-btn { font-size: 0.9rem; padding: 5px 7px; }
+/* responsive */
+@media (max-width: 980px) {
+  .halloween-frame { width: 96vw; height: calc(100vh - 72px); }
+  .center-score { font-size: 1.0rem; top: 12px; }
 }

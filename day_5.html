@@ -6,7 +6,8 @@
   <title>Midnight Crossing</title>
   <link rel="stylesheet" href="index.css">
   <link rel="stylesheet" href="day_5.css">
-  <link href="https://fonts.googleapis.googleapis.com/css2?family=Creepster&family=Shadows+Into+Light&display=swap" rel="stylesheet">
+  <!-- fixed Google Fonts URL, uses same title / playful fonts used previously -->
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Shadows+Into+Light&display=swap" rel="stylesheet">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌙</text></svg>">
 </head>
 <body>
@@ -41,10 +42,18 @@
 
           <div id="hearts" aria-hidden="true"></div>
           <div id="big-score" class="center-score" style="top:46px;">Score: 0</div>
+
+          <!-- HUD moved inside playbound so it does not overlap top controls -->
+          <div id="hud" class="hud" aria-hidden="false">
+            <div id="hp-text">HP: 100 / 100</div>
+            <div class="xp-bar"><i id="xp-fill"></i></div>
+            <div style="margin-top:6px;">Level: <span id="lvl">1</span></div>
+            <div class="ability-list" id="ability-pills"></div>
+          </div>
         </div>
       </div>
       <div id="game-note" class="game-note-muted">
-        <small>Midnight Crossing — move carefully. This is a reusable scaffold for Day 5.</small>
+        <small>Midnight Crossing — survive the hordes. Movement-only controls (WASD / IJKL / arrows).</small>
       </div>
     </div>
   </main>
@@ -54,7 +63,7 @@
     <div class="modal-content">
       <h2 id="overlay-title">Midnight Crossing</h2>
       <div id="overlay-body">
-        <p id="overlay-desc">Press Play to start. (Gameplay will begin and you'll pick an ability.)</p>
+        <p id="overlay-desc">Press Play to start. Pick a damaging starting ability.</p>
         <div id="choice-area" class="choice-grid" style="display:none;"></div>
       </div>
       <div class="modal-buttons">
@@ -97,13 +106,6 @@
     <div class="modal-content" style="background:transparent;border:none;box-shadow:none;">
       <div id="flash" style="position:absolute;inset:0;background:white;opacity:0;pointer-events:none;"></div>
     </div>
-  </div>
-
-  <div id="hud" class="hud" aria-hidden="false" style="display:none;">
-    <div id="hp-text">HP: 100 / 100</div>
-    <div class="xp-bar"><i id="xp-fill"></i></div>
-    <div style="margin-top:6px;">Level: <span id="lvl">1</span></div>
-    <div class="ability-list" id="ability-pills"></div>
   </div>
 
   <!-- only Firebase imports/initialization live here -->
@@ -160,7 +162,7 @@
     window.firebaseReady = true;
   </script>
 
-  <!-- main game code (moved to day_5.js) -->
+  <!-- main game code -->
   <script src="day_5.js"></script>
 </body>
 </html>
