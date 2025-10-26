@@ -17,16 +17,16 @@
   const TILE_SIZE = 60;
   const PLAYER_SIZE = 40;
   const GRID_COLS = 8;
-  const VISIBLE_ROWS = 16; // Increased for better buffer
-  const SAFE_START_ROWS = 6;
-  const ROW_BUFFER = 8; // Rows to keep ahead/behind player
+  const VISIBLE_ROWS = 16;
+  const SAFE_START_ROWS = 4; // Reduced safe area for more enemies earlier
+  const ROW_BUFFER = 8;
 
   canvas.width = CANVAS_W;
   canvas.height = CANVAS_H;
 
   // Game state
   let player = null;
-  let rows = new Map(); // Use Map for reliable row storage
+  let rows = new Map();
   let score = 0;
   let highestRow = 0;
   let running = false;
@@ -48,50 +48,50 @@
     };
   }
 
-  // Row types and generation - FIXED: Consistent row generation
+  // Row types and generation - FIXED: More roads, fewer rivers
   function createRow(rowNum) {
     const row = {
-      id: rowNum, // Use consistent ID
+      id: rowNum,
       num: rowNum,
       type: 'grass',
       obstacles: []
     };
 
-    // Safe starting area
-    if (rowNum < 2) {
+    // Very short safe starting area
+    if (rowNum < 1) {
       row.type = rowNum === 0 ? 'island' : 'grass';
       return row;
     }
 
-    // Gradual difficulty with more roads early
-    const difficulty = Math.min(1, (rowNum - 2) / 25);
+    // Faster difficulty progression
+    const difficulty = Math.min(1, (rowNum - 1) / 20);
     
-    // Generate terrain - increased road probability
+    // Generate terrain - MORE ROADS, FEWER RIVERS
     const rand = Math.random();
     
     if (rowNum < SAFE_START_ROWS) {
-      // Early game: mix of grass, islands, and some roads
-      if (rand < 0.3) {
-        row.type = 'grass';
-      } else if (rand < 0.5) {
-        row.type = 'island';
-      } else if (rand < 0.8) {
+      // Early game: Mostly roads with some variety
+      if (rand < 0.4) { // 40% roads early
         row.type = 'road';
         generateRoadObstacles(row, rowNum, difficulty);
-      } else {
+      } else if (rand < 0.6) { // 20% grass
+        row.type = 'grass';
+      } else if (rand < 0.8) { // 20% islands
+        row.type = 'island';
+      } else { // 20% rivers
         row.type = 'river';
         generateRiverObstacles(row, rowNum, difficulty);
       }
     } else {
-      // Normal game distribution
-      if (rand < 0.2) {
-        row.type = 'grass';
-      } else if (rand < 0.35) {
-        row.type = 'island';
-      } else if (rand < 0.65) {
+      // Normal game: Heavy road focus
+      if (rand < 0.5) { // 50% roads
         row.type = 'road';
         generateRoadObstacles(row, rowNum, difficulty);
-      } else {
+      } else if (rand < 0.65) { // 15% grass
+        row.type = 'grass';
+      } else if (rand < 0.75) { // 10% islands
+        row.type = 'island';
+      } else { // 25% rivers (reduced from previous)
         row.type = 'river';
         generateRiverObstacles(row, rowNum, difficulty);
       }
@@ -102,14 +102,14 @@
 
   function generateRoadObstacles(row, rowNum, difficulty) {
     const direction = Math.random() < 0.5 ? 1 : -1;
-    const speed = (0.4 + Math.random() * 0.3 + difficulty * 0.5) * direction;
-    const spacing = 200 + Math.random() * 100;
-    const count = Math.max(1, Math.ceil(CANVAS_W / spacing) - 1);
+    const speed = (0.5 + Math.random() * 0.4 + difficulty * 0.6) * direction; // Faster enemies
+    const spacing = 160 + Math.random() * 80; // Closer spacing for more enemies
+    const count = Math.max(2, Math.ceil(CANVAS_W / spacing)); // More obstacles
 
     for (let i = 0; i < count; i++) {
-      const isGhost = Math.random() < (0.1 + difficulty * 0.3);
+      const isGhost = Math.random() < (0.3 + difficulty * 0.4); // More ghosts
       row.obstacles.push({
-        x: i * spacing + Math.random() * 80,
+        x: i * spacing + Math.random() * 60,
         speed: speed,
         width: isGhost ? 50 : 60,
         height: isGhost ? 50 : 45,
@@ -120,22 +120,22 @@
 
   function generateRiverObstacles(row, rowNum, difficulty) {
     const direction = Math.random() < 0.5 ? 1 : -1;
-    const speed = (0.3 + Math.random() * 0.2 + difficulty * 0.3) * direction;
-    const spacing = 180 + Math.random() * 80;
-    const count = Math.max(1, Math.ceil(CANVAS_W / spacing));
+    const speed = (0.4 + Math.random() * 0.3 + difficulty * 0.4) * direction;
+    const spacing = 150 + Math.random() * 60; // Closer logs
+    const count = Math.max(2, Math.ceil(CANVAS_W / spacing)); // More logs
 
     for (let i = 0; i < count; i++) {
       row.obstacles.push({
-        x: i * spacing + Math.random() * 40,
+        x: i * spacing + Math.random() * 30,
         speed: speed,
-        width: 140 + Math.random() * 60,
+        width: 120 + Math.random() * 40, // Slightly narrower logs for challenge
         height: 30,
         type: 'log'
       });
     }
   }
 
-  // Initialize game - FIXED: Better row initialization
+  // Initialize game
   function initGame() {
     player = createPlayer();
     rows = new Map();
@@ -176,7 +176,6 @@
   function updateCamera() {
     if (!player) return;
     
-    // Camera centers on the player's row (adjusted for visual position)
     const targetY = player.row * TILE_SIZE - (CANVAS_H / 2 - TILE_SIZE);
     cameraY = targetY;
   }
@@ -185,18 +184,18 @@
   function updatePlayerPosition() {
     if (!player) return;
     player.x = player.col * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
-    
-    // Player Y is based on their actual row, adjusted for camera
     player.y = getRowY(player.row) + (TILE_SIZE - PLAYER_SIZE) / 2;
   }
 
-  // Movement - FIXED: Better row management
+  // Movement - FIXED: Swapped up/down movement
   function movePlayer(dcol, drow) {
     if (!player || !player.alive) return;
 
     const newCol = Math.max(0, Math.min(GRID_COLS - 1, player.col + dcol));
     const newRow = Math.max(0, player.row + drow);
 
+    // SWAPPED: Moving "up" in grid means moving backward visually
+    // Moving "down" in grid means moving forward visually
     player.col = newCol;
     player.row = newRow;
     player.ridingLog = null;
@@ -204,25 +203,22 @@
     updateCamera();
     updatePlayerPosition();
 
-    // Score for moving forward
+    // Score for moving forward (which is now "down" in grid)
     if (newRow > highestRow) {
       score += (newRow - highestRow) * 10;
       highestRow = newRow;
       updateScore();
     }
 
-    // Generate new rows as needed - FIXED: Proper row generation
     ensureRowsExist();
   }
 
-  // FIXED: Proper row management to prevent corruption
   function ensureRowsExist() {
     if (!player) return;
 
     const minRow = player.row - ROW_BUFFER;
     const maxRow = player.row + VISIBLE_ROWS + ROW_BUFFER;
 
-    // Generate missing rows ahead
     for (let rowNum = player.row; rowNum <= maxRow; rowNum++) {
       if (!rows.has(rowNum)) {
         const row = createRow(rowNum);
@@ -231,7 +227,6 @@
       }
     }
 
-    // Generate missing rows behind (for going backwards)
     for (let rowNum = player.row - 1; rowNum >= minRow; rowNum--) {
       if (!rows.has(rowNum)) {
         const row = createRow(rowNum);
@@ -239,8 +234,7 @@
       }
     }
 
-    // Clean up rows that are too far away (conservative cleanup)
-    const cleanupThreshold = 30; // Only remove rows very far away
+    const cleanupThreshold = 30;
     for (let [rowNum, row] of rows) {
       if (rowNum < player.row - cleanupThreshold || rowNum > player.row + cleanupThreshold) {
         rows.delete(rowNum);
@@ -293,7 +287,6 @@
       }
     }
 
-    // Check boundaries
     if (player.x < -player.size || player.x > CANVAS_W) {
       endGame();
     }
@@ -304,18 +297,15 @@
            y1 < y2 + h2 - 8 && y1 + h1 > y2 + 8;
   }
 
-  // Get Y position for a row (relative to camera)
   function getRowY(rowNum) {
     return rowNum * TILE_SIZE - cameraY;
   }
 
-  // Update obstacles
   function updateObstacles(dt) {
     for (const [rowNum, row] of rows) {
       for (const obs of row.obstacles) {
         obs.x += obs.speed * dt * 0.1;
         
-        // Wrap around
         if (obs.speed > 0 && obs.x > CANVAS_W + 100) {
           obs.x = -obs.width - 50;
         } else if (obs.speed < 0 && obs.x < -obs.width - 100) {
@@ -324,7 +314,6 @@
       }
     }
 
-    // Move player with log
     if (player && player.ridingLog && player.alive) {
       player.x += player.ridingLog.speed * dt * 0.1;
       player.col = Math.floor(player.x / TILE_SIZE);
@@ -333,7 +322,7 @@
     }
   }
 
-  // Input handling
+  // Input handling - ADDED: IJKL controls and swapped up/down
   let lastMoveTime = 0;
   const MOVE_COOLDOWN = 150;
 
@@ -346,16 +335,19 @@
     const key = e.key.toLowerCase();
     let moved = false;
 
+    // Arrow keys + WASD + IJKL
     if (key === 'arrowleft' || key === 'a' || key === 'j') {
-      movePlayer(-1, 0);
+      movePlayer(-1, 0); // Left
       moved = true;
     } else if (key === 'arrowright' || key === 'd' || key === 'l') {
-      movePlayer(1, 0);
+      movePlayer(1, 0); // Right
       moved = true;
     } else if (key === 'arrowup' || key === 'w' || key === 'i') {
+      // SWAPPED: Up arrow/W/I now moves backward (decreases row)
       movePlayer(0, -1);
       moved = true;
     } else if (key === 'arrowdown' || key === 's' || key === 'k') {
+      // SWAPPED: Down arrow/S/K now moves forward (increases row)
       movePlayer(0, 1);
       moved = true;
     }
@@ -366,7 +358,7 @@
     }
   });
 
-  // Drawing
+  // Drawing functions (unchanged)
   function drawBackground() {
     const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
     grad.addColorStop(0, '#0a0508');
@@ -376,16 +368,13 @@
   }
 
   function drawRows() {
-    // Convert Map to array and sort by row number for proper drawing order
     const sortedRows = Array.from(rows.values()).sort((a, b) => a.num - b.num);
     
     for (const row of sortedRows) {
       const y = getRowY(row.num);
       
-      // Only draw rows that are visible on screen
       if (y < -TILE_SIZE || y > CANVAS_H + TILE_SIZE) continue;
 
-      // Draw terrain
       if (row.type === 'grass') {
         ctx.fillStyle = '#3d2f1f';
         ctx.fillRect(0, y, CANVAS_W, TILE_SIZE);
@@ -419,7 +408,6 @@
         ctx.fillRect(0, y, CANVAS_W, TILE_SIZE);
       }
 
-      // Draw obstacles
       for (const obs of row.obstacles) {
         const oy = y + (TILE_SIZE - obs.height) / 2;
         
@@ -457,7 +445,6 @@
     const cy = player.y + player.size / 2;
     const r = player.size / 2;
 
-    // Pumpkin body
     const grad = ctx.createRadialGradient(cx, cy - r * 0.3, 0, cx, cy, r);
     grad.addColorStop(0, '#ffb347');
     grad.addColorStop(0.7, '#ff8c00');
@@ -467,7 +454,6 @@
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
 
-    // Ridges
     ctx.strokeStyle = 'rgba(180,80,0,0.4)';
     ctx.lineWidth = 2;
     for (let i = -2; i <= 2; i++) {
@@ -477,11 +463,9 @@
       ctx.stroke();
     }
 
-    // Stem
     ctx.fillStyle = '#4a3a1a';
     ctx.fillRect(cx - 4, cy - r - 8, 8, 10);
 
-    // Jack-o-lantern face
     ctx.fillStyle = '#000';
     ctx.beginPath();
     ctx.moveTo(cx - r * 0.3, cy - r * 0.2);
@@ -527,12 +511,11 @@
 
     if (running && player && player.alive) {
       updateObstacles(dt);
-      ensureRowsExist(); // Ensure rows exist before collision check
+      ensureRowsExist();
       checkCollisions();
       updateCamera();
     }
 
-    // Draw
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     drawBackground();
     drawRows();
@@ -563,6 +546,14 @@
       }
     } catch (e) {
       console.log('Fullscreen error:', e);
+    }
+  });
+
+  // Update instructions in the play overlay
+  document.addEventListener('DOMContentLoaded', function() {
+    const controlsElement = document.querySelector('.controls p');
+    if (controlsElement) {
+      controlsElement.textContent = 'Arrow Keys, WASD, or IJKL to move (Down/S/K = forward, Up/W/I = backward)';
     }
   });
 
