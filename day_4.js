@@ -221,7 +221,7 @@
 
   // util mapping between grid row index and world Y so player is centered inside tiles
   function gridYToWorldY(gridY) {
-    return -gridY * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
+    return -gridY * TILE_SIZE / 2 + (TILE_SIZE - PLAYER_SIZE) / 2;
   }
 
   // Camera helper to keep player near bottom and allow looking ahead
@@ -705,8 +705,8 @@
     const k = e.key.toLowerCase();
     if (k === 'arrowleft' || k === 'a' || k === 'j') { e.preventDefault(); movePlayer(-1, 0); }
     if (k === 'arrowright' || k === 'd' || k === 'l') { e.preventDefault(); movePlayer(1, 0); }
-    if (k === 'arrowup' || k === 'w' || k === 'i') { e.preventDefault(); movePlayer(0, 0.5); }
-    if (k === 'arrowdown' || k === 's' || k === 'k') { e.preventDefault(); movePlayer(0, -0.5); }
+    if (k === 'arrowup' || k === 'w' || k === 'i') { e.preventDefault(); movePlayer(0, 1); }
+    if (k === 'arrowdown' || k === 's' || k === 'k') { e.preventDefault(); movePlayer(0, -1); }
   });
 
   // UI handlers
