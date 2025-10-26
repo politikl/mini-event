@@ -47,7 +47,7 @@
   // Constants (in logical coords)
   const W = LOG_W;
   const H = LOG_H;
-  const TILE_SIZE = 24;
+  const TILE_SIZE = 48;
   const PLAYER_SIZE = 36;
   const ROWS_VISIBLE = Math.ceil(H / TILE_SIZE) + 2;
   // how many tile rows the camera leaves above the player (look-ahead)
@@ -257,6 +257,7 @@
 
   // grid move: dx/dy in tiles. dy positive = forward/up, negative = backward/down
   function movePlayer(dx, dy) {
+    console.log('movePlayer called - dx:', dx, 'dy:', dy, 'current gridY:', player?.gridY); // Add this debug line
     if (!player || !player.alive) return;
     if (moveDelay > 0 || player.moving) return;
 
