@@ -18,7 +18,7 @@
   const PLAYER_SIZE = 40;
   const GRID_COLS = 8;
   const VISIBLE_ROWS = 14;
-  const SAFE_START_ROWS = 4;
+  const SAFE_START_ROWS = 8; // Increased safe area
 
   canvas.width = CANVAS_W;
   canvas.height = CANVAS_H;
@@ -53,37 +53,42 @@
       obstacles: []
     };
 
-    // First few rows are safe
+    // Extended safe starting area
     if (rowNum < SAFE_START_ROWS) {
       row.type = rowNum === 0 ? 'island' : 'grass';
       return row;
     }
 
-    // Generate terrain
+    // Gradually introduce difficulty
+    const difficulty = Math.min(1, (rowNum - SAFE_START_ROWS) / 30);
+    
+    // Generate terrain with easier probabilities at start
     const rand = Math.random();
-    if (rand < 0.15) {
+    if (rand < 0.25) { // More grass/island, less roads/rivers
+      row.type = 'grass';
+    } else if (rand < 0.45) {
       row.type = 'island';
-    } else if (rand < 0.55) {
+    } else if (rand < 0.7) { // Reduced road probability
       row.type = 'road';
-      generateRoadObstacles(row, rowNum);
+      generateRoadObstacles(row, rowNum, difficulty);
     } else {
       row.type = 'river';
-      generateRiverObstacles(row, rowNum);
+      generateRiverObstacles(row, rowNum, difficulty);
     }
 
     return row;
   }
 
-  function generateRoadObstacles(row, rowNum) {
+  function generateRoadObstacles(row, rowNum, difficulty) {
     const direction = Math.random() < 0.5 ? 1 : -1;
-    const speed = (0.8 + Math.random() * 0.6) * direction;
-    const spacing = 140 + Math.random() * 100;
-    const count = Math.ceil(CANVAS_W / spacing) + 1;
+    const speed = (0.6 + Math.random() * 0.4 + difficulty * 0.4) * direction; // Slower initial speed
+    const spacing = 180 + Math.random() * 120; // More spacing between obstacles
+    const count = Math.max(1, Math.ceil(CANVAS_W / spacing)); // Fewer obstacles
 
     for (let i = 0; i < count; i++) {
-      const isGhost = Math.random() < 0.3;
+      const isGhost = Math.random() < (0.2 + difficulty * 0.3); // Fewer ghosts initially
       row.obstacles.push({
-        x: i * spacing + Math.random() * 40,
+        x: i * spacing + Math.random() * 60,
         speed: speed,
         width: isGhost ? 50 : 60,
         height: isGhost ? 50 : 45,
@@ -92,17 +97,17 @@
     }
   }
 
-  function generateRiverObstacles(row, rowNum) {
+  function generateRiverObstacles(row, rowNum, difficulty) {
     const direction = Math.random() < 0.5 ? 1 : -1;
-    const speed = (0.5 + Math.random() * 0.4) * direction;
-    const spacing = 150 + Math.random() * 80;
-    const count = Math.ceil(CANVAS_W / spacing) + 1;
+    const speed = (0.4 + Math.random() * 0.3 + difficulty * 0.3) * direction; // Slower initial speed
+    const spacing = 200 + Math.random() * 100; // More spacing between logs
+    const count = Math.max(1, Math.ceil(CANVAS_W / spacing)); // Fewer logs
 
     for (let i = 0; i < count; i++) {
       row.obstacles.push({
-        x: i * spacing + Math.random() * 30,
+        x: i * spacing + Math.random() * 50,
         speed: speed,
-        width: 100 + Math.random() * 60,
+        width: 120 + Math.random() * 80, // Wider logs for easier landing
         height: 30,
         type: 'log'
       });
@@ -128,7 +133,9 @@
   function startGame() {
     initGame();
     running = true;
+    player.alive = true;
     hideModal(playOverlay);
+    hideModal(gameOverModal); // Ensure game over modal is hidden
     if (gameLoop) cancelAnimationFrame(gameLoop);
     gameLoop = requestAnimationFrame(update);
   }
@@ -149,7 +156,7 @@
 
   // Movement
   function movePlayer(dcol, drow) {
-    if (!player || !player.alive || player.moving) return;
+    if (!player || !player.alive) return;
 
     const newCol = Math.max(0, Math.min(GRID_COLS - 1, player.col + dcol));
     const newRow = Math.max(0, player.row + drow);
@@ -167,13 +174,13 @@
       updateScore();
       
       // Generate new rows ahead
-      while (rows.length < player.row + VISIBLE_ROWS) {
+      while (rows.length <= player.row + VISIBLE_ROWS) {
         rows.push(createRow(rows.length));
       }
       
-      // Remove old rows
-      if (rows.length > VISIBLE_ROWS + 20) {
-        rows = rows.filter(r => r.num >= player.row - 5);
+      // Remove old rows (more conservative)
+      if (rows.length > VISIBLE_ROWS + 25) {
+        rows = rows.filter(r => r.num >= player.row - 8);
       }
     }
   }
@@ -256,6 +263,9 @@
     // Move player with log
     if (player && player.ridingLog && player.alive) {
       player.x += player.ridingLog.speed * dt * 0.1;
+      // Update grid position based on new x position
+      player.col = Math.floor(player.x / TILE_SIZE);
+      player.col = Math.max(0, Math.min(GRID_COLS - 1, player.col));
     }
   }
 
@@ -372,7 +382,7 @@
   }
 
   function drawPlayer() {
-    if (!player) return;
+    if (!player || !player.alive) return;
 
     const cx = player.x + player.size / 2;
     const cy = player.y + player.size / 2;
@@ -446,7 +456,7 @@
     const dt = Math.min(50, timestamp - lastTime);
     lastTime = timestamp;
 
-    if (running) {
+    if (running && player && player.alive) {
       updateObstacles(dt);
       checkCollisions();
     }
@@ -485,7 +495,8 @@
     }
   });
 
-  // Start
+  // Start with play overlay visible
   initGame();
+  showModal(playOverlay);
   gameLoop = requestAnimationFrame(update);
 })();
