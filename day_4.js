@@ -18,8 +18,9 @@
   const PLAYER_SIZE = 40;
   const GRID_COLS = 8;
   const VISIBLE_ROWS = 16;
-  const SAFE_START_ROWS = 4; // Reduced safe area for more enemies earlier
+  const SAFE_START_ROWS = 4;
   const ROW_BUFFER = 8;
+  const START_ROW = 3; // Player starts at row 3 instead of 0
 
   canvas.width = CANVAS_W;
   canvas.height = CANVAS_H;
@@ -34,12 +35,13 @@
   let keys = {};
   let cameraY = 0;
   let nextRowId = 0;
+  let hasMoved = false; // Track if player has moved yet
 
   // Player object
   function createPlayer() {
     return {
       col: Math.floor(GRID_COLS / 2),
-      row: 0,
+      row: START_ROW, // Start at row 3 instead of 0
       x: 0,
       y: 0,
       size: PLAYER_SIZE,
@@ -48,7 +50,7 @@
     };
   }
 
-  // Row types and generation - FIXED: More roads, fewer rivers
+  // Row types and generation
   function createRow(rowNum) {
     const row = {
       id: rowNum,
@@ -57,41 +59,41 @@
       obstacles: []
     };
 
-    // Very short safe starting area
-    if (rowNum < 1) {
-      row.type = rowNum === 0 ? 'island' : 'grass';
+    // Safe starting area - adjusted for new start position
+    if (rowNum < START_ROW + 1) {
+      row.type = rowNum === START_ROW ? 'island' : 'grass';
       return row;
     }
 
     // Faster difficulty progression
-    const difficulty = Math.min(1, (rowNum - 1) / 20);
+    const difficulty = Math.min(1, (rowNum - START_ROW - 1) / 20);
     
     // Generate terrain - MORE ROADS, FEWER RIVERS
     const rand = Math.random();
     
-    if (rowNum < SAFE_START_ROWS) {
+    if (rowNum < START_ROW + SAFE_START_ROWS) {
       // Early game: Mostly roads with some variety
-      if (rand < 0.4) { // 40% roads early
+      if (rand < 0.4) {
         row.type = 'road';
         generateRoadObstacles(row, rowNum, difficulty);
-      } else if (rand < 0.6) { // 20% grass
+      } else if (rand < 0.6) {
         row.type = 'grass';
-      } else if (rand < 0.8) { // 20% islands
+      } else if (rand < 0.8) {
         row.type = 'island';
-      } else { // 20% rivers
+      } else {
         row.type = 'river';
         generateRiverObstacles(row, rowNum, difficulty);
       }
     } else {
       // Normal game: Heavy road focus
-      if (rand < 0.5) { // 50% roads
+      if (rand < 0.5) {
         row.type = 'road';
         generateRoadObstacles(row, rowNum, difficulty);
-      } else if (rand < 0.65) { // 15% grass
+      } else if (rand < 0.65) {
         row.type = 'grass';
-      } else if (rand < 0.75) { // 10% islands
+      } else if (rand < 0.75) {
         row.type = 'island';
-      } else { // 25% rivers (reduced from previous)
+      } else {
         row.type = 'river';
         generateRiverObstacles(row, rowNum, difficulty);
       }
@@ -102,12 +104,23 @@
 
   function generateRoadObstacles(row, rowNum, difficulty) {
     const direction = Math.random() < 0.5 ? 1 : -1;
-    const speed = (0.5 + Math.random() * 0.4 + difficulty * 0.6) * direction; // Faster enemies
-    const spacing = 160 + Math.random() * 80; // Closer spacing for more enemies
-    const count = Math.max(2, Math.ceil(CANVAS_W / spacing)); // More obstacles
+    // VARIABLE SPEEDS: Some enemies much faster than others
+    const speedVariation = Math.random();
+    let baseSpeed;
+    if (speedVariation < 0.2) {
+      baseSpeed = 0.8 + Math.random() * 0.4; // Very fast (20%)
+    } else if (speedVariation < 0.5) {
+      baseSpeed = 0.5 + Math.random() * 0.3; // Medium fast (30%)
+    } else {
+      baseSpeed = 0.3 + Math.random() * 0.3; // Normal (50%)
+    }
+    
+    const speed = (baseSpeed + difficulty * 0.6) * direction;
+    const spacing = 160 + Math.random() * 80;
+    const count = Math.max(2, Math.ceil(CANVAS_W / spacing));
 
     for (let i = 0; i < count; i++) {
-      const isGhost = Math.random() < (0.3 + difficulty * 0.4); // More ghosts
+      const isGhost = Math.random() < (0.3 + difficulty * 0.4);
       row.obstacles.push({
         x: i * spacing + Math.random() * 60,
         speed: speed,
@@ -120,15 +133,26 @@
 
   function generateRiverObstacles(row, rowNum, difficulty) {
     const direction = Math.random() < 0.5 ? 1 : -1;
-    const speed = (0.4 + Math.random() * 0.3 + difficulty * 0.4) * direction;
-    const spacing = 150 + Math.random() * 60; // Closer logs
-    const count = Math.max(2, Math.ceil(CANVAS_W / spacing)); // More logs
+    // VARIABLE SPEEDS: Some logs much faster than others
+    const speedVariation = Math.random();
+    let baseSpeed;
+    if (speedVariation < 0.3) {
+      baseSpeed = 0.5 + Math.random() * 0.3; // Fast (30%)
+    } else if (speedVariation < 0.6) {
+      baseSpeed = 0.3 + Math.random() * 0.2; // Medium (30%)
+    } else {
+      baseSpeed = 0.1 + Math.random() * 0.2; // Slow (40%)
+    }
+    
+    const speed = (baseSpeed + difficulty * 0.4) * direction;
+    const spacing = 150 + Math.random() * 60;
+    const count = Math.max(2, Math.ceil(CANVAS_W / spacing));
 
     for (let i = 0; i < count; i++) {
       row.obstacles.push({
         x: i * spacing + Math.random() * 30,
         speed: speed,
-        width: 120 + Math.random() * 40, // Slightly narrower logs for challenge
+        width: 120 + Math.random() * 40,
         height: 30,
         type: 'log'
       });
@@ -140,12 +164,13 @@
     player = createPlayer();
     rows = new Map();
     score = 0;
-    highestRow = 0;
+    highestRow = START_ROW;
     cameraY = 0;
     nextRowId = 0;
+    hasMoved = false;
     
-    // Create initial rows around player
-    for (let i = -ROW_BUFFER; i < VISIBLE_ROWS + ROW_BUFFER; i++) {
+    // Create initial rows around player's start position
+    for (let i = START_ROW - ROW_BUFFER; i < START_ROW + VISIBLE_ROWS + ROW_BUFFER; i++) {
       const row = createRow(i);
       rows.set(i, row);
       nextRowId = Math.max(nextRowId, i + 1);
@@ -180,22 +205,25 @@
     cameraY = targetY;
   }
 
-  // Update player visual position
+  // Update player visual position - FIXED: Proper initial positioning
   function updatePlayerPosition() {
     if (!player) return;
     player.x = player.col * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
     player.y = getRowY(player.row) + (TILE_SIZE - PLAYER_SIZE) / 2;
   }
 
-  // Movement - FIXED: Swapped up/down movement
+  // Movement
   function movePlayer(dcol, drow) {
     if (!player || !player.alive) return;
 
     const newCol = Math.max(0, Math.min(GRID_COLS - 1, player.col + dcol));
     const newRow = Math.max(0, player.row + drow);
 
-    // SWAPPED: Moving "up" in grid means moving backward visually
-    // Moving "down" in grid means moving forward visually
+    // Mark that player has moved for the first time
+    if (!hasMoved) {
+      hasMoved = true;
+    }
+
     player.col = newCol;
     player.row = newRow;
     player.ridingLog = null;
@@ -203,7 +231,7 @@
     updateCamera();
     updatePlayerPosition();
 
-    // Score for moving forward (which is now "down" in grid)
+    // Score for moving forward
     if (newRow > highestRow) {
       score += (newRow - highestRow) * 10;
       highestRow = newRow;
@@ -211,6 +239,50 @@
     }
 
     ensureRowsExist();
+  }
+
+  // FIXED: Auto movement when on raft - player moves with raft automatically
+  function updateRaftMovement(dt) {
+    if (!player || !player.alive || !player.ridingLog) return;
+
+    const currentRow = rows.get(player.row);
+    if (!currentRow) return;
+
+    // Find the current log the player is on (in case it changed)
+    let currentLog = null;
+    for (const obs of currentRow.obstacles) {
+      const playerCenterX = player.x + player.size / 2;
+      const obstacleY = getRowY(player.row) + (TILE_SIZE - obs.height) / 2;
+      
+      if (playerCenterX > obs.x && playerCenterX < obs.x + obs.width &&
+          player.y < obstacleY + obs.height && player.y + player.size > obstacleY) {
+        currentLog = obs;
+        break;
+      }
+    }
+
+    if (currentLog) {
+      // AUTO MOVEMENT: Player moves with the raft automatically
+      player.x += currentLog.speed * dt * 0.1;
+      
+      // Update grid position based on new x position
+      const newCol = Math.floor(player.x / TILE_SIZE);
+      player.col = Math.max(0, Math.min(GRID_COLS - 1, newCol));
+      
+      // Update visual position
+      updatePlayerPosition();
+      
+      // Check if player is still on the log after movement
+      const playerCenterX = player.x + player.size / 2;
+      if (!(playerCenterX > currentLog.x && playerCenterX < currentLog.x + currentLog.width)) {
+        // Player fell off the log
+        player.ridingLog = null;
+      } else {
+        player.ridingLog = currentLog;
+      }
+    } else {
+      player.ridingLog = null;
+    }
   }
 
   function ensureRowsExist() {
@@ -256,6 +328,7 @@
       return;
     }
 
+    // Reset riding log - we'll check if player is still on one
     player.ridingLog = null;
 
     if (currentRow.type === 'road') {
@@ -314,15 +387,11 @@
       }
     }
 
-    if (player && player.ridingLog && player.alive) {
-      player.x += player.ridingLog.speed * dt * 0.1;
-      player.col = Math.floor(player.x / TILE_SIZE);
-      player.col = Math.max(0, Math.min(GRID_COLS - 1, player.col));
-      updatePlayerPosition();
-    }
+    // Handle raft movement automatically
+    updateRaftMovement(dt);
   }
 
-  // Input handling - ADDED: IJKL controls and swapped up/down
+  // Input handling
   let lastMoveTime = 0;
   const MOVE_COOLDOWN = 150;
 
@@ -335,19 +404,16 @@
     const key = e.key.toLowerCase();
     let moved = false;
 
-    // Arrow keys + WASD + IJKL
     if (key === 'arrowleft' || key === 'a' || key === 'j') {
-      movePlayer(-1, 0); // Left
+      movePlayer(-1, 0);
       moved = true;
     } else if (key === 'arrowright' || key === 'd' || key === 'l') {
-      movePlayer(1, 0); // Right
+      movePlayer(1, 0);
       moved = true;
     } else if (key === 'arrowup' || key === 'w' || key === 'i') {
-      // SWAPPED: Up arrow/W/I now moves backward (decreases row)
       movePlayer(0, -1);
       moved = true;
     } else if (key === 'arrowdown' || key === 's' || key === 'k') {
-      // SWAPPED: Down arrow/S/K now moves forward (increases row)
       movePlayer(0, 1);
       moved = true;
     }
@@ -358,7 +424,7 @@
     }
   });
 
-  // Drawing functions (unchanged)
+  // Drawing functions
   function drawBackground() {
     const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
     grad.addColorStop(0, '#0a0508');
@@ -412,13 +478,22 @@
         const oy = y + (TILE_SIZE - obs.height) / 2;
         
         if (obs.type === 'car') {
-          ctx.fillStyle = '#c41e3a';
+          // Color code cars by speed
+          const speedRatio = Math.abs(obs.speed) / 1.5;
+          const red = Math.min(255, 180 + speedRatio * 75);
+          const color = `rgb(${red}, 30, 58)`;
+          
+          ctx.fillStyle = color;
           roundRect(ctx, obs.x, oy, obs.width, obs.height, 8);
           ctx.fill();
           ctx.fillStyle = 'rgba(255,255,255,0.3)';
           ctx.fillRect(obs.x + 10, oy + 5, obs.width * 0.4, obs.height * 0.4);
         } else if (obs.type === 'ghost') {
-          ctx.fillStyle = 'rgba(230,240,255,0.9)';
+          // Ghosts get more transparent when faster
+          const speedRatio = Math.abs(obs.speed) / 1.5;
+          const alpha = Math.min(0.95, 0.7 + speedRatio * 0.25);
+          
+          ctx.fillStyle = `rgba(230,240,255,${alpha})`;
           ctx.beginPath();
           ctx.arc(obs.x + obs.width / 2, oy + obs.height / 2, obs.width / 2, 0, Math.PI * 2);
           ctx.fill();
@@ -428,10 +503,14 @@
           ctx.arc(obs.x + obs.width * 0.65, oy + obs.height * 0.4, 4, 0, Math.PI * 2);
           ctx.fill();
         } else if (obs.type === 'log') {
-          ctx.fillStyle = '#5d3a1a';
+          // Logs get darker when faster
+          const speedRatio = Math.abs(obs.speed) / 0.8;
+          const darken = Math.min(80, speedRatio * 40);
+          
+          ctx.fillStyle = `rgb(${93 - darken}, ${58 - darken}, ${26 - darken})`;
           roundRect(ctx, obs.x, oy, obs.width, obs.height, 6);
           ctx.fill();
-          ctx.fillStyle = '#7d5a3a';
+          ctx.fillStyle = `rgb(${125 - darken}, ${90 - darken}, ${58 - darken})`;
           ctx.fillRect(obs.x + 4, oy + 4, obs.width - 8, obs.height - 8);
         }
       }
@@ -546,14 +625,6 @@
       }
     } catch (e) {
       console.log('Fullscreen error:', e);
-    }
-  });
-
-  // Update instructions in the play overlay
-  document.addEventListener('DOMContentLoaded', function() {
-    const controlsElement = document.querySelector('.controls p');
-    if (controlsElement) {
-      controlsElement.textContent = 'Arrow Keys, WASD, or IJKL to move (Down/S/K = forward, Up/W/I = backward)';
     }
   });
 
