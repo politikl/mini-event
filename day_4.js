@@ -226,9 +226,10 @@
 
   // Camera helper to keep player near bottom and allow looking ahead
   function getCamY() {
-    if (!player) return 0;
-    return player.y - (H - TILE_SIZE * CAMERA_LOOKAHEAD_ROWS);
-  }
+  if (!player) return 0;
+  // Keep player near bottom by subtracting less from player.y
+  return player.y - TILE_SIZE * CAMERA_LOOKAHEAD_ROWS;
+}
 
   // Player
   function createPlayer() {
