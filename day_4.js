@@ -228,7 +228,7 @@
   function getCamY() {
   if (!player) return 0;
   // Keep player near bottom by subtracting less from player.y
-  return player.y - TILE_SIZE * CAMERA_LOOKAHEAD_ROWS;
+  return -player.gridY * TILE_SIZE - TILE_SIZE * CAMERA_LOOKAHEAD_ROWS;
 }
 
   // Player
