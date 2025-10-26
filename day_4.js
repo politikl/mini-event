@@ -47,11 +47,11 @@
   // Constants (in logical coords)
   const W = LOG_W;
   const H = LOG_H;
-  const TILE_SIZE = 48;
+  const TILE_SIZE = 24;
   const PLAYER_SIZE = 36;
   const ROWS_VISIBLE = Math.ceil(H / TILE_SIZE) + 2;
   // how many tile rows the camera leaves above the player (look-ahead)
-  const CAMERA_LOOKAHEAD_ROWS = 3;
+  const CAMERA_LOOKAHEAD_ROWS = 12;
   const STARTING_ROW = -3; // Player starts 3 rows back from enemies
 
   // State
@@ -151,7 +151,7 @@
     };
 
     // Only add obstacles to positive rows (enemies start at row 1+)
-    if (rowIndex > 0) {
+    if (rowIndex >= 1) {
       if (row.type === 'road') {
         const direction = Math.random() < 0.5 ? 1 : -1;
         const baseSpeed = 1.0 + difficulty * 1.8;
@@ -287,7 +287,7 @@
     player.gridX = clampedGridX;
     player.gridY = newGridY;
 
-    moveDelay = player.moveDuration + 40;
+    moveDelay = player.moveDuration + 80;
   }
 
   function updateScoreUI(){
@@ -703,8 +703,8 @@
     const k = e.key.toLowerCase();
     if (k === 'arrowleft' || k === 'a' || k === 'j') { e.preventDefault(); movePlayer(-1, 0); }
     if (k === 'arrowright' || k === 'd' || k === 'l') { e.preventDefault(); movePlayer(1, 0); }
-    if (k === 'arrowup' || k === 'w' || k === 'i') { e.preventDefault(); movePlayer(0, 1); }
-    if (k === 'arrowdown' || k === 's' || k === 'k') { e.preventDefault(); movePlayer(0, -1); }
+    if (k === 'arrowup' || k === 'w' || k === 'i') { e.preventDefault(); movePlayer(0, 0.5); }
+    if (k === 'arrowdown' || k === 's' || k === 'k') { e.preventDefault(); movePlayer(0, -0.5); }
   });
 
   // UI handlers
