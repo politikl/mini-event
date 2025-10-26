@@ -20,7 +20,6 @@
   const VISIBLE_ROWS = 16;
   const SAFE_START_ROWS = 4;
   const ROW_BUFFER = 8;
-  const START_ROW = 0; // Reset to 0 for proper alignment
 
   canvas.width = CANVAS_W;
   canvas.height = CANVAS_H;
@@ -40,7 +39,7 @@
   function createPlayer() {
     return {
       col: Math.floor(GRID_COLS / 2),
-      row: START_ROW,
+      row: 0,
       x: 0,
       y: 0,
       size: PLAYER_SIZE,
@@ -49,7 +48,7 @@
     };
   }
 
-  // Row types and generation - FIXED: Proper start row alignment
+  // Row types and generation
   function createRow(rowNum) {
     const row = {
       id: rowNum,
@@ -58,22 +57,20 @@
       obstacles: []
     };
 
-    // Safe starting area - row 0 is safe island, rows 1-3 are safe grass
-    if (rowNum === 0) {
-      row.type = 'island';
-    } else if (rowNum < SAFE_START_ROWS) {
-      row.type = 'grass';
+    // Safe starting area
+    if (rowNum < 2) {
+      row.type = rowNum === 0 ? 'island' : 'grass';
       return row;
     }
 
-    // Faster difficulty progression
-    const difficulty = Math.min(1, (rowNum - SAFE_START_ROWS) / 20);
+    // Gradual difficulty with more roads early
+    const difficulty = Math.min(1, (rowNum - 2) / 25);
     
-    // Generate terrain
+    // Generate terrain - increased road probability
     const rand = Math.random();
     
-    if (rowNum < SAFE_START_ROWS + 2) {
-      // Early game after safe area
+    if (rowNum < SAFE_START_ROWS) {
+      // Early game: mix of grass, islands, and some roads
       if (rand < 0.4) {
         row.type = 'road';
         generateRoadObstacles(row, rowNum, difficulty);
@@ -86,14 +83,14 @@
         generateRiverObstacles(row, rowNum, difficulty);
       }
     } else {
-      // Normal game
-      if (rand < 0.5) {
+      // Normal game distribution
+      if (rand < 0.2) {
+        row.type = 'grass';
+      } else if (rand < 0.35) {
+        row.type = 'island';
+      } else if (rand < 0.65) {
         row.type = 'road';
         generateRoadObstacles(row, rowNum, difficulty);
-      } else if (rand < 0.65) {
-        row.type = 'grass';
-      } else if (rand < 0.75) {
-        row.type = 'island';
       } else {
         row.type = 'river';
         generateRiverObstacles(row, rowNum, difficulty);
@@ -108,11 +105,11 @@
     const speedVariation = Math.random();
     let baseSpeed;
     if (speedVariation < 0.2) {
-      baseSpeed = 0.8 + Math.random() * 0.4;
+      baseSpeed = 0.8 + Math.random() * 0.4; // Very fast (20%)
     } else if (speedVariation < 0.5) {
-      baseSpeed = 0.5 + Math.random() * 0.3;
+      baseSpeed = 0.5 + Math.random() * 0.3; // Medium fast (30%)
     } else {
-      baseSpeed = 0.3 + Math.random() * 0.3;
+      baseSpeed = 0.3 + Math.random() * 0.3; // Normal (50%)
     }
     
     const speed = (baseSpeed + difficulty * 0.6) * direction;
@@ -136,11 +133,11 @@
     const speedVariation = Math.random();
     let baseSpeed;
     if (speedVariation < 0.3) {
-      baseSpeed = 0.5 + Math.random() * 0.3;
+      baseSpeed = 0.5 + Math.random() * 0.3; // Fast (30%)
     } else if (speedVariation < 0.6) {
-      baseSpeed = 0.3 + Math.random() * 0.2;
+      baseSpeed = 0.3 + Math.random() * 0.2; // Medium (30%)
     } else {
-      baseSpeed = 0.1 + Math.random() * 0.2;
+      baseSpeed = 0.1 + Math.random() * 0.2; // Slow (40%)
     }
     
     const speed = (baseSpeed + difficulty * 0.4) * direction;
@@ -158,24 +155,22 @@
     }
   }
 
-  // Initialize game - FIXED: Proper camera initialization
+  // Initialize game
   function initGame() {
     player = createPlayer();
     rows = new Map();
     score = 0;
-    highestRow = START_ROW;
+    highestRow = 0;
     cameraY = 0;
     nextRowId = 0;
     
     // Create initial rows around player
-    for (let i = START_ROW - ROW_BUFFER; i < START_ROW + VISIBLE_ROWS + ROW_BUFFER; i++) {
+    for (let i = -ROW_BUFFER; i < VISIBLE_ROWS + ROW_BUFFER; i++) {
       const row = createRow(i);
       rows.set(i, row);
       nextRowId = Math.max(nextRowId, i + 1);
     }
     
-    // FIXED: Update camera BEFORE player position for proper alignment
-    updateCamera();
     updatePlayerPosition();
     updateScore();
   }
@@ -197,12 +192,11 @@
     showModal(gameOverModal);
   }
 
-  // Update camera to center on player's row - FIXED: Better centering
+  // Update camera to center on player's row
   function updateCamera() {
     if (!player) return;
     
-    // Center player vertically in the screen
-    const targetY = player.row * TILE_SIZE - (CANVAS_H / 2) + (TILE_SIZE / 2);
+    const targetY = player.row * TILE_SIZE - (CANVAS_H / 2 - TILE_SIZE);
     cameraY = targetY;
   }
 
@@ -227,6 +221,7 @@
     updateCamera();
     updatePlayerPosition();
 
+    // Score for moving forward
     if (newRow > highestRow) {
       score += (newRow - highestRow) * 10;
       highestRow = newRow;
@@ -236,7 +231,7 @@
     ensureRowsExist();
   }
 
-  // FIXED: Working raft movement
+  // WORKING: Raft movement - player moves automatically with rafts
   function updateRaftMovement(dt) {
     if (!player || !player.alive || !player.ridingLog) return;
 
@@ -305,7 +300,7 @@
     if (scoreEl) scoreEl.textContent = `Score: ${score}`;
   }
 
-  // Collision detection - FIXED: Better raft detection
+  // Collision detection - IMPROVED: Better raft detection
   function checkCollisions() {
     if (!player || !player.alive) return;
 
@@ -382,7 +377,7 @@
       }
     }
 
-    // FIXED: Call raft movement every frame
+    // WORKING: Call raft movement every frame
     updateRaftMovement(dt);
   }
 
@@ -419,7 +414,7 @@
     }
   });
 
-  // Drawing functions
+  // Drawing functions (unchanged - with speed visual indicators)
   function drawBackground() {
     const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
     grad.addColorStop(0, '#0a0508');
