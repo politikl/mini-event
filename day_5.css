@@ -1,4 +1,4 @@
-/* Updated styles: game area expanded, HUD moved inside playbound, same decorative style & fonts used earlier */
+/* Updated styles including leaderboard / timer styles (copied / adapted for day_3 look) */
 
 :root {
   --accent: #ff6b35;
@@ -6,6 +6,7 @@
   --dark: #0a0606;
   --frame-bg: linear-gradient(135deg, rgba(10,5,5,0.95), rgba(20,8,8,0.98));
   --vh-offset: 92px;
+  --muted: rgba(255,255,255,0.06);
 }
 
 /* page layout */
@@ -69,6 +70,7 @@ html, body {
   display:flex;
   flex-direction:column;
   gap:6px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.6);
 }
 
 /* XP bar */
@@ -95,6 +97,18 @@ html, body {
   border-radius: 10px;
   border: 2px solid var(--accent);
 }
+
+/* countdown / timer style */
+#game-countdown { font-family: monospace; font-weight:700; background: rgba(0,0,0,0.65); padding:8px 10px; border-radius:10px; border:2px solid var(--accent); color:#ffd8a8; }
+#game-countdown { display:flex; flex-direction:column; gap:4px; }
+#game-countdown .small-label { font-size:0.72rem; color:#e8c89a; opacity:0.9; }
+
+/* leaderboard modal table styling (day_3 style) */
+#day-leaderboard-modal .modal-content { max-height: 60vh; overflow:auto; }
+.leaderboard-container { background: linear-gradient(180deg, rgba(10,8,6,0.8), rgba(20,12,10,0.9)); padding:12px; border-radius:8px; border:1px solid rgba(255,107,53,0.06); }
+#day-leaderboard-table { width:100%; border-collapse:collapse; color:#ffd8a8; }
+#day-leaderboard-table thead th { position:sticky; top:0; background:linear-gradient(90deg, rgba(40,20,10,0.6), rgba(30,12,10,0.55)); color:#ffebc6; padding:8px; font-weight:800; border-bottom:1px solid rgba(255,107,53,0.08); }
+#day-leaderboard-table td { padding:10px; text-align:center; border-bottom:1px solid rgba(255,107,53,0.04); font-size:0.95rem; }
 
 /* choice / modal styles (kept) */
 .playbound .modal { position:absolute; left:50%; top:50%; transform: translate(-50%,-50%); width:min(92%,560px); z-index:520; background:linear-gradient(180deg,rgba(10,8,6,0.96),rgba(20,10,10,0.98)); border-radius:10px; box-shadow:0 10px 40px rgba(0,0,0,0.7); border:2px solid rgba(255,107,53,0.9); }

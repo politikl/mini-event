@@ -1,5 +1,4 @@
-// Completed game logic with map background, clearer visuals, more abilities, healing drops,
-// slower early difficulty, easier leveling, auto abilities and HUD moved into playbound.
+// Updated game logic: rebalanced, visibility rules, extra abilities/enemies, leaderboard save.
 
 (() => {
   // DOM
@@ -11,6 +10,7 @@
   const dayLeaderboardBtn = document.getElementById('day-leaderboard-btn');
   const dayLeaderboardModal = document.getElementById('day-leaderboard-modal');
   const dayLeaderboardClose = document.getElementById('day-leaderboard-close');
+  const dayLeaderboardBody = document.getElementById('day-leaderboard-body');
   const gameOverModal = document.getElementById('game-over-modal');
   const finalScoreEl = document.getElementById('final-score');
   const submitScoreBtn = document.getElementById('submit-score-btn');
@@ -61,36 +61,40 @@
   let projectiles = [];
   let orbs = [];
   let spawnTimer = 0;
-  // slower start, longer initial interval
   let spawnInterval = 3800;
-  let difficultyTimer = 0;
   let score = 0;
   let abilityDefs = {};
 
   // visual effect arrays
-  let blades = []; // spinning blades around player
-  let beams = []; // lasers / cones
-  let anvils = []; // falling anvils
+  let blades = [];
+  let beams = [];
+  let anvils = [];
   let particles = [];
+  let poisonTrails = []; // visual trail segments
 
   // --- ability definitions (extended) ---
   const ABILITIES = [
     { id:'blade_spin', title:'Blade Spin', desc:'Rotating blades around you (auto, melee).', type:'auto', basePower:16, cooldown:900, range:72, upgradePow:(lv)=>16 + lv*6 },
     { id:'dash_strike', title:'Dash Strike', desc:'Short dash that damages enemies you pass through.', type:'dash', basePower:28, cooldown:2600, range:160, upgradePow:(lv)=>28+lv*10 },
-    { id:'fireball', title:'Fireball', desc:'Launchs a slowing, damaging fireball (projectile).', type:'projectile', basePower:22, cooldown:900, range:440, upgradePow:(lv)=>22+lv*8 },
-    { id:'siphon', title:'Siphon', desc:'On-hit siphon: also deals small damage and heals you.', type:'passive', basePower:6, cooldown:0, range:40, upgradePow:(lv)=>6+lv*3 },
+    { id:'fireball', title:'Fireball', desc:'Launch a slowing, damaging fireball (projectile).', type:'projectile', basePower:22, cooldown:900, range:440, upgradePow:(lv)=>22+lv*8 },
+    { id:'multi_arrow', title:'Multi Arrow', desc:'Fire a spread of arrows in movement direction.', type:'projectile', basePower:14, cooldown:1100, range:520, upgradePow:(lv)=>14+lv*6 },
+    { id:'siphon', title:'Siphon', desc:'On-hit siphon: heals on damaging enemy (passive).', type:'passive', basePower:6, cooldown:0, range:40, upgradePow:(lv)=>6+lv*3 },
     { id:'turret', title:'Turret', desc:'Deploy a turret that auto-shoots nearby enemies.', type:'deploy', basePower:12, cooldown:5000, range:0, upgradePow:(lv)=>12+lv*6 },
+    { id:'homing_mine', title:'Homing Mine', desc:'Spawn a homing mine that seeks enemies.', type:'deploy', basePower:18, cooldown:4000, range:0, upgradePow:(lv)=>18+lv*8 },
     { id:'shockwave', title:'Shockwave', desc:'Forward cone shock that knocks and damages.', type:'cone', basePower:20, cooldown:2500, range:220, upgradePow:(lv)=>20+lv*8 },
     { id:'poison_trail', title:'Poison Trail', desc:'Leave damaging trail when moving.', type:'aura', basePower:6, cooldown:0, range:28, upgradePow:(lv)=>6+lv*3 },
-    { id:'multi_arrow', title:'Multi Arrow', desc:'Fire a spread of arrows forward.', type:'projectile', basePower:16, cooldown:1200, range:520, upgradePow:(lv)=>16+lv*6 },
+    { id:'frost_aura', title:'Frost Aura', desc:'Cold aura that chills and damages nearby enemies.', type:'aura', basePower:4, cooldown:0, range:80, upgradePow:(lv)=>4+lv*2 },
     { id:'shield', title:'Shield', desc:'Temporary damage reduction shield.', type:'active', basePower:0.36, cooldown:8000, range:0, upgradePow:(lv)=>0.36+lv*0.08 },
     { id:'time_slown', title:'Time Slow', desc:'Slow enemies in range for a short period.', type:'aoe', basePower:0.55, cooldown:10000, range:260, upgradePow:(lv)=>0.55+lv*0.06 },
 
-    // new auto / special abilities
-    { id:'auto_laser', title:'Auto Laser', desc:'Auto-aim laser periodically to nearest enemy.', type:'auto', basePower:22, cooldown:1200, range:700, upgradePow:(lv)=>22+lv*10 },
-    { id:'anvil_drop', title:'Anvil Drop', desc:'Random heavy anvil falls on a nearby enemy.', type:'auto', basePower:45, cooldown:6000, range:700, upgradePow:(lv)=>45+lv*20 },
-    { id:'homing_mine', title:'Homing Mine', desc:'Spawn a slow homing mine that seeks enemies.', type:'deploy', basePower:18, cooldown:4000, range:0, upgradePow:(lv)=>18+lv*8 },
-    { id:'frost_aura', title:'Frost Aura', desc:'Constant cold aura that chills and damages enemies nearby.', type:'aura', basePower:4, cooldown:0, range:80, upgradePow:(lv)=>4+lv*2 }
+    // auto / special abilities
+    { id:'auto_laser', title:'Auto Laser', desc:'Auto-aim laser to nearest visible enemy.', type:'auto', basePower:22, cooldown:1200, range:700, upgradePow:(lv)=>22+lv*10 },
+    { id:'anvil_drop', title:'Anvil Drop', desc:'Heavy anvil falls on a nearby visible enemy.', type:'auto', basePower:45, cooldown:6000, range:700, upgradePow:(lv)=>45+lv*20 },
+
+    // extra fun ones
+    { id:'gust', title:'Gust', desc:'Short knockback burst around you.', type:'melee', basePower:10, cooldown:2000, range:90, upgradePow:(lv)=>10+lv*4 },
+    { id:'orbital', title:'Orbital Strike', desc:'Spawn rotating orbs that damage enemies in their path.', type:'auto', basePower:18, cooldown:4000, range:0, upgradePow:(lv)=>18+lv*6 },
+    { id:'poison_bomb', title:'Poison Bomb', desc:'Throw a bomb that creates a poison patch.', type:'projectile', basePower:12, cooldown:2600, range:420, upgradePow:(lv)=>12+lv*5 }
   ];
   ABILITIES.forEach(a=> abilityDefs[a.id]=a);
 
@@ -99,19 +103,24 @@
   function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
   function dist(ax,ay,bx,by){ const dx=ax-bx, dy=ay-by; return Math.hypot(dx,dy); }
   function choose(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+  function onScreen(x,y){
+    return x >= camera.x - 16 && x <= camera.x + VIEW_W + 16 && y >= camera.y - 16 && y <= camera.y + VIEW_H + 16;
+  }
 
   // --- Player ---
   class Player {
     constructor(x,y){
       this.x=x; this.y=y; this.r=18;
-      this.hp=110; this.maxHp=110;
+      this.hp=120; this.maxHp=120;
       this.xp=0; this.level=1;
-      this.nextXp = 60; // easier leveling
+      this.nextXp = 50;
       this.abilities = [];
       this.moveSpeed = 180;
       this.shieldUntil = 0;
       this.alive = true;
       this.lastAuto = {};
+      this.lastDir = { x:1, y:0 };
+      this.trailPoints = []; // for poison trail visuals
     }
     addAbility(id){
       const existing = this.abilities.find(a=>a.id===id);
@@ -126,7 +135,6 @@
     abilityLevel(id){ const a=this.abilities.find(x=>x.id===id); return a? a.lvl:0; }
     tick(dt){
       this.abilities.forEach(a=>{ if(a.cd>0) a.cd = Math.max(0, a.cd - dt); });
-      // auto abilities: check timers
       for(const a of this.abilities){
         const def = abilityDefs[a.id];
         if(!def) continue;
@@ -138,29 +146,34 @@
           }
         }
       }
+      // poison trail tracking
+      if(this.hasAbility('poison_trail')){
+        this.trailPoints.push({ x:this.x, y:this.y, t:performance.now() });
+        while(this.trailPoints.length > 120) this.trailPoints.shift();
+      } else {
+        this.trailPoints = [];
+      }
     }
     triggerAuto(id){
-      // auto abilities which don't require player facing
       const def = abilityDefs[id];
       const lvl = this.abilityLevel(id);
       const power = def.upgradePow ? def.upgradePow(lvl-1) : def.basePower;
       if(id === 'blade_spin'){
-        // spawn blades visual that deal damage over time nearby
-        blades.push({ t: performance.now(), dur: 600, power, spins: 6 + lvl*2 });
+        blades.push({ t: performance.now(), dur: 700, power, spins: 6 + lvl*2 });
       } else if(id === 'auto_laser'){
-        // target nearest enemy and fire a beam
-        const target = enemies.filter(e=>e.alive && !e.friendly).sort((a,b)=>dist(this.x,this.y,a.x,a.y)-dist(this.x,this.y,b.x,b.y))[0];
+        const target = enemies.filter(e=>e.alive && !e.friendly && onScreen(e.x,e.y)).sort((a,b)=>dist(this.x,this.y,a.x,a.y)-dist(this.x,this.y,b.x,b.y))[0];
         if(target) {
           beams.push({ x1:this.x, y1:this.y, x2:target.x, y2:target.y, t:performance.now(), dur:160, power });
           target.takeDamage(power);
         }
       } else if(id === 'anvil_drop'){
-        // pick random enemy and spawn anvil above them
-        const pool = enemies.filter(e=>e.alive && !e.friendly);
+        const pool = enemies.filter(e=>e.alive && !e.friendly && onScreen(e.x,e.y));
         if(pool.length){
           const target = choose(pool);
           anvils.push({ tx: target.x, ty: target.y, x: target.x, y: -80, vy: 0, t: performance.now(), power, hit:false });
         }
+      } else if(id === 'orbital'){
+        blades.push({ t:performance.now(), dur:1100, power, spins: 3 + lvl*2 });
       }
     }
     takeDamage(dmg){
@@ -175,7 +188,7 @@
       while(this.xp >= this.nextXp){
         this.xp -= this.nextXp;
         this.level++;
-        this.nextXp = Math.floor(60 * Math.pow(1.35, this.level-1));
+        this.nextXp = Math.floor(50 * Math.pow(1.3, this.level-1));
         queueLevelUp();
       }
     }
@@ -188,31 +201,50 @@
       const lvl = slot.lvl;
       const power = def.upgradePow ? def.upgradePow(lvl-1) : def.basePower;
 
-      // ensure every ability deals damage somewhere (passives also do small damage)
+      // resolve direction: prefer argument, fall back to lastDir
+      const dirx = (typeof dx === 'number') ? dx : this.lastDir.x;
+      const diry = (typeof dy === 'number') ? dy : this.lastDir.y;
+      const mag = Math.hypot(dirx, diry) || 1;
+
       if(def.type==='melee' || def.type==='auto' || def.type==='aura'){
-        // melee-like: immediate radius damage + visible blades
         blades.push({ t:performance.now(), dur:500, power, spins: 5 + lvl });
         for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) <= (def.range||72)) e.takeDamage(power);
         return true;
       }
       if(def.type==='dash'){
-        const nx = dx||1, ny = dy||0, mag=Math.hypot(nx,ny)||1;
-        this.x += (nx/mag)*def.range;
-        this.y += (ny/mag)*def.range;
+        this.x += (dirx/mag)*def.range;
+        this.y += (diry/mag)*def.range;
         this.x = clamp(this.x, this.r, MAP_W - this.r); this.y = clamp(this.y, this.r, MAP_H - this.r);
-        // visible rush streak and damage enemies along path
         particles.push({ x:this.x, y:this.y, t:performance.now(), dur:350, col:'#ffcc88' });
         for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) <= this.r + e.r + 8) e.takeDamage(power);
         return true;
       }
       if(def.type==='projectile'){
-        const nx = (dx||1), ny = (dy||0), mag=Math.hypot(nx,ny)||1;
-        const speed = 420;
-        projectiles.push(new Projectile(this.x + nx/mag*(this.r+8), this.y + ny/mag*(this.r+8), nx/mag*speed, ny/mag*speed, power, 6, 'player', def.range));
+        // multi projectile variants
+        if(id === 'multi_arrow'){
+          const spread = 5;
+          for(let i=0;i<spread;i++){
+            const a = (i - Math.floor(spread/2)) * 0.18;
+            const ang = Math.atan2(diry,dirx) + a;
+            const nx = Math.cos(ang), ny = Math.sin(ang);
+            projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*420, ny*420, power, 6, 'player', def.range));
+          }
+        } else if(id === 'poison_bomb'){
+          // projectile that creates poison patch on impact
+          const nx = dirx/mag, ny = diry/mag;
+          projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*300, ny*300, power, 8, 'player', def.range, { onExpire: (px,py)=> {
+            // spawn poison patch effect (visual + damage area)
+            beams.push({ x1:px, y1:py, aoe:true, range:80, t:performance.now(), dur:220, power: power*0.6, poison:true });
+            // actual lingering poison: add particles and small periodic damage handled in update
+            poisonTrails.push({ x:px, y:py, r:80, t:performance.now(), dur:4500, power:power*0.5 });
+          }}));
+        } else {
+          const nx = dirx/mag, ny = diry/mag;
+          projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*420, ny*420, power, 6, 'player', def.range));
+        }
         return true;
       }
       if(def.type==='deploy'){
-        // turret or mine
         if(id === 'turret'){
           const t = new Turret(this.x + 20, this.y, power, 7000 + lvl*1500); t.friendly = true; enemies.push(t);
         } else if(id === 'homing_mine'){
@@ -221,9 +253,8 @@
         return true;
       }
       if(def.type==='cone'){
-        beams.push({ x1:this.x, y1:this.y, angle: Math.atan2(dy||1,dx||1), cone:true, dur:220, t:performance.now(), power, range:def.range });
-        // apply damage
-        const angleCenter = Math.atan2(dy||1,dx||1);
+        beams.push({ x1:this.x, y1:this.y, angle: Math.atan2(diry,dirx), cone:true, dur:220, t:performance.now(), power, range:def.range });
+        const angleCenter = Math.atan2(diry,dirx);
         const coneSize = Math.PI/3;
         for(const e of enemies) if(e.alive && !e.friendly){
           const dx2 = e.x - this.x, dy2 = e.y - this.y, d = Math.hypot(dx2,dy2);
@@ -248,31 +279,28 @@
 
   // --- Enemy, Turret, Projectile, Orb, HomingMine ---
   class Enemy {
-    constructor(x,y,hp=40,speed=40,r=14,type='zombie',melee=true){
+    constructor(x,y,hp=40,speed=40,r=14,type='zombie',melee=true,xpValue=10){
       this.x=x; this.y=y; this.hp=hp; this.maxHp=hp; this.speed=speed; this.r=r; this.type=type; this.melee=melee;
-      this.alive=true; this.slowUntil=0; this.slowFactor=1; this.tickAcc=0; this.friendly=false;
+      this.alive=true; this.slowUntil=0; this.slowFactor=1; this.tickAcc=0; this.friendly=false; this.xpValue = xpValue;
     }
     takeDamage(d){
       this.hp -= d;
-      // small particle burst
       particles.push({ x:this.x, y:this.y, t:performance.now(), dur:500, col:'#ff6b6b' });
       if(this.hp<=0) this.die();
     }
     die(){
       if(!this.alive) return;
       this.alive=false;
-      score += Math.round(this.maxHp/3);
-      // xp orbs
-      const orbsCount = Math.max(1, Math.floor(this.maxHp/18));
-      for(let i=0;i<orbsCount;i++) orbs.push(new Orb(this.x + randRange(-10,10), this.y + randRange(-10,10), randRange(8,18), 'xp'));
-      // chance to drop heal
+      score += Math.round(this.xpValue);
+      const orbsCount = Math.max(1, Math.floor(this.xpValue/6));
+      for(let i=0;i<orbsCount;i++) orbs.push(new Orb(this.x + randRange(-10,10), this.y + randRange(-10,10), randRange(6,16), 'xp'));
       if(Math.random() < 0.18) orbs.push(new Orb(this.x + randRange(-8,8), this.y + randRange(-8,8), randRange(12,30), 'heal'));
+      // bosses/minis drop big xp
     }
     applySlow(factor, ms){ this.slowFactor = factor; this.slowUntil = performance.now() + ms; }
     update(dt){
       if(!player || !player.alive) return;
       if(this.friendly) {
-        // turrets or friendly entities don't chase player
         if(this.updateFriendly) this.updateFriendly(dt);
         return;
       }
@@ -300,6 +328,9 @@
       if(this.type==='skeleton'){ ctx.fillStyle = '#dfe8e9'; }
       else if(this.type==='demon'){ ctx.fillStyle = '#b14a4a'; }
       else if(this.type==='brute'){ ctx.fillStyle = '#7b3a3a'; }
+      else if(this.type==='wolf'){ ctx.fillStyle = '#88aacc'; }
+      else if(this.type==='mini'){ ctx.fillStyle = '#ffc968'; }
+      else if(this.type==='boss'){ ctx.fillStyle = '#ff6b6b'; }
       else ctx.fillStyle = '#6b8b6b';
       ctx.beginPath(); ctx.arc(0,0,this.r,0,Math.PI*2); ctx.fill();
       // hp bar
@@ -311,7 +342,7 @@
 
   class Turret extends Enemy {
     constructor(x,y,power,lifeMs){
-      super(x,y, 40, 0, 12, 'turret', false);
+      super(x,y, 40, 0, 12, 'turret', false, 8);
       this.power=power; this.expireAt=performance.now()+lifeMs; this.shootAcc=0; this.friendly=true;
     }
     update(dt){
@@ -329,10 +360,9 @@
     }
   }
 
-  // homing mine as friendly deployable that seeks enemies
   class HomingMine extends Enemy {
     constructor(x,y,power,lifeMs){
-      super(x,y, 24, 30, 10, 'mine', false);
+      super(x,y, 24, 30, 10, 'mine', false, 10);
       this.power = power; this.expireAt = performance.now()+lifeMs; this.friendly=true;
     }
     update(dt){
@@ -358,19 +388,25 @@
   }
 
   class Projectile {
-    constructor(x,y,vx,vy,power,r,owner,range=600){
+    constructor(x,y,vx,vy,power,r,owner,range=600,opt={}){
       this.x=x; this.y=y; this.vx=vx; this.vy=vy; this.power=power; this.r=r; this.owner=owner; this.range=range;
       this.life = Math.max(200, range / Math.hypot(vx,vy) * 1000);
-      this.alive=true; this.trail=[];
+      this.alive=true; this.trail=[]; this.opt = opt;
     }
     update(dt){
       if(!this.alive) return;
       this.x += this.vx * dt/1000; this.y += this.vy * dt/1000;
       this.trail.push({x:this.x, y:this.y, t:performance.now()});
       while(this.trail.length>10) this.trail.shift();
-      this.life -= dt; if(this.life<=0) this.alive=false;
+      this.life -= dt; 
+      if(this.life<=0){
+        this.alive=false;
+        if(this.opt.onExpire) this.opt.onExpire(this.x, this.y);
+      }
       if(this.owner === 'player'){
-        for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) <= e.r + this.r){ e.takeDamage(this.power); this.alive=false; break; }
+        for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) <= e.r + this.r){ e.takeDamage(this.power); 
+            if(this.opt.onHit) this.opt.onHit(e);
+            this.alive=false; break; }
       } else if(this.owner === 'enemy'){
         if(dist(this.x,this.y,player.x,player.y) <= player.r + this.r){ player.takeDamage(this.power); this.alive=false; }
       }
@@ -404,36 +440,65 @@
     }
   }
 
-  // --- spawns / difficulty ---
+  // --- spawns: scale by player.level and unlock types by level ---
   function spawnEnemyWave(dt){
     spawnTimer -= dt;
     if(spawnTimer <= 0){
-      spawnTimer = spawnInterval;
+      spawnTimer = clamp(200 + Math.max(0, 2200 - player.level*60), 200, 3800);
       const side = Math.floor(Math.random()*4);
       let sx=0, sy=0;
       if(side===0){ sx = randRange(0,MAP_W); sy = -20; }
       else if(side===1){ sx = randRange(0,MAP_W); sy = MAP_H + 20; }
       else if(side===2){ sx = -20; sy = randRange(0,MAP_H); }
       else { sx = MAP_W + 20; sy = randRange(0,MAP_H); }
-      const t = Math.min(1, difficultyTimer/90000); // slower ramp (90s)
+
+      const lvl = Math.max(1, player.level);
       const r = Math.random();
-      if(r < 0.04 + 0.06*t){
-        enemies.push(new Enemy(sx,sy, 220 + 60*t*3, 28, 34, 'brute', true));
-      } else if(r < 0.2){
-        enemies.push(new Enemy(sx,sy, 40 + 30*t*2, 45 + 20*t, 12, 'skeleton', false));
+
+      // boss/miniboss chance based on level
+      if(lvl >= 8 && Math.random() < 0.02){
+        const bossHp = 800 + (lvl-8)*160;
+        const boss = new Enemy(sx,sy, bossHp, 18, 48, 'boss', true, 230);
+        // boss special: larger melee and periodic stomp
+        boss.update = function(dt){
+          Enemy.prototype.update.call(this,dt);
+          // occasional stomp
+          this.tickAcc = (this.tickAcc || 0) - dt;
+          if(this.tickAcc <= 0){
+            this.tickAcc = 2000;
+            for(const e of enemies) if(e.alive && e !== this && dist(this.x,this.y,e.x,e.y) < 120) e.takeDamage(40);
+          }
+        };
+        enemies.push(boss);
+        return;
+      }
+
+      // miniboss
+      if(lvl >=5 && Math.random() < 0.04){
+        const mini = new Enemy(sx,sy, 220 + lvl*40, 30, 28, 'mini', true, 90 + lvl*8);
+        enemies.push(mini); return;
+      }
+
+      // standard spawns: introduce new types as level increases
+      if(r < 0.05 + lvl*0.005){
+        enemies.push(new Enemy(sx,sy, 150 + lvl*18, 20 + lvl*1, 36, 'brute', true, 60 + lvl*6));
+      } else if(r < 0.18){
+        // weaker ranged skeleton: nerfed power early
+        enemies.push(new Enemy(sx,sy, 40 + lvl*8, 36, 12, 'skeleton', false, 18 + lvl*2));
       } else if(r < 0.55){
-        enemies.push(new Enemy(sx,sy, 46 + 24*t*2, 34 + 8*t, 16, 'zombie', true));
+        enemies.push(new Enemy(sx,sy, 34 + lvl*6, 28 + lvl*1.5, 16, 'zombie', true, 12 + lvl*2));
       } else {
-        enemies.push(new Enemy(sx,sy, 30 + 18*t*2, 90 + 30*t, 10, 'demon', true));
+        // fast wolf introduced after level 3
+        if(lvl >= 3 && Math.random() < 0.5){
+          enemies.push(new Enemy(sx,sy, 24 + lvl*5, 110 + lvl*6, 10, 'wolf', true, 10 + lvl*2));
+        } else {
+          enemies.push(new Enemy(sx,sy, 28 + lvl*5, 86 + lvl*5, 10, 'demon', true, 14 + lvl*3));
+        }
       }
     }
   }
-  function updateDifficulty(dt){
-    difficultyTimer += dt;
-    spawnInterval = Math.max(700, 3800 - (difficultyTimer/1000)*6); // decline slower
-  }
 
-  // --- camera centering with clamp to borders ---
+  // --- camera centering ---
   function updateCamera(){
     camera.w = VIEW_W; camera.h = VIEW_H;
     let cx = player.x - camera.w/2; let cy = player.y - camera.h/2;
@@ -454,7 +519,7 @@
     const m = Math.hypot(x,y); if(m>0) return {x:x/m,y:y/m}; return null;
   }
 
-  // --- level up UI & choices ---
+  // --- level up UI & choices (no duplicates, guaranteed damage options for start) ---
   function getRandomAbilityOption(existingIds=[]){
     const pool = ABILITIES.filter(a=> !existingIds.includes(a.id));
     if(pool.length===0) return ABILITIES[Math.floor(Math.random()*ABILITIES.length)].id;
@@ -475,29 +540,36 @@
   }
   function queueLevelUp(){
     const opts=[];
-    for(let i=0;i<3;i++){
-      if(player.abilities.length>0 && Math.random()<0.5){
-        const a = player.abilities[Math.floor(Math.random()*player.abilities.length)];
-        const def = abilityDefs[a.id];
-        opts.push({ id:a.id, title: def.title + ` (Upgrade)`, desc: def.desc, extra:`Upgrade to level ${a.lvl+1}` });
-      } else {
-        const id = getRandomAbilityOption(player.abilities.map(x=>x.id));
-        const def = abilityDefs[id];
-        opts.push({ id, title: def.title, desc: def.desc, extra:'New ability' });
-      }
+    const used = new Set();
+    // prefer upgrades half the time, but avoid duplicates
+    const candidates = [];
+    // upgrade candidates
+    for(const a of player.abilities) candidates.push({ id:a.id, title:abilityDefs[a.id].title + ' (Upgrade)', desc:abilityDefs[a.id].desc, upgrade:true });
+    // new ability candidates
+    ABILITIES.forEach(a=> candidates.push({ id:a.id, title:a.title, desc:a.desc }));
+    // shuffle
+    for(let i=candidates.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [candidates[i], candidates[j]]=[candidates[j], candidates[i]]; }
+    for(const c of candidates){
+      if(opts.length>=3) break;
+      if(used.has(c.id)) continue;
+      opts.push({ id:c.id, title:c.title, desc:c.desc, extra: c.upgrade ? 'Upgrade' : 'New ability' });
+      used.add(c.id);
     }
     running = false;
     presentChoices('Level Up', opts, (opt)=>{ player.addAbility(opt.id); running = true; updateHud(); });
   }
 
-  // --- ranged enemy behaviour: skeleton shoots ---
+  // --- ranged enemy behaviour: skeleton shoots but less frequently and weaker ---
   function enemyRangedBehavior(e, dt){
     if(e.type!=='skeleton' || !e.alive) return;
     e.tickAcc = (e.tickAcc||0) - dt;
     if(e.tickAcc <= 0){
-      e.tickAcc = 1600;
+      e.tickAcc = 2000 + player.level*80;
       const dx = player.x - e.x, dy = player.y - e.y; const m = Math.hypot(dx,dy)||1;
-      projectiles.push(new Projectile(e.x, e.y, dx/m*170, dy/m*170, 10, 5, 'enemy', 900));
+      // only shoot if on-screen (makes ranged less punishing)
+      if(onScreen(e.x,e.y) && onScreen(player.x,player.y)){
+        projectiles.push(new Projectile(e.x, e.y, dx/m*150, dy/m*150, 8 + Math.floor(player.level*0.6), 5, 'enemy', 900));
+      }
     }
   }
 
@@ -516,29 +588,27 @@
 
   // --- update & visuals helper ---
   function updateEffects(dt){
-    // blades: deal damage to nearby enemies while present
     const now = performance.now();
+    // blades
     for(const b of blades){
       const elapsed = now - b.t;
       if(elapsed > b.dur) continue;
-      // apply intermittent damage
       for(const e of enemies) if(e.alive && !e.friendly){
         const d = dist(player.x,player.y,e.x,e.y);
-        if(d <= (b.spins/6)*48) e.takeDamage(b.power * dt/1000 * 60); // scaled per second
+        if(d <= (b.spins/6)*48) e.takeDamage(b.power * dt/1000 * 60);
       }
     }
     blades = blades.filter(b=> now - b.t <= b.dur);
 
-    // beams: short-lived visual (already damaged on spawn for some)
+    // beams cleanup
     beams = beams.filter(b => now - b.t <= (b.dur||220));
 
-    // anvils: fall and hit
+    // anvils fall
     for(const a of anvils){
       if(a.hit) continue;
       a.vy += 1200 * dt/1000;
       a.y += a.vy * dt/1000;
       if(a.y >= a.ty){
-        // damage nearby enemies
         for(const e of enemies) if(e.alive && !e.friendly && dist(a.tx,a.ty,e.x,e.y) < 36) e.takeDamage(a.power);
         a.hit = true;
         particles.push({ x:a.tx, y:a.ty, t:performance.now(), dur:700, col:'#ffb86b' });
@@ -546,7 +616,14 @@
     }
     anvils = anvils.filter(a => !a.hit || (now - a.t < 600));
 
-    // particles cleanup
+    // poison patches deal damage
+    for(const p of poisonTrails){
+      const elapsed = now - p.t;
+      if(elapsed > p.dur) continue;
+      for(const e of enemies) if(e.alive && !e.friendly && dist(p.x,p.y,e.x,e.y) <= p.r) e.takeDamage(p.power * dt/1000);
+    }
+    poisonTrails = poisonTrails.filter(p => now - p.t <= p.dur);
+
     particles = particles.filter(p => performance.now() - p.t <= p.dur);
   }
 
@@ -558,11 +635,16 @@
       player.y += dir.y * player.moveSpeed * dt/1000;
       player.x = clamp(player.x, 0, MAP_W);
       player.y = clamp(player.y, 0, MAP_H);
+      // update last moving direction
+      player.lastDir = dir;
+      // poison trail visuals: record
+      if(player.hasAbility('poison_trail')) player.trailPoints.push({ x:player.x, y:player.y, t:performance.now() });
     }
+
     player.tick(dt);
 
-    // passive abilities that do damage without facing
-    if(player.hasAbility('poison_trail') && dir){
+    // passive auras
+    if(player.hasAbility('poison_trail')){
       const lvl = player.abilityLevel('poison_trail');
       for(const e of enemies) if(e.alive && !e.friendly && dist(player.x,player.y,e.x,e.y) < 40) e.takeDamage( (6 + (lvl-1)*3) * dt/1000 );
     }
@@ -570,12 +652,17 @@
       const lvl = player.abilityLevel('frost_aura');
       for(const e of enemies) if(e.alive && !e.friendly && dist(player.x,player.y,e.x,e.y) <= 80) { e.takeDamage((4 + (lvl-1)*2) * dt/1000); e.applySlow(0.7, 600); }
     }
-    // attempt use directional abilities when moving (still supports auto abilities)
-    if(dir){
-      for(const a of player.abilities){
-        const def = abilityDefs[a.id]; if(!def) continue;
-        if(['projectile','cone','melee','dash','active','aoe','deploy'].includes(def.type)){
-          player.tryUseAbility(a.id, dir.x, dir.y);
+
+    // allow directional abilities to use lastDir even when standing still
+    for(const a of player.abilities){
+      const def = abilityDefs[a.id]; if(!def) continue;
+      if(['projectile','cone','melee','dash','active','aoe','deploy'].includes(def.type)){
+        // call tryUseAbility with lastDir if not moving
+        const useDir = dir ? {x:dir.x,y:dir.y} : {x:player.lastDir.x, y:player.lastDir.y};
+        // only invoke automatically for certain cooldown-free or auto-fired ones are handled in tick()
+        // here we attempt passive "on-move" triggers only: if we are moving or ability is projectiles and auto press enabled
+        if(dir || def.type==='projectile'){
+          player.tryUseAbility(a.id, useDir.x, useDir.y);
         }
       }
     }
@@ -591,12 +678,9 @@
     // orbs
     for(const o of orbs) o.update(dt);
 
-    // enemy projectiles hitting player handled in Projectile.update
-
     pickupOrbs();
 
     spawnEnemyWave(dt);
-    updateDifficulty(dt);
 
     updateEffects(dt);
 
@@ -604,27 +688,22 @@
     updateHud();
   }
 
-  // --- draw: background tilemap + entities + effects ---
+  // --- draw: background tilemap + entities + effects + player health bar ---
   function drawBackground(){
-    // textured grid / floor with subtle parallax
     const tile = 64;
     const camX = camera.x, camY = camera.y;
-    // base floor
     ctx.save();
-    // draw large tiles with variation
     for(let y = Math.floor(camY/tile)-1; y <= Math.floor((camY+VIEW_H)/tile)+1; y++){
       for(let x = Math.floor(camX/tile)-1; x <= Math.floor((camX+VIEW_W)/tile)+1; x++){
         const px = x*tile - camX, py = y*tile - camY;
         const shade = ((x + y) % 2 === 0) ? '#0b1a1e' : '#081316';
         ctx.fillStyle = shade;
         ctx.fillRect(px, py, tile, tile);
-        // faint pattern
         ctx.strokeStyle = 'rgba(255,255,255,0.02)';
         ctx.strokeRect(px+1, py+1, tile-2, tile-2);
       }
     }
     ctx.restore();
-    // draw map bounds indicator (slightly)
     ctx.save();
     ctx.strokeStyle = 'rgba(255,107,53,0.03)';
     ctx.lineWidth = 6;
@@ -633,11 +712,9 @@
   }
 
   function draw(){
-    // clear
     ctx.fillStyle = '#041018';
     ctx.fillRect(0,0,VIEW_W,VIEW_H);
 
-    // background map
     drawBackground();
 
     // draw orbs
@@ -650,12 +727,12 @@
       ctx.save();
       ctx.globalAlpha = a*0.95;
       if(b.aoe){
-        ctx.fillStyle = 'rgba(120,200,255,0.12)'; ctx.beginPath(); ctx.arc(b.x1 - camera.x, b.y1 - camera.y, b.range, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = 'rgba(120,200,255,0.12)'; ctx.beginPath(); ctx.arc(b.x1 - camera.x, b.y1 - camera.y, b.range || 80, 0, Math.PI*2); ctx.fill();
       } else if(b.cone){
         ctx.fillStyle = 'rgba(255,180,110,0.12)'; ctx.beginPath();
         ctx.moveTo(b.x1-camera.x, b.y1-camera.y);
         const ang = b.angle;
-        const r = b.range;
+        const r = b.range || 180;
         ctx.arc(b.x1-camera.x, b.y1-camera.y, r, ang - 0.7, ang + 0.7);
         ctx.closePath(); ctx.fill();
       } else {
@@ -681,17 +758,31 @@
     // projectiles
     for(const p of projectiles) p.draw(ctx, camera);
 
+    // poison trail visual (draw path)
+    if(player && player.trailPoints && player.trailPoints.length){
+      for(let i=0;i<player.trailPoints.length;i++){
+        const t = player.trailPoints[i]; const age = performance.now() - t.t;
+        const alpha = 1 - (age/1200);
+        if(alpha <= 0) continue;
+        ctx.save(); ctx.globalAlpha = alpha*0.6; ctx.fillStyle = '#7fbf3f';
+        ctx.beginPath(); ctx.arc(t.x - camera.x, t.y - camera.y, 6, 0, Math.PI*2); ctx.fill(); ctx.restore();
+      }
+    }
+
     // player
     if(player && player.alive){
       const px = player.x - camera.x, py = player.y - camera.y;
       ctx.save(); ctx.translate(px,py);
-      // avatar
       ctx.fillStyle = '#7fbfff'; ctx.beginPath(); ctx.arc(0,0,player.r,0,Math.PI*2); ctx.fill();
-      // shield indicator
       if(player.shieldUntil > performance.now()){
         ctx.strokeStyle = 'rgba(130,200,255,0.6)'; ctx.lineWidth = 4;
         ctx.beginPath(); ctx.arc(0,0,player.r+8,0,Math.PI*2); ctx.stroke();
       }
+      // health bar above player
+      const barW = 64; const barH = 8;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(-barW/2, -player.r - 20, barW, barH);
+      ctx.fillStyle = '#ff6b6b'; ctx.fillRect(-barW/2, -player.r - 20, barW * (player.hp/player.maxHp), barH);
+      ctx.strokeStyle = '#00000055'; ctx.lineWidth = 1; ctx.strokeRect(-barW/2, -player.r - 20, barW, barH);
       ctx.restore();
     }
 
@@ -757,34 +848,75 @@
   retryBtn.addEventListener('click', ()=>{ gameOverModal.classList.add('hidden'); resetGame(); startGame(); });
 
   function resetGame(){
-    enemies = []; projectiles = []; orbs = []; blades=[]; beams=[]; anvils=[]; particles=[];
-    score = 0; spawnTimer = 0; spawnInterval = 3800; difficultyTimer = 0;
+    enemies = []; projectiles = []; orbs = []; blades=[]; beams=[]; anvils=[]; particles=[]; poisonTrails=[];
+    score = 0; spawnTimer = 0; spawnInterval = 3800;
     player = new Player(MAP_W/2, MAP_H/2);
     player.abilities = [];
     updateHud();
   }
 
-  // starting choice ensures damage-dealing starts (filter out pure non-damaging picks)
+  // starting choice ensures damage-dealing starts (filter options to damaging abilities)
   function startGame(){
     resetGame();
-    const opts=[]; const pool = ABILITIES.slice();
-    while(opts.length<3 && pool.length){
-      const i = Math.floor(Math.random()*pool.length);
-      const a = pool.splice(i,1)[0];
-      // ensure given options are damaging or at least pseudo-damaging
+    const damageCandidates = ABILITIES.filter(a => ['projectile','auto','melee','cone','aura','deploy','aoe','dash'].includes(a.type));
+    // sample 3 unique
+    const pool = damageCandidates.slice();
+    const opts = [];
+    while(opts.length < 3 && pool.length){
+      const idx = Math.floor(Math.random()*pool.length); const a = pool.splice(idx,1)[0];
       opts.push({ id:a.id, title:a.title, desc:a.desc, extra:'Starting ability' });
     }
     presentChoices('Choose starting ability', opts, (opt)=>{ player.addAbility(opt.id); playOverlay.classList.add('hidden'); running=true; });
   }
 
-  // UI wiring
+  // UI wiring + leaderboard save (uses firebase objects exposed on window)
   if(playBtn) playBtn.addEventListener('click', ()=> startGame());
   if(fullscreenBtn && playbound) fullscreenBtn.addEventListener('click', async ()=>{ try{ if(!document.fullscreenElement) await playbound.requestFullscreen(); else await document.exitFullscreen(); setTimeout(resizeCanvasToPlaybound,80);}catch(e){} });
-  if(dayLeaderboardBtn && dayLeaderboardModal) dayLeaderboardBtn.addEventListener('click', ()=> dayLeaderboardModal.classList.remove('hidden'));
+  if(dayLeaderboardBtn && dayLeaderboardModal) dayLeaderboardBtn.addEventListener('click', ()=> {
+    dayLeaderboardModal.classList.remove('hidden');
+    // attempt to load top scores
+    if(window.firebaseReady){
+      const db = window.firebaseDb;
+      const col = window.firebaseCollection(db, 'scores-day');
+      const q = window.firebaseQuery(col, window.firebaseOrderBy('score', 'desc'));
+      window.firebaseGetDocs(q).then(snap => {
+        dayLeaderboardBody.innerHTML = '';
+        let rank = 1;
+        snap.forEach(docSnap => {
+          const d = docSnap.data();
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${rank++}</td><td>${d.name||'Guest'}</td><td>${d.score}</td><td>${new Date(d.when).toLocaleString()}</td><td>${d.event?'Yes':''}</td>`;
+          dayLeaderboardBody.appendChild(tr);
+        });
+      }).catch(()=>{});
+    }
+  });
   if(dayLeaderboardClose && dayLeaderboardModal) dayLeaderboardClose.addEventListener('click', ()=> dayLeaderboardModal.classList.add('hidden'));
-  if(submitScoreBtn){ submitScoreBtn.addEventListener('click', async ()=>{ submitScoreBtn.disabled=true; submitScoreBtn.textContent='Saving...'; setTimeout(()=>{ submitScoreBtn.textContent='Saved'; submitScoreBtn.disabled=false; gameOverModal.classList.add('hidden'); },700); }); }
 
-  // --- pickups / visuals initial helpers ---
+  if(submitScoreBtn){
+    submitScoreBtn.addEventListener('click', async ()=>{
+      if(!window.firebaseReady){ submitScoreBtn.textContent='No Firebase'; setTimeout(()=>submitScoreBtn.textContent='Save Score',900); return; }
+      submitScoreBtn.disabled = true;
+      submitScoreBtn.textContent = 'Saving...';
+      try{
+        const db = window.firebaseDb;
+        const auth = window.firebaseAuth;
+        const user = auth && auth.currentUser;
+        const name = user ? (user.displayName||user.email||'Player') : 'Guest';
+        const id = 'score-' + Date.now() + '-' + Math.floor(Math.random()*9999);
+        const data = { name, score, when: Date.now(), event: false };
+        const docRef = window.firebaseDoc(db, 'scores-day', id);
+        await window.firebaseSetDoc(docRef, data);
+        submitScoreBtn.textContent = 'Saved';
+        setTimeout(()=>{ gameOverModal.classList.add('hidden'); submitScoreBtn.textContent='Save Score'; submitScoreBtn.disabled=false; }, 700);
+      }catch(e){
+        submitScoreBtn.textContent = 'Error';
+        setTimeout(()=>{ submitScoreBtn.textContent='Save Score'; submitScoreBtn.disabled=false; }, 900);
+      }
+    });
+  }
+
+  // --- resize / background helpers ---
   function resizeCanvasToPlaybound(){
     if(!canvas || !playbound) return;
     const rect = playbound.getBoundingClientRect();
