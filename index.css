@@ -128,7 +128,7 @@ font-family: monospace;
 
 /* Scary Toggle */
 #scary-toggle-container {
-display: flex;
+display: none;
 align-items: center;
 background-color: rgba(0, 0, 0, 0.9);
 padding: 10px 15px;

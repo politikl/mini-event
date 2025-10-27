@@ -475,9 +475,17 @@
               p.brokenAt = Date.now();
             }
           } else if(p.type === 'jet'){
-            player.flight = { remaining: 800, vel:20, taper:300 };
-            player.vy = -player.flight.vel;
+            // Natural bounce with strong upward velocity
+            player.vy = JUMP_VEL * 1.8; // Stronger than normal jump but not fixed flight
             p.used = true;
+            
+            // Add a temporary flight effect that only lasts for the bounce duration
+            // This allows enemy destruction during the bounce without sustained flight
+            player.flight = { 
+              remaining: 300, // Short duration just for the bounce
+              vel: Math.abs(JUMP_VEL) * 1.5, 
+              taper: 150 
+            };
           } else {
             player.vy = JUMP_VEL + (-Math.random()*2);
           }
