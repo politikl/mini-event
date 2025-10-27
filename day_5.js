@@ -87,7 +87,7 @@
     // siphon passive: deals damage on hit and heals small — visible as particle
     { id:'siphon', title:'Siphon', desc:'On-hit heal.', type:'passive', basePower:5, cooldown:0, range:40, upgradePow:(lv)=>5+lv*2 },
     // turret (friendly) — visual bullets
-    { id:'turret', title:'Turret', desc:'Place a turret that shoots at on-screen enemies.', type:'deploy', basePower:10, cooldown:5000, range:0, upgradePow:(lv)=>10+lv*4 },
+  { id:'turret', title:'Turret', desc:'Place a turret that shoots at on-screen enemies.', type:'deploy', basePower:10, cooldown:5000, range:0, upgradePow:(lv)=>10+lv*4 },
     // homing mine — visible seeker
     { id:'homing_mine', title:'Homing Mine', desc:'Spawn a homing mine that seeks enemies.', type:'deploy', basePower:14, cooldown:4000, range:0, upgradePow:(lv)=>14+lv*6 },
     // cone: visible cone shock but nerfed damage
@@ -102,13 +102,78 @@
     { id:'auto_laser', title:'Auto Laser', desc:'Auto-aim laser at nearest on-screen enemy).', type:'auto', basePower:18, cooldown:1400, range:700, upgradePow:(lv)=>18+lv*6 },
     { id:'anvil_drop', title:'Anvil Drop', desc:'Drop an anvil on a enemy.', type:'auto', basePower:36, cooldown:7000, range:700, upgradePow:(lv)=>36+lv*12 },
 
-    // extra projectile/area abilities (visible)
-    { id:'poison_bomb', title:'Poison Bomb', desc:'Throws a bomb that spawns a poison patch.', type:'projectile', basePower:10, cooldown:2600, range:420, upgradePow:(lv)=>10+lv*3 },
+  // extra projectile/area abilities (visible)
+  { id:'poison_bomb', title:'Poison Bomb', desc:'Throws a bomb that spawns a poison patch.', type:'projectile', basePower:10, cooldown:2600, range:420, upgradePow:(lv)=>10+lv*3 },
+  // cannon: heavy click-targeted projectile with AoE
+  { id:'cannon', title:'Cannon', desc:'Click to fire a heavy cannonball that explodes on impact.', type:'projectile', basePower:36, cooldown:4000, range:720, upgradePow:(lv)=>36+lv*12 },
+  // stun grenade: short telegraph then stun on impact
+  { id:'stun_grenade', title:'Stun Grenade', desc:'Throws a grenade that stuns enemies in an area.', type:'projectile', basePower:0, cooldown:6000, range:420, upgradePow:(lv)=>0+lv*0 },
+  // ricochet shot: bounces between nearby enemies
+  { id:'ricochet', title:'Ricochet Shot', desc:'Fires a projectile that ricochets to another nearby enemy.', type:'projectile', basePower:14, cooldown:2000, range:640, upgradePow:(lv)=>14+lv*5 },
   // orbital removed (duplicate / deprecated)
     { id:'chain_lightning', title:'Chain Lightning', desc:'Strikes an enemy and chains to nearby enemies.', type:'projectile', basePower:16, cooldown:3200, range:540, upgradePow:(lv)=>16+lv*5 },
     { id:'meteor', title:'Meteor', desc:'Calls down a meteor that deals huge explosion (long cooldown).', type:'projectile', basePower:60, cooldown:14000, range:900, upgradePow:(lv)=>60+lv*24 }
   ];
   ABILITIES.forEach(a=> abilityDefs[a.id]=a);
+
+  // --- New enemy types: Replicator + MeteorSummoner Boss ---
+  class Replicator extends Enemy {
+    constructor(x,y,lvl){
+      super(x,y, 120 + lvl*30, 30, 20, 'replicator', true, 80 + lvl*8);
+      this.lifespan = performance.now() + 18000; // will spawn clones then perish
+      this.spawned = false;
+      this.realId = Math.random().toString(36).slice(2,8);
+    }
+    update(dt){
+      Enemy.prototype.update.call(this, dt);
+      if(!this.spawned && performance.now() > this.lifespan - 14000){
+        // spawn clones nearby (visual only weaker)
+        for(let i=0;i<3;i++){
+          const c = new Enemy(this.x + randRange(-28,28), this.y + randRange(-28,28), Math.max(8, 18 + Math.floor(this.xpValue/6)), 80, 10, 'mini', true, Math.max(4, Math.floor(this.xpValue/5)));
+          // mark clone as illusion (no XP)
+          c.illusion = true; c.realRef = this.realId; enemies.push(c);
+        }
+        this.spawned = true;
+      }
+      // replicator occasionally duplicates: clone itself (rare)
+      if(performance.now() > this.lifespan){ this.die(); }
+    }
+    die(){
+      if(!this.alive) return;
+      this.alive = false;
+      // reward only if real
+      score += Math.round(this.xpValue * 1.5);
+      for(let i=0;i<3;i++) orbs.push(new Orb(this.x + randRange(-10,10), this.y + randRange(-10,10), randRange(6,12), 'xp'));
+      particles.push({ x:this.x, y:this.y, t:performance.now(), dur:900, col:'#ff9b6b' });
+    }
+  }
+
+  class MeteorSummoner extends Enemy {
+    constructor(x,y,lvl){
+      super(x,y, 420 + lvl*80, 8, 30, 'meteor_summoner', false, 160 + lvl*20);
+      this.strikeAcc = 4000 - lvl*80;
+    }
+    update(dt){
+      Enemy.prototype.update.call(this, dt);
+      this.strikeAcc -= dt;
+      if(this.strikeAcc <= 0){
+        this.strikeAcc = 3200 + Math.random()*2000;
+        // telegraph a meteor at a random on-screen position near player
+        const ang = Math.random()*Math.PI*2; const rad = randRange(80, Math.min(420, VIEW_W));
+        const tx = clamp(player.x + Math.cos(ang)*rad, 0, MAP_W);
+        const ty = clamp(player.y + Math.sin(ang)*rad, 0, MAP_H);
+        // create telegraph beam with long dur
+        beams.push({ x1:tx, y1:ty, aoe:true, range:100, t:performance.now(), dur:3000, power:0, meteor:true, long:true });
+        // impact after telegraph
+        setTimeout(()=>{
+          beams.push({ x1:tx, y1:ty, aoe:true, range:160, t:performance.now(), dur:420, power:80 + Math.floor(this.xpValue/2) });
+          for(const e of enemies) if(e.alive && !e.friendly && dist(tx,ty,e.x,e.y) <= 160){ e.takeDamage(80 + Math.floor(this.xpValue/2)); }
+          if(dist(tx,ty,player.x,player.y) <= 160) player.takeDamage(60);
+          particles.push({ x:tx, y:ty, t:performance.now(), dur:1200, col:'#ff6b6b' });
+        }, 3000);
+      }
+    }
+  }
 
   // --- utilities ---
   function randRange(a,b){ return a + Math.random()*(b-a); }
@@ -158,8 +223,22 @@
           }
         }
       }
-      // trailPoints reserved for visual movement trail (no passive poison trail support)
+      // trailPoints reserved for visual movement trail
       this.trailPoints = [];
+      // allow deploy-type abilities to auto-trigger when ready (place turret/mine automatically)
+      for(const a of this.abilities){
+        const def = abilityDefs[a.id]; if(!def) continue;
+        if(def.type === 'deploy' && a.cd <= 0){
+          // avoid placing duplicate turret/mine nearby
+          if(a.id === 'turret'){
+            const nearbyTurret = enemies.find(en=>en.friendly && en.type === 'turret' && dist(en.x,en.y,this.x,this.y) < 180);
+            if(!nearbyTurret) this.tryUseAbility(a.id);
+          } else if(a.id === 'homing_mine'){
+            const nearbyMine = enemies.find(en=>en.friendly && en.type === 'mine' && dist(en.x,en.y,this.x,this.y) < 120);
+            if(!nearbyMine) this.tryUseAbility(a.id);
+          }
+        }
+      }
     }
     triggerAuto(id){
       const def = abilityDefs[id];
@@ -262,6 +341,64 @@
             },
             visual:'poison'
           }));
+        } else if(id === 'cannon'){
+          // heavy cannonball: explodes on impact or expire with AoE damage
+          const nx = dirx/mag, ny = diry/mag;
+          projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*320, ny*320, power, 10, 'player', def.range, {
+            onExpire: (px,py)=>{
+              const rad = 80 + lvl*12;
+              beams.push({ x1:px, y1:py, aoe:true, range:rad, t:performance.now(), dur:360, power: power*0.9 });
+              for(const e of enemies) if(e.alive && !e.friendly && dist(px,py,e.x,e.y) <= rad){ e.takeDamage(Math.round(power*0.9)); e.vx = (e.x-px)/Math.max(1,dist(px,py,e.x,e.y))*80; e.vy = (e.y-py)/Math.max(1,dist(px,py,e.x,e.y))*80; }
+              particles.push({ x:px, y:py, t:performance.now(), dur:900, col:'#ffb86b' });
+            },
+            onHit: (enemy)=>{
+              // immediate explosion on hit
+              const px = enemy.x, py = enemy.y; const rad = 80 + lvl*12;
+              beams.push({ x1:px, y1:py, aoe:true, range:rad, t:performance.now(), dur:360, power: power*0.9 });
+              for(const e of enemies) if(e.alive && !e.friendly && dist(px,py,e.x,e.y) <= rad){ e.takeDamage(Math.round(power*0.9)); e.vx = (e.x-px)/Math.max(1,dist(px,py,e.x,e.y))*80; e.vy = (e.y-py)/Math.max(1,dist(px,py,e.x,e.y))*80; }
+            },
+            visual:'heavy'
+          }));
+        } else if(id === 'stun_grenade'){
+          // grenade that stuns on explode
+          const nx = dirx/mag, ny = diry/mag;
+          projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*260, ny*260, power, 9, 'player', def.range, {
+            onExpire: (px,py)=>{
+              const rad = 64 + lvl*8;
+              const stunMs = 1100 + lvl*350;
+              beams.push({ x1:px, y1:py, aoe:true, range:rad, t:performance.now(), dur:360, power:0, stun:true });
+              for(const e of enemies) if(e.alive && !e.friendly && dist(px,py,e.x,e.y) <= rad){ e.stunUntil = performance.now() + stunMs; }
+              particles.push({ x:px, y:py, t:performance.now(), dur:700, col:'#d6f2ff' });
+            },
+            visual:'stun'
+          }));
+        } else if(id === 'ricochet'){
+          // ricochet: spawns a projectile that can spawn follow-up projectiles hitting nearby enemies
+          const nx = dirx/mag, ny = diry/mag;
+          const bounces = 1 + Math.floor(lvl/2);
+          const speed = 420;
+          function makeRicochet(sx, sy, tx, ty, remaining){
+            const dxr = tx - sx, dyr = ty - sy; const m2 = Math.hypot(dxr,dyr)||1;
+            projectiles.push(new Projectile(sx, sy, dxr/m2*speed, dyr/m2*speed, Math.round(power), 6, 'player', def.range, {
+              onHit: (enemy)=>{
+                // spawn particle beam
+                beams.push({ x1:enemy.x, y1:enemy.y, aoe:false, t:performance.now(), dur:200, power: power*0.6 });
+                if(remaining > 0){
+                  // find next nearest enemy excluding this one
+                  const next = enemies.filter(e=>e.alive && !e.friendly && e !== enemy).sort((a,b)=>dist(enemy.x,enemy.y,a.x,a.y)-dist(enemy.x,enemy.y,b.x,b.y))[0];
+                  if(next){
+                    // spawn new projectile from this enemy to next
+                    setTimeout(()=> makeRicochet(enemy.x, enemy.y, next.x, next.y, remaining-1), 40);
+                  }
+                }
+              },
+              visual:'spark'
+            }));
+          }
+          // initial target: pick an on-screen enemy towards click direction or nearest
+          const firstTarget = enemies.filter(e=>e.alive && !e.friendly).sort((a,b)=>dist(this.x,this.y,a.x,a.y)-dist(this.x,this.y,b.x,b.y))[0];
+          if(firstTarget){ makeRicochet(this.x + nx*(this.r+8), this.y + ny*(this.r+8), firstTarget.x, firstTarget.y, bounces); }
+        } else if(id === 'chain_lightning'){
         } else if(id === 'chain_lightning'){
           const nx = dirx/mag, ny = diry/mag;
           const chains = 1 + Math.floor((lvl-1)/2) + 1; // more chains with levels
@@ -344,6 +481,7 @@
       this.x=x; this.y=y; this.hp=hp; this.maxHp=hp; this.speed=speed; this.r=r; this.type=type; this.melee=melee;
       this.alive=true; this.slowUntil=0; this.slowFactor=1; this.tickAcc=0; this.friendly=false; this.xpValue = xpValue;
       this.vx = 0; this.vy = 0; // for knockback
+      this.stunUntil = 0; // timestamp while stunned (skip AI)
     }
     takeDamage(d){
       this.hp -= d;
@@ -362,6 +500,11 @@
     applySlow(factor, ms){ this.slowFactor = factor; this.slowUntil = performance.now() + ms; }
     update(dt){
       if(!player || !player.alive) return;
+      // if stunned, only apply lingering velocity (knockback) and skip AI/movement
+      if(this.stunUntil > performance.now()){
+        this.applyVelocity(dt);
+        return;
+      }
       if(this.friendly) {
         if(this.updateFriendly) this.updateFriendly(dt);
         // friendly can still have vx vy applied
@@ -480,11 +623,9 @@
         let target=null, td=Infinity;
         for(const e of enemies) if(e.alive && !e.friendly && onScreen(e.x,e.y)){ const d=dist(this.x,this.y,e.x,e.y); if(d<td){td=d;target=e;} }
         if(target){
-          const enemyProjCount = projectiles.filter(p=>p.owner === 'enemy').length;
-          if(enemyProjCount < ENEMY_PROJECTILE_CAP){
-            const dx = target.x - this.x, dy = target.y - this.y, m = Math.hypot(dx,dy)||1;
-            projectiles.push(new Projectile(this.x, this.y, dx/m*220, dy/m*220, this.power, 6, 'enemy', 420));
-          }
+          // turret projectiles are friendly and owned by 'player'
+          const dx = target.x - this.x, dy = target.y - this.y, m = Math.hypot(dx,dy)||1;
+          projectiles.push(new Projectile(this.x, this.y, dx/m*260, dy/m*260, this.power, 6, 'player', 620));
         }
       }
       Enemy.prototype.applyVelocity.call(this, dt);
