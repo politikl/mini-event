@@ -166,6 +166,22 @@
             </ol>
         </div>
 
+        <div id="achievements-panel">
+            <h2>Achievements</h2>
+            <div id="achievements-list">
+                <!-- Achievements will be populated here -->
+            </div>
+        </div>
+
+        <div id="statistics-panel">
+            <h2>Statistics</h2>
+            <div id="stats-content">
+                <div>Total Trades: <span id="total-trades">0</span></div>
+                <div>Highest Profit: <span id="highest-profit">$0.00</span></div>
+                <div>Total Profit: <span id="total-profit">$0.00</span></div>
+            </div>
+        </div>
+
         <div id="game-message" class="hidden">
             <!-- Game messages will appear here -->
         </div>
@@ -173,15 +189,55 @@
         <div id="score-submission" class="hidden">
             <h2>Game Over!</h2>
             <p>Your final score: <span id="final-score">0</span></p>
+            <div id="high-scores">
+                <h3>High Scores</h3>
+                <ol id="high-scores-list"></ol>
+            </div>
             <button id="submit-score-btn">Submit Score</button>
             <button id="play-again-btn">Play Again</button>
         </div>
 
         <footer>
             <button id="back-btn">Back to Games</button>
+            <button id="save-btn" data-tooltip="Save your progress">Save Game</button>
         </footer>
     </div>
 
+    <!-- Achievements popup template -->
+    <div id="achievement-popup" class="hidden">
+        <div class="achievement-content">
+            <h3>Achievement Unlocked!</h3>
+            <p id="achievement-name"></p>
+            <p id="achievement-description"></p>
+        </div>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>🏆 High Scores 🏆</h2>
+            <div id="leaderboard-content">
+                <table id="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Player</th>
+                            <th>Score</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-body">
+                        <!-- Leaderboard entries will be added here -->
+                    </tbody>
+                </table>
+            </div>
+            <button id="close-leaderboard" class="modal-close">Close</button>
+        </div>
+    </div>
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="day_4.js"></script>
 </body>

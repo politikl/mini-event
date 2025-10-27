@@ -78,8 +78,16 @@ const GAME_CONFIG = {
     priceUpdateInterval: 1000, // milliseconds
     newsUpdateInterval: 5000,  // milliseconds
     chartUpdateInterval: 1000, // milliseconds
-    maxPriceHistory: 30,       // number of days to show in charts
-    volatilityBase: 0.05,      // base volatility for price changes
+    maxPriceHistory: 30,      // number of days to show in charts
+    volatilityBase: 0.05,     // base volatility for price changes
+    autosaveInterval: 30000,  // autosave every 30 seconds
+    highScoreKey: 'candyStockHighScores',
+    achievements: {
+        firstPurchase: { name: 'First Purchase', description: 'Buy your first candy stock' },
+        thousandProfit: { name: 'Sweet Profit', description: 'Make $1000 in profit' },
+        diversified: { name: 'Candy Connoisseur', description: 'Own all types of candy stocks' },
+        bigSpender: { name: 'Big Spender', description: 'Have $5000 total worth' }
+    }
 };
 
 // Candy Stock Data
@@ -197,11 +205,31 @@ const gameState = {
     currentNews: [],
     gameOver: false,
     selectedCandy: 'choco',
-    charts: {}
+    charts: {},
+    achievements: new Set(),
+    statistics: {
+        totalProfit: 0,
+        tradesCount: 0,
+        highestProfit: 0
+    }
 };
 
 // DOM Elements
 // Candy-themed Stock Market Game
+// Firebase Configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyDYcUOKFG2OH7LXrS1YpMB04YMBrT9w4Yc",
+    authDomain: "mini-event-a5460.firebaseapp.com",
+    projectId: "mini-event-a5460",
+    storageBucket: "mini-event-a5460.appspot.com",
+    messagingSenderId: "402811747405",
+    appId: "1:402811747405:web:7701ee5e962e5a6b89f4c4"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize the game
     initGame();
@@ -209,12 +237,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Initialize the game
 function initGame() {
-    // Initialize price history for each candy
-    Object.keys(CANDY_STOCKS).forEach(candyId => {
-        const candy = CANDY_STOCKS[candyId];
-        candy.currentPrice = candy.basePrice;
-        candy.history = [candy.basePrice];
-    });
+    // Try to load saved game
+    const savedGame = loadGame();
+    if (savedGame) {
+        Object.assign(gameState, savedGame);
+        showMessage("Game loaded from save!");
+    } else {
+        // Initialize price history for each candy
+        Object.keys(CANDY_STOCKS).forEach(candyId => {
+            const candy = CANDY_STOCKS[candyId];
+            candy.currentPrice = candy.basePrice;
+            candy.history = [candy.basePrice];
+        });
+    }
 
     // Create charts for each candy
     createCharts();
@@ -228,6 +263,58 @@ function initGame() {
     // Start news ticker
     updateNewsTicker();
     setInterval(updateNewsTicker, GAME_CONFIG.newsUpdateInterval);
+
+    // Start autosave
+    setInterval(saveGame, GAME_CONFIG.autosaveInterval);
+
+    // Initialize tooltips
+    setupTooltips();
+}
+
+// Save game state
+function saveGame() {
+    const saveData = {
+        day: gameState.day,
+        cash: gameState.cash,
+        portfolio: gameState.portfolio,
+        selectedCandy: gameState.selectedCandy,
+        achievements: Array.from(gameState.achievements),
+        statistics: gameState.statistics
+    };
+    localStorage.setItem('candyStockSave', JSON.stringify(saveData));
+}
+
+// Load game state
+function loadGame() {
+    const saveData = localStorage.getItem('candyStockSave');
+    if (saveData) {
+        const parsed = JSON.parse(saveData);
+        parsed.achievements = new Set(parsed.achievements);
+        return parsed;
+    }
+    return null;
+}
+
+// Setup tooltips
+function setupTooltips() {
+    const tooltips = document.querySelectorAll('[data-tooltip]');
+    tooltips.forEach(element => {
+        element.addEventListener('mouseenter', e => {
+            const tooltip = document.createElement('div');
+            tooltip.className = 'tooltip';
+            tooltip.textContent = e.target.dataset.tooltip;
+            document.body.appendChild(tooltip);
+
+            const rect = e.target.getBoundingClientRect();
+            tooltip.style.left = rect.left + (rect.width / 2) - (tooltip.offsetWidth / 2) + 'px';
+            tooltip.style.top = rect.bottom + 5 + 'px';
+        });
+
+        element.addEventListener('mouseleave', () => {
+            const tooltip = document.querySelector('.tooltip');
+            if (tooltip) tooltip.remove();
+        });
+    });
 }
 
 // Create price charts for each candy
@@ -474,6 +561,59 @@ function updatePortfolioTable() {
     }
 }
 
+// Check for achievements
+function checkAchievements() {
+    const totalWorth = gameState.cash + calculatePortfolioValue();
+    
+    // First Purchase
+    if (!gameState.achievements.has('firstPurchase') && 
+        Object.values(gameState.portfolio).some(h => h.shares > 0)) {
+        unlockAchievement('firstPurchase');
+    }
+    
+    // Thousand Profit
+    if (!gameState.achievements.has('thousandProfit') && 
+        gameState.statistics.totalProfit >= 1000) {
+        unlockAchievement('thousandProfit');
+    }
+    
+    // Diversified Portfolio
+    if (!gameState.achievements.has('diversified') && 
+        Object.values(gameState.portfolio).every(h => h.shares > 0)) {
+        unlockAchievement('diversified');
+    }
+    
+    // Big Spender
+    if (!gameState.achievements.has('bigSpender') && totalWorth >= 5000) {
+        unlockAchievement('bigSpender');
+    }
+}
+
+// Unlock achievement
+function unlockAchievement(achievementId) {
+    if (gameState.achievements.has(achievementId)) return;
+    
+    gameState.achievements.add(achievementId);
+    const achievement = GAME_CONFIG.achievements[achievementId];
+    
+    // Show achievement popup
+    const popup = document.getElementById('achievement-popup');
+    const name = document.getElementById('achievement-name');
+    const description = document.getElementById('achievement-description');
+    
+    name.textContent = achievement.name;
+    description.textContent = achievement.description;
+    popup.classList.remove('hidden');
+    
+    // Hide popup after 3 seconds
+    setTimeout(() => {
+        popup.classList.add('hidden');
+    }, 3000);
+    
+    // Update achievements panel
+    updateAchievementsPanel();
+}
+
 // Buy candy stocks
 function buyStocks() {
     const quantityInput = document.getElementById('quantity');
@@ -498,12 +638,19 @@ function buyStocks() {
     holding.avgBuyPrice = newTotalCost / newTotalShares;
     holding.shares = newTotalShares;
     
-    // Update cash
+    // Update cash and statistics
     gameState.cash -= totalCost;
+    gameState.statistics.tradesCount++;
+    
+    // Check achievements
+    checkAchievements();
     
     // Update UI
     updateUI();
     showMessage(`Bought ${quantity} shares of ${selectedCandy.name} for $${totalCost.toFixed(2)}`);
+    
+    // Autosave
+    saveGame();
 }
 
 // Sell candy stocks
@@ -555,6 +702,52 @@ function nextDay() {
     }
 }
 
+// Leaderboard functions
+async function submitScore(playerName, score) {
+    try {
+        const scoreData = {
+            player: playerName,
+            score: score,
+            date: firebase.firestore.Timestamp.now(),
+            achievements: Array.from(gameState.achievements),
+            statistics: gameState.statistics
+        };
+
+        await db.collection('candyStockScores').add(scoreData);
+        showMessage("Score submitted successfully!");
+        updateLeaderboard();
+    } catch (error) {
+        console.error("Error submitting score:", error);
+        showMessage("Error submitting score. Please try again.");
+    }
+}
+
+async function updateLeaderboard() {
+    try {
+        const leaderboardBody = document.getElementById('leaderboard-body');
+        leaderboardBody.innerHTML = '';
+
+        const snapshot = await db.collection('candyStockScores')
+            .orderBy('score', 'desc')
+            .limit(10)
+            .get();
+
+        snapshot.docs.forEach((doc, index) => {
+            const data = doc.data();
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${data.player}</td>
+                <td>$${data.score.toFixed(2)}</td>
+                <td>${data.date.toDate().toLocaleDateString()}</td>
+            `;
+            leaderboardBody.appendChild(row);
+        });
+    } catch (error) {
+        console.error("Error updating leaderboard:", error);
+    }
+}
+
 // End the game
 function endGame() {
     gameState.gameOver = true;
@@ -566,7 +759,13 @@ function endGame() {
     if (finalScoreElement) finalScoreElement.textContent = `$${finalScore.toFixed(2)}`;
     if (scoreSubmission) scoreSubmission.classList.remove('hidden');
     
+    // Update leaderboard
+    updateLeaderboard();
+    
     showMessage("Game Over! Check your final score.");
+    
+    // Show leaderboard modal
+    document.getElementById('leaderboard-modal').classList.remove('hidden');
 }
 
 // Reset the game
@@ -665,10 +864,21 @@ function setupEventListeners() {
     
     // Submit score button
     if (submitScoreButton) {
-        submitScoreButton.addEventListener('click', () => {
+        submitScoreButton.addEventListener('click', async () => {
             const finalScore = gameState.cash + calculatePortfolioValue();
-            // Here you would typically send the score to a server
-            alert(`Score submitted: $${finalScore.toFixed(2)}`);
+            const playerName = prompt("Enter your name for the leaderboard:");
+            
+            if (playerName && playerName.trim()) {
+                await submitScore(playerName.trim(), finalScore);
+            }
+        });
+    }
+    
+    // Close leaderboard button
+    const closeLeaderboardBtn = document.getElementById('close-leaderboard');
+    if (closeLeaderboardBtn) {
+        closeLeaderboardBtn.addEventListener('click', () => {
+            document.getElementById('leaderboard-modal').classList.add('hidden');
         });
     }
     
