@@ -1,4 +1,5 @@
 // Candy Stock Market Simulation Game
+/*
 const PT_TZ = 'America/Los_Angeles';
 const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_TZ }));
 
@@ -69,6 +70,7 @@ const __timeLockChecker = setInterval(() => {
     }
   }
 }, 30_000);
+*/
 // Game Configuration
 const GAME_CONFIG = {
     initialCash: 1000,
