@@ -84,31 +84,31 @@
     // multi_arrow spread
     { id:'multi_arrow', title:'Multi Arrow', desc:'Spread arrows in movement direction.', type:'projectile', basePower:12, cooldown:1100, range:520, upgradePow:(lv)=>12+lv*4 },
     // siphon passive: deals damage on hit and heals small — visible as particle
-    { id:'siphon', title:'Siphon', desc:'On-hit heal (visible drain particles).', type:'passive', basePower:5, cooldown:0, range:40, upgradePow:(lv)=>5+lv*2 },
+    { id:'siphon', title:'Siphon', desc:'On-hit heal.', type:'passive', basePower:5, cooldown:0, range:40, upgradePow:(lv)=>5+lv*2 },
     // turret (friendly) — visual bullets
-    { id:'turret', title:'Turret', desc:'Place a turret that shoots visible rounds at on-screen enemies.', type:'deploy', basePower:10, cooldown:5000, range:0, upgradePow:(lv)=>10+lv*4 },
+    { id:'turret', title:'Turret', desc:'Place a turret that shoots at on-screen enemies.', type:'deploy', basePower:10, cooldown:5000, range:0, upgradePow:(lv)=>10+lv*4 },
     // homing mine — visible seeker
     { id:'homing_mine', title:'Homing Mine', desc:'Spawn a homing mine that seeks enemies.', type:'deploy', basePower:14, cooldown:4000, range:0, upgradePow:(lv)=>14+lv*6 },
     // cone: visible cone shock but nerfed damage
-    { id:'shockwave', title:'Shockwave', desc:'Cone shock forward (visible cone).', type:'cone', basePower:12, cooldown:2500, range:220, upgradePow:(lv)=>12+lv*5 },
+    { id:'shockwave', title:'Shockwave', desc:'Cone shock forward.', type:'cone', basePower:12, cooldown:2500, range:220, upgradePow:(lv)=>12+lv*5 },
     // poison trail: visible trail and patch
-    { id:'poison_trail', title:'Poison Trail', desc:'Leave a visible damaging trail while moving.', type:'aura', basePower:4, cooldown:0, range:28, upgradePow:(lv)=>4+lv*2 },
+    { id:'poison_trail', title:'Poison Trail', desc:'Leave a damaging trail while moving.', type:'aura', basePower:4, cooldown:0, range:28, upgradePow:(lv)=>4+lv*2 },
     // frost aura: visible chill ring
-    { id:'frost_aura', title:'Frost Aura', desc:'Cold aura that chills and damages enemies nearby (visible).', type:'aura', basePower:3, cooldown:0, range:80, upgradePow:(lv)=>3+lv*1.5 },
+    { id:'frost_aura', title:'Frost Aura', desc:'Cold aura that chills and damages enemies nearby.', type:'aura', basePower:3, cooldown:0, range:80, upgradePow:(lv)=>3+lv*1.5 },
     // shield visible
-    { id:'shield', title:'Shield', desc:'Temporary damage reduction (visible bubble).', type:'active', basePower:0.3, cooldown:8000, range:0, upgradePow:(lv)=>0.3+lv*0.06 },
+    { id:'shield', title:'Shield', desc:'Temporary damage reduction.', type:'active', basePower:0.3, cooldown:8000, range:0, upgradePow:(lv)=>0.3+lv*0.06 },
     // time slow visible aoe
     { id:'time_slown', title:'Time Slow', desc:'Slow enemies in visible radius.', type:'aoe', basePower:0.45, cooldown:10000, range:260, upgradePow:(lv)=>0.45+lv*0.05 },
 
     // auto special (only hit on-screen)
-    { id:'auto_laser', title:'Auto Laser', desc:'Auto-aim laser at nearest on-screen enemy (visible beam).', type:'auto', basePower:18, cooldown:1400, range:700, upgradePow:(lv)=>18+lv*6 },
-    { id:'anvil_drop', title:'Anvil Drop', desc:'Drop an anvil on a visible enemy (dramatic).', type:'auto', basePower:36, cooldown:7000, range:700, upgradePow:(lv)=>36+lv*12 },
+    { id:'auto_laser', title:'Auto Laser', desc:'Auto-aim laser at nearest on-screen enemy).', type:'auto', basePower:18, cooldown:1400, range:700, upgradePow:(lv)=>18+lv*6 },
+    { id:'anvil_drop', title:'Anvil Drop', desc:'Drop an anvil on a enemy.', type:'auto', basePower:36, cooldown:7000, range:700, upgradePow:(lv)=>36+lv*12 },
 
     // extra projectile/area abilities (visible)
-    { id:'poison_bomb', title:'Poison Bomb', desc:'Throws a bomb that spawns a poison patch (visible cloud).', type:'projectile', basePower:10, cooldown:2600, range:420, upgradePow:(lv)=>10+lv*3 },
-    { id:'orbital', title:'Orbital Strike', desc:'Spawn rotating orbs around you (visible orbs).', type:'auto', basePower:14, cooldown:4200, range:0, upgradePow:(lv)=>14+lv*4 },
-    { id:'chain_lightning', title:'Chain Lightning', desc:'Strikes an enemy and chains to nearby enemies (visible arcs).', type:'projectile', basePower:16, cooldown:3200, range:540, upgradePow:(lv)=>16+lv*5 },
-    { id:'meteor', title:'Meteor', desc:'Calls down a meteor that deals huge visible explosion (long cooldown).', type:'projectile', basePower:60, cooldown:14000, range:900, upgradePow:(lv)=>60+lv*24 }
+    { id:'poison_bomb', title:'Poison Bomb', desc:'Throws a bomb that spawns a poison patch.', type:'projectile', basePower:10, cooldown:2600, range:420, upgradePow:(lv)=>10+lv*3 },
+    { id:'orbital', title:'Orbital Strike', desc:'Spawn rotating orbs around you.', type:'auto', basePower:14, cooldown:4200, range:0, upgradePow:(lv)=>14+lv*4 },
+    { id:'chain_lightning', title:'Chain Lightning', desc:'Strikes an enemy and chains to nearby enemies.', type:'projectile', basePower:16, cooldown:3200, range:540, upgradePow:(lv)=>16+lv*5 },
+    { id:'meteor', title:'Meteor', desc:'Calls down a meteor that deals huge explosion (long cooldown).', type:'projectile', basePower:60, cooldown:14000, range:900, upgradePow:(lv)=>60+lv*24 }
   ];
   ABILITIES.forEach(a=> abilityDefs[a.id]=a);
 

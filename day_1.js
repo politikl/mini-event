@@ -188,7 +188,7 @@
       }
 
       // pickups more likely
-      if(Math.random() < 0.005){
+      if(Math.random() < 0.001){
         pickups.push({ kind: Math.random() < 0.7 ? 'candy' : 'hat', x: Math.max(10,p.x + Math.random()*(p.w-20)), y: p.y - 36, picked:false });
       }
 
@@ -475,16 +475,11 @@
               p.brokenAt = Date.now();
             }
           } else if(p.type === 'jet'){
-            // Natural bounce with strong upward velocity
-            player.vy = JUMP_VEL * 1.8; // Stronger than normal jump but not fixed flight
-            p.used = true;
-            
-            // Add a temporary flight effect that only lasts for the bounce duration
-            // This allows enemy destruction during the bounce without sustained flight
+
             player.flight = { 
-              remaining: 300, // Short duration just for the bounce
-              vel: Math.abs(JUMP_VEL) * 1.5, 
-              taper: 150 
+              remaining: 800, // Short duration just for the bounce
+              vel: 20, 
+              taper: 400 
             };
           } else {
             player.vy = JUMP_VEL + (-Math.random()*2);
