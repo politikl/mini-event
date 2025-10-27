@@ -16,6 +16,77 @@
 
 // Full replacement of day_1 runtime implementing requested fixes/features
 (() => {
+const PT_TZ = 'America/Los_Angeles';
+const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_TZ }));
+
+// blocked weekday ranges in minutes (08:15–11:00, 12:50–15:20 PT)
+const BLOCKED_RANGES = [[8*60 + 15, 11*60], [12*60 + 50, 15*60 + 20]];
+function isWeekday(d){ const day = d.getDay(); return day >= 1 && day <= 5; }
+function inBlockedWindow(ptDate){
+  if(!isWeekday(ptDate)) return false;
+  const mins = ptDate.getHours()*60 + ptDate.getMinutes();
+  return BLOCKED_RANGES.some(([a,b]) => mins >= a && mins < b);
+}
+
+function showTimeLockOverlay(message){
+  if(document.getElementById('time-lock-overlay')) return;
+  const o = document.createElement('div');
+  o.id = 'time-lock-overlay';
+  Object.assign(o.style, {
+    position: 'fixed', inset: '0', zIndex: 99999,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(0,0,0,0.92)', color: '#ffdca8', textAlign: 'center',
+    padding: '24px', fontFamily: 'system-ui, "Segoe UI", Roboto, sans-serif'
+  });
+  o.innerHTML = `<div style="max-width:820px">
+    <h2 style="margin:0 0 8px">Game temporarily unavailable</h2>
+    <p style="margin:0 0 12px">${message}</p>
+    <div style="opacity:.85;font-size:.9rem">Blocked PT weekday hours: 08:15–11:00 and 12:50–15:20</div>
+  </div>`;
+  document.body.appendChild(o);
+}
+
+function hideTimeLockOverlay(){
+  const el = document.getElementById('time-lock-overlay');
+  if(el) el.remove();
+}
+
+// set per-day unlock ISO (change as needed). Example for day_1:
+const UNLOCK_ISO = '2025-10-27T00:00:00-07:00'; // adjust per-day
+const unlockDate = new Date(UNLOCK_ISO);
+
+const rn = nowPT();
+if(rn < unlockDate){
+  showTimeLockOverlay(`This game will unlock on ${unlockDate.toLocaleString('en-US', { timeZone: PT_TZ })} PT.`);
+  return; // stop executing the rest of the day's script (paste inside the day's IIFE)
+}
+
+if(inBlockedWindow(rn)){
+  showTimeLockOverlay('This game is temporarily blocked for scheduled hours. Please try again later.');
+  // continue polling until outside blocked hours, remove overlay when allowed
+}
+
+const __timeLockChecker = setInterval(() => {
+  const n = nowPT();
+  if(n < unlockDate){
+    if(!document.getElementById('time-lock-overlay')){
+      showTimeLockOverlay(`This game will unlock on ${unlockDate.toLocaleString('en-US', { timeZone: PT_TZ })} PT.`);
+    }
+    return;
+  }
+  // unlocked; hide overlay if not in blocked window
+  if(!inBlockedWindow(n)){
+    hideTimeLockOverlay();
+    // once unlocked and outside blocked window, we can stop checking
+    clearInterval(__timeLockChecker);
+  } else {
+    // still in blocked window: ensure overlay visible
+    if(!document.getElementById('time-lock-overlay')){
+      showTimeLockOverlay('This game is temporarily blocked for scheduled hours. Please try again later.');
+    }
+  }
+}, 30_000);
+
   // DOM
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d');
