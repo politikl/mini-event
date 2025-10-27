@@ -1,188 +1,160 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Candies - Mathoween</title>
-    <link rel="stylesheet" href="day_2.css">
-    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Shadows+Into+Light&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Fruitoween</title>
+  <link rel="stylesheet" href="index.css">
+  <link rel="stylesheet" href="day_3.css">
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Shadows+Into+Light&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎃</text></svg>">
 </head>
 <body>
-    <div id="game-container">
-        <h1>Stock Candies</h1>
-        <p>Buy low, sell high, and become the candy market mogul!</p>
-        
-        <div id="game-stats">
-            <div>Cash: <span id="player-cash">$1000.00</span></div>
-            <div>Portfolio Value: <span id="portfolio-value">$0.00</span></div>
-            <div>Total Worth: <span id="total-worth">$1000.00</span></div>
-            <div>Day: <span id="current-day">1</span></div>
-        </div>
+  <div id="background"></div>
 
-        <div id="game-content">
-            <div id="market-view">
-                <div id="charts-container">
-                    <div class="chart-wrapper" data-candy="choco">
-                        <h3>Choco Delights</h3>
-                        <div class="price-label">$10.00</div>
-                        <canvas class="price-chart"></canvas>
-                        <div class="shares-display">0 shares</div>
-                        <div class="profit-display">+$0</div>
-                        <div class="action-buttons">
-                            <button class="buy-btn">BUY</button>
-                            <button class="sell-btn">SELL</button>
-                        </div>
-                    </div>
-                    <div class="chart-wrapper" data-candy="gummy">
-                        <h3>Gummy Worms</h3>
-                        <div class="price-label">$5.50</div>
-                        <canvas class="price-chart"></canvas>
-                        <div class="shares-display">0 shares</div>
-                        <div class="profit-display">+$0</div>
-                        <div class="action-buttons">
-                            <button class="buy-btn">BUY</button>
-                            <button class="sell-btn">SELL</button>
-                        </div>
-                    </div>
-                    <div class="chart-wrapper" data-candy="lollipop">
-                        <h3>Lollipop Dreams</h3>
-                        <div class="price-label">$3.25</div>
-                        <canvas class="price-chart"></canvas>
-                        <div class="shares-display">0 shares</div>
-                        <div class="profit-display">+$0</div>
-                        <div class="action-buttons">
-                            <button class="buy-btn">BUY</button>
-                            <button class="sell-btn">SELL</button>
-                        </div>
-                    </div>
-                    <div class="chart-wrapper" data-candy="taffy">
-                        <h3>Taffy Twists</h3>
-                        <div class="price-label">$7.75</div>
-                        <canvas class="price-chart"></canvas>
-                        <div class="shares-display">0 shares</div>
-                        <div class="profit-display">+$0</div>
-                        <div class="action-buttons">
-                            <button class="buy-btn">BUY</button>
-                            <button class="sell-btn">SELL</button>
-                        </div>
-                    </div>
-                    <div class="chart-wrapper" data-candy="caramel">
-                        <h3>Caramel Clouds</h3>
-                        <div class="price-label">$12.50</div>
-                        <canvas class="price-chart"></canvas>
-                        <div class="shares-display">0 shares</div>
-                        <div class="profit-display">+$0</div>
-                        <div class="action-buttons">
-                            <button class="buy-btn">BUY</button>
-                            <button class="sell-btn">SELL</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="trading-panel">
-                <h2>Trading Panel</h2>
-                <div id="candy-selector">
-                    <label for="candy-select">Select Candy:</label>
-                    <select id="candy-select">
-                        <option value="choco">Choco Delights</option>
-                        <option value="gummy">Gummy Worms</option>
-                        <option value="lollipop">Lollipop Dreams</option>
-                        <option value="taffy">Taffy Twists</option>
-                        <option value="caramel">Caramel Clouds</option>
-                    </select>
-                </div>
-                
-                <div id="candy-info">
-                    <div class="info-row">
-                        <span class="info-label">Current Price:</span>
-                        <span id="current-price">$0.00</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Shares Owned:</span>
-                        <span id="shares-owned">0</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Value:</span>
-                        <span id="shares-value">$0.00</span>
-                    </div>
-                </div>
-                
-                <div id="transaction-controls">
-                    <div class="transaction-row">
-                        <label for="quantity">Quantity:</label>
-                        <input type="number" id="quantity" min="1" value="1">
-                    </div>
-                    <div class="transaction-row">
-                        <span class="transaction-label">Total Cost:</span>
-                        <span id="transaction-cost">$0.00</span>
-                    </div>
-                    <div class="transaction-buttons">
-                        <button id="buy-btn" class="action-btn">Buy</button>
-                        <button id="sell-btn" class="action-btn">Sell</button>
-                    </div>
-                </div>
-                
-                <div id="game-controls">
-                    <button id="next-day-btn" class="control-btn">Next Day</button>
-                    <button id="reset-game-btn" class="control-btn">Reset Game</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="portfolio-panel">
-            <h2>Your Candy Portfolio</h2>
-            <table id="portfolio-table">
-                <thead>
-                    <tr>
-                        <th>Candy</th>
-                        <th>Shares</th>
-                        <th>Avg. Buy Price</th>
-                        <th>Current Price</th>
-                        <th>Value</th>
-                        <th>Profit/Loss</th>
-                    </tr>
-                </thead>
-                <tbody id="portfolio-body">
-                    <!-- Portfolio data will be dynamically generated here -->
-                </tbody>
-            </table>
-        </div>
-
-        <div id="news-ticker">
-            <div id="news-content">
-                <!-- News items will be dynamically generated here -->
-            </div>
-        </div>
-
-        <div id="instructions-panel">
-            <h2>How to Play</h2>
-            <ol>
-                <li>You start with $1000 to invest in candy stocks.</li>
-                <li>Buy and sell candy stocks to maximize your profits.</li>
-                <li>Watch the market trends and news for investment tips.</li>
-                <li>Click "Next Day" to advance time and see price changes.</li>
-                <li>Try to build the most valuable candy empire by day 30!</li>
-            </ol>
-        </div>
-
-        <div id="game-message" class="hidden">
-            <!-- Game messages will appear here -->
-        </div>
-
-        <div id="score-submission" class="hidden">
-            <h2>Game Over!</h2>
-            <p>Your final score: <span id="final-score">0</span></p>
-            <button id="submit-score-btn">Submit Score</button>
-            <button id="play-again-btn">Play Again</button>
-        </div>
-
-        <footer>
-            <button id="back-btn">Back to Games</button>
-        </footer>
+  <div id="auth-container">
+    <div id="user-info" class="hidden">
+      <span id="username-display"></span>
+      <button id="sign-out-btn">Sign Out</button>
     </div>
+    <button id="sign-in-btn" class="hidden">Sign In</button>
+  </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="day_2.js"></script>
+  <div id="left-controls" class="top-controls">
+    <a class="header-btn" href="index.html">← Back</a>
+    <button id="day-leaderboard-btn" class="header-btn">🏆 Day Leaderboard</button>
+  </div>
+
+  <div id="right-controls" class="top-controls">
+    <div id="game-countdown" class="header-box">
+      <div class="small-label">Game Ends</div>
+      <div id="game-timer">--:--:--</div>
+    </div>
+  </div>
+
+  <main id="game-wrap" role="main" aria-label="Game area">
+    <div class="halloween-frame" aria-hidden="false">
+      <div id="game-area">
+        <div class="playbound" id="playbound">
+          <canvas id="game-canvas" width="640" height="480" aria-label="Game canvas"></canvas>
+          <button id="fullscreen-btn" class="fullscreen-btn" aria-label="Toggle fullscreen">⤢</button>
+
+          <!-- hearts rendered as symbols (max 5) -->
+          <div id="hearts" aria-hidden="true"></div>
+
+          <!-- score moved downward to clear room for hearts -->
+          <div id="big-score" class="center-score" style="top:46px;">Score: 0</div>
+        </div>
+      </div>
+      <div id="game-note" class="game-note-muted">
+        <small>Slice pumpkins and Halloween objects. Avoid bombs. Powerups cross the screen. 3 lives, infinite time.</small>
+      </div>
+    </div>
+  </main>
+
+  <!-- Play overlay -->
+  <div id="play-overlay" class="modal play-overlay">
+    <div class="modal-content">
+      <h2>Fruitoween — Slice!</h2>
+      <p>Move the cursor or touch to slice. Slice pumpkins and objects; avoid bombs.</p>
+      <div class="modal-buttons">
+        <button id="play-btn" class="btn-primary">Play</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Day Leaderboard Modal (will be allowed to span whole page) -->
+  <div id="day-leaderboard-modal" class="modal hidden">
+    <div class="modal-content leaderboard-content">
+      <h2>Day 3 Leaderboard</h2>
+      <div class="leaderboard-container">
+        <table id="day-leaderboard-table">
+          <thead><tr><th>Rank</th><th>Player</th><th>Score</th><th>When</th><th>Event?</th></tr></thead>
+          <tbody id="day-leaderboard-body"></tbody>
+        </table>
+      </div>
+      <div class="modal-buttons">
+        <button id="day-leaderboard-close" class="btn-primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Over content (we will move content out of wrapper like day_1) -->
+  <div id="game-over-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Game Over</h2>
+      <p>Your score: <strong id="final-score">0</strong></p>
+      <p id="submit-note" style="font-size:0.9rem;color:#ffb86b;"></p>
+      <div class="modal-buttons">
+        <button id="submit-score-btn" class="btn-primary">Save Score</button>
+        <button id="retry-btn" class="btn-secondary">Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Jumpscare / flash overlay used by bombs -->
+  <div id="day-jumpscare" class="modal hidden" aria-hidden="true">
+    <div class="modal-content" style="background:transparent;border:none;box-shadow:none;">
+      <div id="flash" style="position:absolute;inset:0;background:white;opacity:0;pointer-events:none;"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    // Firebase init copied from day_1 (same config)
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
+    import { 
+        getAuth, 
+        GoogleAuthProvider, 
+        signInWithPopup, 
+        signOut, 
+        onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+    import { 
+        getFirestore, 
+        doc, 
+        setDoc, 
+        getDoc,
+        collection,
+        getDocs,
+        orderBy,
+        query 
+    } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyARY96nrH2Aio8rOiLkewSXtTS40TZLrAw",
+        authDomain: "nerd-mini-events.firebaseapp.com",
+        projectId: "nerd-mini-events",
+        storageBucket: "nerd-mini-events.firebasestorage.app",
+        messagingSenderId: "974357416633",
+        appId: "1:974357416633:web:e190de60553a685d03e968",
+        measurementId: "G-V9NGCSEY8J"
+    };
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+
+    window.firebaseApp = app;
+    window.firebaseAuth = auth;
+    window.firebaseDb = db;
+    window.googleProvider = provider;
+    window.firebaseSignInWithPopup = signInWithPopup;
+    window.firebaseSignOut = signOut;
+    window.firebaseOnAuthStateChanged = onAuthStateChanged;
+    window.firebaseDoc = doc;
+    window.firebaseSetDoc = setDoc;
+    window.firebaseGetDoc = getDoc;
+    window.firebaseCollection = collection;
+    window.firebaseGetDocs = getDocs;
+    window.firebaseQuery = query;
+    window.firebaseOrderBy = orderBy;
+    window.firebaseReady = true;
+  </script>
+
+  <script src="day_3.js"></script>
 </body>
 </html>
+
