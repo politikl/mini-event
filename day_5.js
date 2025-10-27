@@ -214,7 +214,8 @@
       const slot = this.abilities.find(a=>a.id===id); if(!slot) return false;
       if(slot.cd>0) return false;
       slot.lastUsed = performance.now();
-      slot.cd = def.cooldown || 0;
+        // effective cooldown decreases with ability level (upgrades reduce cooldown)
+        slot.cd = def.cooldown ? Math.max(0, Math.round(def.cooldown * Math.pow(0.85, slot.lvl - 1))) : 0;
       const lvl = slot.lvl;
       const power = def.upgradePow ? def.upgradePow(lvl-1) : def.basePower;
 
@@ -252,9 +253,10 @@
       }
       if(def.type==='projectile'){
         if(id === 'multi_arrow'){
-          const spread = 5;
+          // number of arrows scales with level
+          const spread = 3 + Math.max(0, lvl-1);
           for(let i=0;i<spread;i++){
-            const a = (i - Math.floor(spread/2)) * 0.18;
+            const a = (i - Math.floor(spread/2)) * 0.12;
             const ang = Math.atan2(diry,dirx) + a;
             const nx = Math.cos(ang), ny = Math.sin(ang);
             projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*420, ny*420, power, 6, 'player', def.range, { type:'arrow' }));
@@ -270,10 +272,11 @@
           }));
         } else if(id === 'chain_lightning'){
           const nx = dirx/mag, ny = diry/mag;
+          const chains = 1 + Math.floor((lvl-1)/2) + 1; // more chains with levels
           projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*420, ny*420, power, 6, 'player', def.range, {
             onHit: (enemy)=>{
               // chain arcs: create beams from hit to nearest other enemies
-              const targets = enemies.filter(e=>e.alive && !e.friendly && e !== enemy).sort((a,b)=>dist(enemy.x,enemy.y,a.x,a.y)-dist(enemy.x,enemy.y,b.x,b.y)).slice(0,3);
+              const targets = enemies.filter(e=>e.alive && !e.friendly && e !== enemy).sort((a,b)=>dist(enemy.x,enemy.y,a.x,a.y)-dist(enemy.x,enemy.y,b.x,b.y)).slice(0, Math.max(1, chains));
               let last = enemy;
               targets.forEach(tg=>{
                 beams.push({ x1:last.x, y1:last.y, x2:tg.x, y2:tg.y, t:performance.now(), dur:220, power: power*0.7 });
@@ -542,6 +545,8 @@
           // apply damage and visual/hit callbacks
           e.takeDamage(this.power);
           if(this.opt.onHit) this.opt.onHit(e);
+          // siphon: heal player a small fraction on hit
+          try{ if(window && window.Day5Game && typeof window.Day5Game.playerRef === 'function'){ const pl = window.Day5Game.playerRef(); if(pl && pl.hasAbility && pl.hasAbility('siphon')) pl.heal(Math.max(1, Math.floor(this.power * 0.12))); } }catch(ex){}
           // knockback from projectile
           const nx = (e.x - this.x) || 1, ny = (e.y - this.y) || 1, m = Math.hypot(nx,ny)||1;
           e.vx = (e.vx||0) + (nx/m) * Math.min(140, this.power*4);
@@ -594,48 +599,45 @@
   function spawnEnemyWave(dt){
     spawnTimer -= dt;
     if(spawnTimer <= 0){
-      spawnTimer = clamp(400 + Math.max(0, 2400 - player.level*60), 200, 3800);
-      const side = Math.floor(Math.random()*4);
-      let sx=0, sy=0;
-      if(side===0){ sx = randRange(0,MAP_W); sy = -20; }
-      else if(side===1){ sx = randRange(0,MAP_W); sy = MAP_H + 20; }
-      else if(side===2){ sx = -20; sy = randRange(0,MAP_H); }
-      else { sx = MAP_W + 20; sy = randRange(0,MAP_H); }
-
+      // spawn more frequently as player levels and spawn around player within a radius
+      spawnTimer = clamp(300 + Math.max(0, 2000 - player.level*80), 120, 3200);
       const lvl = Math.max(1, player.level);
-      const r = Math.random();
+      const count = Math.min(1 + Math.floor(1 + lvl/3), 10); // more mobs as level increases
 
-      // big boss spawning by chance at higher levels
-      if(lvl >= 10 && Math.random() < 0.015){
+      // chance for special large spawns
+      if(lvl >= 12 && Math.random() < 0.012){
+        // big boss near player
+        const ang = Math.random()*Math.PI*2; const rad = randRange(160, 300);
+        const sx = clamp(player.x + Math.cos(ang)*rad, 0, MAP_W);
+        const sy = clamp(player.y + Math.sin(ang)*rad, 0, MAP_H);
         enemies.push(new Boss(sx,sy,lvl));
         return;
       }
 
-      // necromancer introduced
-      if(lvl >= 6 && Math.random() < 0.06){
-        enemies.push(new Necromancer(sx,sy,lvl));
-        return;
-      }
+      for(let i=0;i<count;i++){
+        const ang = Math.random()*Math.PI*2;
+        const rad = randRange(120, 380) * (1 + Math.min(1, lvl/10));
+        const sx = clamp(player.x + Math.cos(ang)*rad, 0, MAP_W);
+        const sy = clamp(player.y + Math.sin(ang)*rad, 0, MAP_H);
 
-      // miniboss
-      if(lvl >=5 && Math.random() < 0.045){
-        const mini = new Enemy(sx,sy, 220 + lvl*38, 30, 28, 'mini', true, 140 + lvl*10);
-        enemies.push(mini); return;
-      }
+        const r = Math.random();
+        // necromancer occasionally
+        if(lvl >= 6 && Math.random() < 0.04){ enemies.push(new Necromancer(sx,sy,lvl)); continue; }
+        // miniboss chance
+        if(lvl >=5 && Math.random() < 0.04){ enemies.push(new Enemy(sx,sy, 160 + lvl*30, 22, 26, 'mini', true, 120 + lvl*10)); continue; }
 
-      // standard spawns: introduce new types as level increases
-      if(r < 0.06 + lvl*0.005){
-        enemies.push(new Enemy(sx,sy, 120 + lvl*16, 18 + lvl*1, 36, 'brute', true, 60 + lvl*6));
-      } else if(r < 0.26){
-        // skeleton (ranged) nerfed and only shooting when on-screen
-        enemies.push(new Enemy(sx,sy, 40 + lvl*6, 36, 12, 'skeleton', false, 22 + lvl*3));
-      } else if(r < 0.6){
-        enemies.push(new Enemy(sx,sy, 34 + lvl*6, 28 + lvl*1.5, 16, 'zombie', true, 16 + lvl*2));
-      } else {
-        if(lvl >= 3 && Math.random() < 0.55){
-          enemies.push(new Enemy(sx,sy, 26 + lvl*5, 110 + lvl*6, 10, 'wolf', true, 12 + lvl*3));
+        if(r < 0.06 + lvl*0.005){
+          enemies.push(new Enemy(sx,sy, 80 + lvl*12, 18 + lvl*1, 34, 'brute', true, 40 + lvl*6));
+        } else if(r < 0.26){
+          enemies.push(new Enemy(sx,sy, 34 + lvl*6, 36, 12, 'skeleton', false, 22 + lvl*3));
+        } else if(r < 0.6){
+          enemies.push(new Enemy(sx,sy, 28 + lvl*6, 28 + lvl*1.5, 16, 'zombie', true, 14 + lvl*2));
         } else {
-          enemies.push(new Enemy(sx,sy, 28 + lvl*5, 86 + lvl*5, 10, 'demon', true, 18 + lvl*3));
+          if(lvl >= 3 && Math.random() < 0.55){
+            enemies.push(new Enemy(sx,sy, 22 + lvl*5, 110 + lvl*6, 10, 'wolf', true, 12 + lvl*3));
+          } else {
+            enemies.push(new Enemy(sx,sy, 26 + lvl*5, 86 + lvl*5, 10, 'demon', true, 18 + lvl*3));
+          }
         }
       }
     }
@@ -652,6 +654,34 @@
   // --- input ---
   window.addEventListener('keydown', e=> { keys[e.key.toLowerCase()] = true; });
   window.addEventListener('keyup', e=> { keys[e.key.toLowerCase()] = false; });
+
+  // space / click bindings: allow player to activate a primary ability with Space or click to fire projectiles
+  window.addEventListener('keydown', (e)=>{
+    if(e.code === 'Space'){ e.preventDefault();
+      if(!player) return;
+      // prioritize dash, then melee, then projectile, then active
+      if(player.hasAbility('dash_strike')) player.tryUseAbility('dash_strike');
+      else {
+        // try first available damaging ability
+        const pref = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && ['melee','projectile','cone','auto','dash','aoe'].includes(d.type); });
+        if(pref) player.tryUseAbility(pref.id);
+      }
+    }
+  });
+
+  if(canvas){
+    canvas.addEventListener('pointerdown', (ev)=>{
+      if(!player) return;
+      const rect = canvas.getBoundingClientRect();
+      const sx = (ev.clientX - rect.left) * (VIEW_W / rect.width) + camera.x;
+      const sy = (ev.clientY - rect.top) * (VIEW_H / rect.height) + camera.y;
+      const dx = sx - player.x, dy = sy - player.y; const m = Math.hypot(dx,dy)||1;
+      // Prefer projectile abilities on click
+      const proj = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && d.type==='projectile'; });
+      if(proj) player.tryUseAbility(proj.id, dx/m, dy/m);
+      else if(player.hasAbility('dash_strike')) player.tryUseAbility('dash_strike', dx/m, dy/m);
+    });
+  }
 
   function getMoveDir(){
     let x=0,y=0;
@@ -731,7 +761,15 @@
       if(elapsed > b.dur) continue;
       for(const e of enemies) if(e.alive && !e.friendly){
         const d = dist(player.x,player.y,e.x,e.y);
-        if(d <= (b.spins/6)*42) e.takeDamage(b.power * dt/1000 * 28);
+        if(d <= (b.spins/6)*42){
+          // nerfed melee: lower DPS multiplier
+          const dmg = b.power * dt/1000 * 8;
+          e.takeDamage(dmg);
+          // siphon (on-hit heal) — small percent of damage
+          if(player && player.hasAbility && player.hasAbility('siphon')){
+            player.heal(Math.max(1, Math.floor(dmg * 0.12)));
+          }
+        }
       }
     }
     blades = blades.filter(b=> now - b.t <= b.dur);
@@ -950,14 +988,12 @@
   function updateHud(){
     if(!player) return;
     hud.style.display = player.alive ? 'flex' : 'none';
-    hpText.textContent = `HP: ${Math.round(player.hp)} / ${player.maxHp}`;
+    // show XP instead of health in small HUD (per request)
+    hpText.textContent = `XP: ${Math.round(player.xp)} / ${player.nextXp}`;
     xpFill.style.width = `${Math.min(100, Math.floor(player.xp / player.nextXp * 100))}%`;
     lvlText.textContent = player.level;
-    abilityPills.innerHTML = '';
-    for(const a of player.abilities){
-      const def = abilityDefs[a.id]; const span = document.createElement('span'); span.className='ability-pill';
-      span.textContent = `${def.title} Lv${a.lvl}`; abilityPills.appendChild(span);
-    }
+    // hide pill list to reduce clutter (showing only on level-up overlay)
+    if(abilityPills) abilityPills.style.display = 'none';
     bigScoreEl.textContent = `Score: ${score}`;
   }
 
@@ -974,6 +1010,8 @@
     score = 0; spawnTimer = 0; spawnInterval = 3800;
     player = new Player(MAP_W/2, MAP_H/2);
     player.abilities = [];
+    // ensure quick initial spawn
+    spawnTimer = 60;
     updateHud();
   }
 
