@@ -184,10 +184,11 @@ html, body {
 /* Choice grid and cards used for ability pick / level-up */
 .choice-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
   width: 100%;
-  max-width: 760px;
+  max-width: 880px;
+  justify-items: stretch;
 }
 .choice-card {
   background: rgba(0,0,0,0.58);
@@ -197,7 +198,7 @@ html, body {
   color: #ffdca8;
   cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
-  min-height: 84px;
+  min-height: 96px;
   display:flex; flex-direction:column; justify-content:space-between;
 }
 .choice-card:hover {

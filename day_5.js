@@ -72,6 +72,7 @@
   let anvils = [];
   let particles = [];
   let poisonTrails = []; // visual trail segments
+  const ENEMY_PROJECTILE_CAP = 12; // cap simultaneous enemy projectiles
 
   // --- ability definitions (all abilities have visible effects) ---
   const ABILITIES = [
@@ -91,10 +92,7 @@
     { id:'homing_mine', title:'Homing Mine', desc:'Spawn a homing mine that seeks enemies.', type:'deploy', basePower:14, cooldown:4000, range:0, upgradePow:(lv)=>14+lv*6 },
     // cone: visible cone shock but nerfed damage
     { id:'shockwave', title:'Shockwave', desc:'Cone shock forward.', type:'cone', basePower:12, cooldown:2500, range:220, upgradePow:(lv)=>12+lv*5 },
-    // poison trail: visible trail and patch
-    { id:'poison_trail', title:'Poison Trail', desc:'Leave a damaging trail while moving.', type:'aura', basePower:4, cooldown:0, range:28, upgradePow:(lv)=>4+lv*2 },
-    // frost aura: visible chill ring
-    { id:'frost_aura', title:'Frost Aura', desc:'Cold aura that chills and damages enemies nearby.', type:'aura', basePower:3, cooldown:0, range:80, upgradePow:(lv)=>3+lv*1.5 },
+  // (removed poison_trail and frost_aura — deprecated)
     // shield visible
     { id:'shield', title:'Shield', desc:'Temporary damage reduction.', type:'active', basePower:0.3, cooldown:8000, range:0, upgradePow:(lv)=>0.3+lv*0.06 },
     // time slow visible aoe
@@ -106,7 +104,7 @@
 
     // extra projectile/area abilities (visible)
     { id:'poison_bomb', title:'Poison Bomb', desc:'Throws a bomb that spawns a poison patch.', type:'projectile', basePower:10, cooldown:2600, range:420, upgradePow:(lv)=>10+lv*3 },
-    { id:'orbital', title:'Orbital Strike', desc:'Spawn rotating orbs around you.', type:'auto', basePower:14, cooldown:4200, range:0, upgradePow:(lv)=>14+lv*4 },
+  // orbital removed (duplicate / deprecated)
     { id:'chain_lightning', title:'Chain Lightning', desc:'Strikes an enemy and chains to nearby enemies.', type:'projectile', basePower:16, cooldown:3200, range:540, upgradePow:(lv)=>16+lv*5 },
     { id:'meteor', title:'Meteor', desc:'Calls down a meteor that deals huge explosion (long cooldown).', type:'projectile', basePower:60, cooldown:14000, range:900, upgradePow:(lv)=>60+lv*24 }
   ];
@@ -160,12 +158,8 @@
           }
         }
       }
-      if(this.hasAbility('poison_trail')){
-        this.trailPoints.push({ x:this.x, y:this.y, t:performance.now() });
-        while(this.trailPoints.length > 160) this.trailPoints.shift();
-      } else {
-        this.trailPoints = [];
-      }
+      // trailPoints reserved for visual movement trail (no passive poison trail support)
+      this.trailPoints = [];
     }
     triggerAuto(id){
       const def = abilityDefs[id];
@@ -189,8 +183,6 @@
           const target = choose(pool);
           anvils.push({ tx: target.x, ty: target.y, x: target.x, y: -80, vy: 0, t: performance.now(), power, hit:false });
         }
-      } else if(id === 'orbital'){
-        blades.push({ t:performance.now(), dur:1100, power, spins: 3 + lvl*2 });
       }
     }
     takeDamage(dmg){
@@ -488,8 +480,11 @@
         let target=null, td=Infinity;
         for(const e of enemies) if(e.alive && !e.friendly && onScreen(e.x,e.y)){ const d=dist(this.x,this.y,e.x,e.y); if(d<td){td=d;target=e;} }
         if(target){
-          const dx = target.x - this.x, dy = target.y - this.y, m = Math.hypot(dx,dy)||1;
-          projectiles.push(new Projectile(this.x, this.y, dx/m*260, dy/m*260, this.power, 6, 'player', 700));
+          const enemyProjCount = projectiles.filter(p=>p.owner === 'enemy').length;
+          if(enemyProjCount < ENEMY_PROJECTILE_CAP){
+            const dx = target.x - this.x, dy = target.y - this.y, m = Math.hypot(dx,dy)||1;
+            projectiles.push(new Projectile(this.x, this.y, dx/m*220, dy/m*220, this.power, 6, 'enemy', 420));
+          }
         }
       }
       Enemy.prototype.applyVelocity.call(this, dt);
@@ -596,50 +591,66 @@
   }
 
   // --- spawns: scale by player.level and unlock types by level ---
+  function findSpawnPoint(minDist, maxDist){
+    const cx = player.x, cy = player.y;
+    const maxAttempts = 24;
+    for(let i=0;i<maxAttempts;i++){
+      const ang = Math.random()*Math.PI*2;
+      const rad = randRange(minDist, maxDist);
+      const sx = clamp(cx + Math.cos(ang)*rad, 0, MAP_W);
+      const sy = clamp(cy + Math.sin(ang)*rad, 0, MAP_H);
+      // ensure not inside visible viewport (+margin)
+      const margin = 48;
+      if(sx < camera.x - margin || sx > camera.x + VIEW_W + margin || sy < camera.y - margin || sy > camera.y + VIEW_H + margin) return {sx, sy};
+    }
+    // fallback: place just outside viewport
+    return { sx: clamp(player.x + (VIEW_W/2 + 80), 0, MAP_W), sy: clamp(player.y + (VIEW_H/2 + 80), 0, MAP_H) };
+  }
+
+  function spawnInitialWave(){
+    // early game: only 2-3 normal zombies, outside visible area
+    const count = 2 + Math.floor(Math.random()*2); // 2 or 3
+    const minDist = Math.max(VIEW_W, VIEW_H)/2 + 60;
+    const maxDist = minDist + 180;
+    for(let i=0;i<count;i++){
+      const pt = findSpawnPoint(minDist, maxDist);
+      enemies.push(new Enemy(pt.sx, pt.sy, 28 + 1*6, 28 + 1*1.5, 16, 'zombie', true, 14 + 1*2));
+    }
+  }
+
   function spawnEnemyWave(dt){
+    if(!player) return;
     spawnTimer -= dt;
-    if(spawnTimer <= 0){
-      // spawn more frequently as player levels and spawn around player within a radius
-      spawnTimer = clamp(300 + Math.max(0, 2000 - player.level*80), 120, 3200);
-      const lvl = Math.max(1, player.level);
-      const count = Math.min(1 + Math.floor(1 + lvl/3), 10); // more mobs as level increases
+    if(spawnTimer > 0) return;
+    // dynamic cap of enemies based on level
+    const lvl = Math.max(1, player.level);
+    const maxEnemies = Math.max(3, Math.min(28, 3 + Math.floor(lvl * 1.2)));
+    if(enemies.length >= maxEnemies) { spawnTimer = 300; return; }
 
-      // chance for special large spawns
-      if(lvl >= 12 && Math.random() < 0.012){
-        // big boss near player
-        const ang = Math.random()*Math.PI*2; const rad = randRange(160, 300);
-        const sx = clamp(player.x + Math.cos(ang)*rad, 0, MAP_W);
-        const sy = clamp(player.y + Math.sin(ang)*rad, 0, MAP_H);
-        enemies.push(new Boss(sx,sy,lvl));
-        return;
-      }
+    // set next timer scaled by level
+    spawnTimer = clamp(600 + Math.max(0, 1600 - player.level*60), 180, 3200);
 
-      for(let i=0;i<count;i++){
-        const ang = Math.random()*Math.PI*2;
-        const rad = randRange(120, 380) * (1 + Math.min(1, lvl/10));
-        const sx = clamp(player.x + Math.cos(ang)*rad, 0, MAP_W);
-        const sy = clamp(player.y + Math.sin(ang)*rad, 0, MAP_H);
+    // early game should remain mild
+    if(lvl <= 1){
+      // only spawn small zombies occasionally (1 at a time)
+      const pt = findSpawnPoint(Math.max(VIEW_W, VIEW_H)/2 + 60, Math.max(VIEW_W, VIEW_H)/2 + 180);
+      enemies.push(new Enemy(pt.sx, pt.sy, 28 + lvl*5, 28 + lvl*1.5, 16, 'zombie', true, 14 + lvl*2));
+      return;
+    }
 
-        const r = Math.random();
-        // necromancer occasionally
-        if(lvl >= 6 && Math.random() < 0.04){ enemies.push(new Necromancer(sx,sy,lvl)); continue; }
-        // miniboss chance
-        if(lvl >=5 && Math.random() < 0.04){ enemies.push(new Enemy(sx,sy, 160 + lvl*30, 22, 26, 'mini', true, 120 + lvl*10)); continue; }
+    // normal spawn group scales with level
+    const count = Math.min(1 + Math.floor(1 + lvl/3), 8);
+    for(let i=0;i<count && enemies.length < maxEnemies;i++){
+      const pt = findSpawnPoint( Math.max(VIEW_W, VIEW_H)/2 + 60, Math.max(VIEW_W, VIEW_H)/2 + 380 );
+      const r = Math.random();
+      if(lvl >= 10 && Math.random() < 0.02){ enemies.push(new Boss(pt.sx,pt.sy,lvl)); continue; }
+      if(lvl >= 6 && Math.random() < 0.04){ enemies.push(new Necromancer(pt.sx,pt.sy,lvl)); continue; }
+      if(lvl >=5 && Math.random() < 0.03){ enemies.push(new Enemy(pt.sx,pt.sy, 120 + lvl*30, 22, 26, 'mini', true, 100 + lvl*10)); continue; }
 
-        if(r < 0.06 + lvl*0.005){
-          enemies.push(new Enemy(sx,sy, 80 + lvl*12, 18 + lvl*1, 34, 'brute', true, 40 + lvl*6));
-        } else if(r < 0.26){
-          enemies.push(new Enemy(sx,sy, 34 + lvl*6, 36, 12, 'skeleton', false, 22 + lvl*3));
-        } else if(r < 0.6){
-          enemies.push(new Enemy(sx,sy, 28 + lvl*6, 28 + lvl*1.5, 16, 'zombie', true, 14 + lvl*2));
-        } else {
-          if(lvl >= 3 && Math.random() < 0.55){
-            enemies.push(new Enemy(sx,sy, 22 + lvl*5, 110 + lvl*6, 10, 'wolf', true, 12 + lvl*3));
-          } else {
-            enemies.push(new Enemy(sx,sy, 26 + lvl*5, 86 + lvl*5, 10, 'demon', true, 18 + lvl*3));
-          }
-        }
-      }
+      if(r < 0.2){ enemies.push(new Enemy(pt.sx,pt.sy, 30 + lvl*6, 30 + lvl*1.2, 14, 'zombie', true, 12 + lvl*2)); }
+      else if(r < 0.45){ enemies.push(new Enemy(pt.sx,pt.sy, 28 + lvl*6, 36, 12, 'skeleton', false, 18 + lvl*3)); }
+      else if(r < 0.7){ enemies.push(new Enemy(pt.sx,pt.sy, 60 + lvl*10, 22 + lvl*1.2, 28, 'brute', true, 40 + lvl*6)); }
+      else { enemies.push(new Enemy(pt.sx,pt.sy, 24 + lvl*5, 86 + lvl*4, 10, 'demon', true, 18 + lvl*3)); }
     }
   }
 
@@ -734,7 +745,12 @@
       e.tickAcc = 1800 + player.level*90;
       const dx = player.x - e.x, dy = player.y - e.y; const m = Math.hypot(dx,dy)||1;
       if(onScreen(e.x,e.y) && onScreen(player.x,player.y)){
-        projectiles.push(new Projectile(e.x, e.y, dx/m*150, dy/m*150, Math.max(6, 6 + Math.floor(player.level*0.5)), 5, 'enemy', 900));
+        // limit enemy projectiles
+        const enemyProjCount = projectiles.filter(p=>p.owner === 'enemy').length;
+        if(enemyProjCount < ENEMY_PROJECTILE_CAP){
+          // shorter range / slower for enemy projectiles
+          projectiles.push(new Projectile(e.x, e.y, dx/m*160, dy/m*160, Math.max(6, 6 + Math.floor(player.level*0.5)), 5, 'enemy', 420));
+        }
       }
     }
   }
@@ -807,20 +823,12 @@
       player.x = clamp(player.x, 0, MAP_W);
       player.y = clamp(player.y, 0, MAP_H);
       player.lastDir = dir;
-      if(player.hasAbility('poison_trail')) player.trailPoints.push({ x:player.x, y:player.y, t:performance.now() });
+      // no passive trails (deprecated)
     }
 
     player.tick(dt);
 
-    // passives
-    if(player.hasAbility('poison_trail')){
-      const lvl = player.abilityLevel('poison_trail');
-      for(const e of enemies) if(e.alive && !e.friendly && dist(player.x,player.y,e.x,e.y) < 40) e.takeDamage( (4 + (lvl-1)*2) * dt/1000 );
-    }
-    if(player.hasAbility('frost_aura')){
-      const lvl = player.abilityLevel('frost_aura');
-      for(const e of enemies) if(e.alive && !e.friendly && dist(player.x,player.y,e.x,e.y) <= 80) { e.takeDamage((3 + (lvl-1)*1.5) * dt/1000); e.applySlow(0.72, 600); }
-    }
+    // passives: (poison_trail and frost_aura removed)
 
     // directional abilities use lastDir when stopped and will fire with cooldowns
     for(const a of player.abilities){
@@ -905,8 +913,10 @@
         ctx.arc(b.x1-camera.x, b.y1-camera.y, r, ang - 0.7, ang + 0.7);
         ctx.closePath(); ctx.fill();
       } else {
-        ctx.strokeStyle = 'rgba(255,220,80,0.85)'; ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255,220,80,0.95)'; ctx.lineWidth = 3;
+        ctx.shadowBlur = 14; ctx.shadowColor = 'rgba(255,200,80,0.6)';
         ctx.beginPath(); ctx.moveTo(b.x1-camera.x, b.y1-camera.y); ctx.lineTo((b.x2||b.tx)-camera.x, (b.y2||b.ty)-camera.y); ctx.stroke();
+        ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
       }
       ctx.restore();
     }
@@ -1010,9 +1020,12 @@
     score = 0; spawnTimer = 0; spawnInterval = 3800;
     player = new Player(MAP_W/2, MAP_H/2);
     player.abilities = [];
-    // ensure quick initial spawn
-    spawnTimer = 60;
+    // ensure quick initial spawn and small starting wave
     updateHud();
+    updateCamera();
+    spawnInitialWave();
+    // next full wave delayed a bit
+    spawnTimer = 900;
   }
 
   // starting choice: guaranteed damaging and unique
