@@ -116,6 +116,92 @@
   ];
   ABILITIES.forEach(a=> abilityDefs[a.id]=a);
 
+
+  // --- Enemy, Turret, Projectile, Orb, HomingMine, Boss, Necromancer ---
+  class Enemy {
+    constructor(x,y,hp=40,speed=40,r=14,type='zombie',melee=true,xpValue=10){
+      this.x=x; this.y=y; this.hp=hp; this.maxHp=hp; this.speed=speed; this.r=r; this.type=type; this.melee=melee;
+      this.alive=true; this.slowUntil=0; this.slowFactor=1; this.tickAcc=0; this.friendly=false; this.xpValue = xpValue;
+      this.vx = 0; this.vy = 0; // for knockback
+      this.stunUntil = 0; // timestamp while stunned (skip AI)
+    }
+    takeDamage(d){
+      this.hp -= d;
+      particles.push({ x:this.x, y:this.y, t:performance.now(), dur:520, col:'#ff6b6b' });
+      if(this.hp<=0) this.die();
+    }
+    die(){
+      if(!this.alive) return;
+      this.alive=false;
+      score += Math.round(this.xpValue);
+      const orbsCount = Math.max(1, Math.floor(this.xpValue/6));
+      for(let i=0;i<orbsCount;i++) orbs.push(new Orb(this.x + randRange(-10,10), this.y + randRange(-10,10), randRange(6,16), 'xp'));
+      // nerfed heal chance
+      if(Math.random() < 0.08) orbs.push(new Orb(this.x + randRange(-8,8), this.y + randRange(-8,8), randRange(12,30), 'heal'));
+    }
+    applySlow(factor, ms){ this.slowFactor = factor; this.slowUntil = performance.now() + ms; }
+    update(dt){
+      if(!player || !player.alive) return;
+      // if stunned, only apply lingering velocity (knockback) and skip AI/movement
+      if(this.stunUntil > performance.now()){
+        this.applyVelocity(dt);
+        return;
+      }
+      if(this.friendly) {
+        if(this.updateFriendly) this.updateFriendly(dt);
+        // friendly can still have vx vy applied
+        this.applyVelocity(dt);
+        return;
+      }
+      if(performance.now() > this.slowUntil) this.slowFactor = 1;
+      const sx = player.x - this.x, sy = player.y - this.y; const d = Math.hypot(sx,sy);
+      if(d > 1){
+        const spd = this.speed * (this.slowFactor || 1);
+        this.x += (sx/d) * spd * dt/1000;
+        this.y += (sy/d) * spd * dt/1000;
+      }
+      // apply knockback velocity
+      this.applyVelocity(dt);
+
+      this.x = clamp(this.x, 0, MAP_W); this.y = clamp(this.y, 0, MAP_H);
+
+      if(this.melee && d <= this.r + player.r + 4){
+        if(this.tickAcc <= 0){
+          player.takeDamage(Math.max(3, this.maxHp*0.06));
+          this.tickAcc = 750;
+        }
+      }
+      if(this.tickAcc > 0) this.tickAcc = Math.max(0, this.tickAcc - dt);
+    }
+    applyVelocity(dt){
+      // simple damping
+      this.x += this.vx * dt/1000;
+      this.y += this.vy * dt/1000;
+      this.vx *= Math.pow(0.2, dt/1000); // quickly damp
+      this.vy *= Math.pow(0.2, dt/1000);
+    }
+    draw(ctx, cam){
+      if(!this.alive) return;
+      const x = this.x - cam.x, y = this.y - cam.y;
+      ctx.save(); ctx.translate(x,y);
+      // style by type
+      if(this.type==='skeleton'){ ctx.fillStyle = '#dfe8e9'; }
+      else if(this.type==='demon'){ ctx.fillStyle = '#b14a4a'; }
+      else if(this.type==='brute'){ ctx.fillStyle = '#7b3a3a'; }
+      else if(this.type==='wolf'){ ctx.fillStyle = '#88aacc'; }
+      else if(this.type==='mini'){ ctx.fillStyle = '#ffc968'; }
+      else if(this.type==='boss'){ ctx.fillStyle = '#ff6b6b'; }
+      else if(this.type==='necromancer'){ ctx.fillStyle = '#9a6bd1'; }
+      else ctx.fillStyle = '#6b8b6b';
+      ctx.beginPath(); ctx.arc(0,0,this.r,0,Math.PI*2); ctx.fill();
+      // hp bar
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(-this.r, -this.r-8, this.r*2, 5);
+      ctx.fillStyle = '#ff8d4d'; ctx.fillRect(-this.r, -this.r-8, (this.hp/this.maxHp)*this.r*2, 5);
+      ctx.restore();
+    }
+  }
+
+
   // --- New enemy types: Replicator + MeteorSummoner Boss ---
   class Replicator extends Enemy {
     constructor(x,y,lvl){
@@ -472,90 +558,6 @@
         return true;
       }
       return false;
-    }
-  }
-
-  // --- Enemy, Turret, Projectile, Orb, HomingMine, Boss, Necromancer ---
-  class Enemy {
-    constructor(x,y,hp=40,speed=40,r=14,type='zombie',melee=true,xpValue=10){
-      this.x=x; this.y=y; this.hp=hp; this.maxHp=hp; this.speed=speed; this.r=r; this.type=type; this.melee=melee;
-      this.alive=true; this.slowUntil=0; this.slowFactor=1; this.tickAcc=0; this.friendly=false; this.xpValue = xpValue;
-      this.vx = 0; this.vy = 0; // for knockback
-      this.stunUntil = 0; // timestamp while stunned (skip AI)
-    }
-    takeDamage(d){
-      this.hp -= d;
-      particles.push({ x:this.x, y:this.y, t:performance.now(), dur:520, col:'#ff6b6b' });
-      if(this.hp<=0) this.die();
-    }
-    die(){
-      if(!this.alive) return;
-      this.alive=false;
-      score += Math.round(this.xpValue);
-      const orbsCount = Math.max(1, Math.floor(this.xpValue/6));
-      for(let i=0;i<orbsCount;i++) orbs.push(new Orb(this.x + randRange(-10,10), this.y + randRange(-10,10), randRange(6,16), 'xp'));
-      // nerfed heal chance
-      if(Math.random() < 0.08) orbs.push(new Orb(this.x + randRange(-8,8), this.y + randRange(-8,8), randRange(12,30), 'heal'));
-    }
-    applySlow(factor, ms){ this.slowFactor = factor; this.slowUntil = performance.now() + ms; }
-    update(dt){
-      if(!player || !player.alive) return;
-      // if stunned, only apply lingering velocity (knockback) and skip AI/movement
-      if(this.stunUntil > performance.now()){
-        this.applyVelocity(dt);
-        return;
-      }
-      if(this.friendly) {
-        if(this.updateFriendly) this.updateFriendly(dt);
-        // friendly can still have vx vy applied
-        this.applyVelocity(dt);
-        return;
-      }
-      if(performance.now() > this.slowUntil) this.slowFactor = 1;
-      const sx = player.x - this.x, sy = player.y - this.y; const d = Math.hypot(sx,sy);
-      if(d > 1){
-        const spd = this.speed * (this.slowFactor || 1);
-        this.x += (sx/d) * spd * dt/1000;
-        this.y += (sy/d) * spd * dt/1000;
-      }
-      // apply knockback velocity
-      this.applyVelocity(dt);
-
-      this.x = clamp(this.x, 0, MAP_W); this.y = clamp(this.y, 0, MAP_H);
-
-      if(this.melee && d <= this.r + player.r + 4){
-        if(this.tickAcc <= 0){
-          player.takeDamage(Math.max(3, this.maxHp*0.06));
-          this.tickAcc = 750;
-        }
-      }
-      if(this.tickAcc > 0) this.tickAcc = Math.max(0, this.tickAcc - dt);
-    }
-    applyVelocity(dt){
-      // simple damping
-      this.x += this.vx * dt/1000;
-      this.y += this.vy * dt/1000;
-      this.vx *= Math.pow(0.2, dt/1000); // quickly damp
-      this.vy *= Math.pow(0.2, dt/1000);
-    }
-    draw(ctx, cam){
-      if(!this.alive) return;
-      const x = this.x - cam.x, y = this.y - cam.y;
-      ctx.save(); ctx.translate(x,y);
-      // style by type
-      if(this.type==='skeleton'){ ctx.fillStyle = '#dfe8e9'; }
-      else if(this.type==='demon'){ ctx.fillStyle = '#b14a4a'; }
-      else if(this.type==='brute'){ ctx.fillStyle = '#7b3a3a'; }
-      else if(this.type==='wolf'){ ctx.fillStyle = '#88aacc'; }
-      else if(this.type==='mini'){ ctx.fillStyle = '#ffc968'; }
-      else if(this.type==='boss'){ ctx.fillStyle = '#ff6b6b'; }
-      else if(this.type==='necromancer'){ ctx.fillStyle = '#9a6bd1'; }
-      else ctx.fillStyle = '#6b8b6b';
-      ctx.beginPath(); ctx.arc(0,0,this.r,0,Math.PI*2); ctx.fill();
-      // hp bar
-      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(-this.r, -this.r-8, this.r*2, 5);
-      ctx.fillStyle = '#ff8d4d'; ctx.fillRect(-this.r, -this.r-8, (this.hp/this.maxHp)*this.r*2, 5);
-      ctx.restore();
     }
   }
 
