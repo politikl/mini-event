@@ -110,23 +110,73 @@ html, body {
 #day-leaderboard-table thead th { position:sticky; top:0; background:linear-gradient(90deg, rgba(40,20,10,0.6), rgba(30,12,10,0.55)); color:#ffebc6; padding:8px; font-weight:800; border-bottom:1px solid rgba(255,107,53,0.08); }
 #day-leaderboard-table td { padding:10px; text-align:center; border-bottom:1px solid rgba(255,107,53,0.04); font-size:0.95rem; }
 
-/* choice / modal styles (kept) */
-.playbound .modal { position:absolute; left:50%; top:50%; transform: translate(-50%,-50%); width:min(92%,560px); z-index:520; background:linear-gradient(180deg,rgba(10,8,6,0.96),rgba(20,10,10,0.98)); border-radius:10px; box-shadow:0 10px 40px rgba(0,0,0,0.7); border:2px solid rgba(255,107,53,0.9); }
-.modal.hidden { display:none; }
-.modal-content { padding:16px; color:#ffdca8; }
-.modal-buttons { display:flex; gap:8px; justify-content:center; margin-top:12px; }
+/* add header-box style (day_3 parity) */
+.header-box {
+  background: rgba(0,0,0,0.72);
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 2px solid var(--accent);
+  color: #ffd8a8;
+  font-family: monospace;
+  font-weight: 700;
+}
 
-/* background visuals */
-#background { pointer-events:none; z-index:100; position:fixed; inset:0; opacity:0.6; }
+/* top ranks (gold / silver / bronze visuals like day_3/day_1) */
+#day-leaderboard-table .rank-1 { background: linear-gradient(90deg, rgba(60,40,8,0.7), rgba(40,20,6,0.6)); color:#ffdca8; font-weight:800; }
+#day-leaderboard-table .rank-2 { background: linear-gradient(90deg, rgba(40,40,40,0.55), rgba(30,30,30,0.5)); color:#f0e0c8; font-weight:700; }
+#day-leaderboard-table .rank-3 { background: linear-gradient(90deg, rgba(60,36,24,0.55), rgba(40,26,16,0.5)); color:#f3d7b0; font-weight:700; }
 
-/* choice card */
-.choice-grid { display:flex; gap:12px; justify-content:center; margin-top:12px; flex-wrap:wrap; }
-.choice-card { cursor:pointer; min-width:200px; background:linear-gradient(180deg,#151212,#2a1c1c); border:2px solid rgba(255,107,53,0.95); padding:12px; border-radius:8px; color:#ffdca8; text-align:left; }
-.choice-card h3 { margin:0 0 6px 0; font-size:1.05rem; }
-.choice-card p { margin:0; font-size:0.9rem; color:#e0b57f; }
+/* save toast (copied from day_3) */
+.save-toast {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.8);
+  color: #ffdca8;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 2px solid var(--accent);
+  z-index: 400;
+  font-weight: 700;
+  font-family: monospace;
+}
 
-/* responsive */
-@media (max-width: 980px) {
-  .halloween-frame { width: 96vw; height: calc(100vh - 72px); }
-  .center-score { font-size: 1.0rem; top: 12px; }
+/* --- Background elements (falling leaves / pumpkins) copied from day_3 --- */
+#background { pointer-events: none; z-index: -1; position: fixed; inset: 0; }
+
+.leaf, .bg-pumpkin {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+  animation-name: fall;
+  animation-duration: 12s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+/* leaf visuals */
+.leaf {
+  background: radial-gradient(circle at 35% 30%, #ffa94d, #7a3a00);
+  border-radius: 6px;
+  transform-origin: center;
+  opacity: 0.9;
+}
+
+/* pumpkin visuals bigger */
+.bg-pumpkin {
+  width: 36px;
+  height: 28px;
+  background: radial-gradient(circle at 50% 40%, #ff8c00, #c25a00);
+  border-radius: 50% 50% 40% 40%;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+  opacity: 0.95;
+}
+
+/* falling animation */
+@keyframes fall {
+  0% { transform: translateY(-20vh) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translateY(120vh) rotate(360deg); opacity: 0.9; }
 }

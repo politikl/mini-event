@@ -1049,6 +1049,12 @@
         playbound.style.height = prevPlayboundStyles.height;
         playbound.style.display = prevPlayboundStyles.display;
       }
+      // ensure we clear any inline canvas sizing left from fullscreen
+      if(canvas){
+        canvas.style.width = '';
+        canvas.style.height = '';
+      }
+      // revert canvas to fill playbound while keeping aspect (resize helper)
       resizeCanvasToPlaybound();
     }
   });
@@ -1057,15 +1063,20 @@
     dayLeaderboardModal.classList.remove('hidden');
     if(window.firebaseReady){
       const db = window.firebaseDb;
-      const col = window.firebaseCollection(db, 'scores-day');
+      // use day5_scores collection and order by 'score' desc (same pattern as day_3)
+      const col = window.firebaseCollection(db, 'day5_scores');
       const q = window.firebaseQuery(col, window.firebaseOrderBy('score', 'desc'));
       window.firebaseGetDocs(q).then(snap => {
         dayLeaderboardBody.innerHTML = '';
         let rank = 1;
         snap.forEach(docSnap => {
           const d = docSnap.data();
+          // apply rank classes for top three
+          const cls = rank===1 ? 'rank-1' : rank===2 ? 'rank-2' : rank===3 ? 'rank-3' : '';
+          const when = d.ts ? new Date(d.ts).toLocaleString() : (d.when ? new Date(d.when).toLocaleString() : '');
           const tr = document.createElement('tr');
-          tr.innerHTML = `<td>${rank++}</td><td>${d.name||'Guest'}</td><td>${d.score}</td><td>${new Date(d.when).toLocaleString()}</td><td>${d.event?'Yes':''}</td>`;
+          tr.className = cls;
+          tr.innerHTML = `<td>${rank++}</td><td>${d.playerName||d.name||'Guest'}</td><td>${d.score}</td><td>${when}</td><td>${d.withinEvent?'Yes':''}</td>`;
           dayLeaderboardBody.appendChild(tr);
         });
       }).catch(()=>{});
@@ -1074,7 +1085,48 @@
   if(dayLeaderboardClose && dayLeaderboardModal) dayLeaderboardClose.addEventListener('click', ()=> dayLeaderboardModal.classList.add('hidden'));
 
   if(submitScoreBtn){
-    submitScoreBtn.addEventListener('click', async ()=>{
+    // Replace previous submission logic with the same flow from day_3 adapted to day5.
+    async function submitScoreToFirestoreDocs(entry){
+      try{
+        if(!window.firebaseDb || !window.firebaseDoc || !window.firebaseSetDoc) return { ok:false, reason:'no-firebase' };
+        const id = entry.uid ? entry.uid : `${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
+        const docRef = window.firebaseDoc(window.firebaseDb, 'day5_scores', id);
+        if(entry.uid && window.firebaseGetDoc){
+          const existing = await window.firebaseGetDoc(docRef);
+          if(existing && existing.exists && existing.exists()){
+            const data = existing.data();
+            if((data.score||0) < entry.score){
+              await window.firebaseSetDoc(docRef, entry);
+            }
+          } else {
+            await window.firebaseSetDoc(docRef, entry);
+          }
+        } else {
+          await window.firebaseSetDoc(docRef, entry);
+        }
+
+        // update user's aggregated scores in users / scores.day5
+        if(entry.uid && window.firebaseGetDoc && window.firebaseSetDoc){
+          const userDocRef = window.firebaseDoc(window.firebaseDb, 'users', entry.uid);
+          const snap = await window.firebaseGetDoc(userDocRef);
+          let docData = {};
+          if(snap && snap.exists && snap.exists()) docData = snap.data();
+          else docData = { username: entry.playerName, email:'', createdAt:new Date(), scores:{ day1:0,day2:0,day3:0,day4:0,day5:0, total:0 } };
+          docData.scores = docData.scores || {};
+          docData.scores.day5 = Math.max(docData.scores.day5 || 0, entry.score);
+          const s = docData.scores;
+          docData.scores.total = (s.day1||0)+(s.day2||0)+(s.day3||0)+(s.day4||0)+(s.day5||0);
+          await window.firebaseSetDoc(userDocRef, docData);
+        }
+
+        return { ok:true };
+      } catch(err){
+        console.error('save error', err);
+        return { ok:false, reason: err && err.message || 'unknown' };
+      }
+    }
+
+    async function handleSubmitScore(){
       if(!window.firebaseReady){ submitScoreBtn.textContent='No Firebase'; setTimeout(()=>submitScoreBtn.textContent='Save Score',900); return; }
       submitScoreBtn.disabled = true;
       submitScoreBtn.textContent = 'Saving...';
@@ -1082,18 +1134,47 @@
         const db = window.firebaseDb;
         const auth = window.firebaseAuth;
         const user = auth && auth.currentUser;
-        const name = user ? (user.displayName||user.email||'Player') : 'Guest';
-        const id = 'score-' + Date.now() + '-' + Math.floor(Math.random()*9999);
-        const data = { name, score, when: Date.now(), event: false };
-        const docRef = window.firebaseDoc(db, 'scores-day', id);
-        await window.firebaseSetDoc(docRef, data);
+        let uid = user ? user.uid : null;
+        let playerName = user ? (user.displayName||user.email||'Player') : 'Guest';
+        const entry = { score, playerName, uid, ts: Date.now(), withinEvent: Date.now() <= GAME_END_TS };
+
+        if(!uid){
+          if(window.firebaseSignInWithPopup && window.firebaseAuth && window.googleProvider){
+            try{
+              const res = await window.firebaseSignInWithPopup(window.firebaseAuth, window.googleProvider);
+              const u = res.user;
+              uid = u.uid;
+              playerName = u.displayName || (u.email ? u.email.split('@')[0] : 'User');
+              entry.uid = uid; entry.playerName = playerName;
+            } catch(e){
+              submitScoreBtn.textContent = 'Sign-in failed';
+              setTimeout(()=>{ submitScoreBtn.textContent='Save Score'; submitScoreBtn.disabled=false; }, 900);
+              return;
+            }
+          } else {
+            submitScoreBtn.textContent = 'Sign-in unavailable';
+            setTimeout(()=>{ submitScoreBtn.textContent='Save Score'; submitScoreBtn.disabled=false; }, 900);
+            return;
+          }
+        }
+
+        const r = await submitScoreToFirestoreDocs(entry);
+        if(!r.ok){
+          submitScoreBtn.textContent = 'Error';
+          setTimeout(()=>{ submitScoreBtn.textContent='Save Score'; submitScoreBtn.disabled=false; }, 900);
+          return;
+        }
+
         submitScoreBtn.textContent = 'Saved';
-        setTimeout(()=>{ gameOverModal.classList.add('hidden'); submitScoreBtn.textContent='Save Score'; submitScoreBtn.disabled=false; }, 700);
+        // reset the game and immediately start a new run (per request)
+        setTimeout(()=>{ gameOverModal.classList.add('hidden'); submitScoreBtn.textContent='Save Score'; submitScoreBtn.disabled=false; resetGame(); startGame(); }, 700);
       }catch(e){
         submitScoreBtn.textContent = 'Error';
         setTimeout(()=>{ submitScoreBtn.textContent='Save Score'; submitScoreBtn.disabled=false; }, 900);
       }
-    });
+    }
+
+    submitScoreBtn.addEventListener('click', handleSubmitScore);
   }
 
   // --- resize / background helpers (keeps aspect ratio inside playbound) ---
