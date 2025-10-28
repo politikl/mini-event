@@ -235,20 +235,35 @@ document.addEventListener('DOMContentLoaded', () => {
     initGame();
 });
 
+// Initialize candy data
+function initializeCandyData() {
+    Object.keys(CANDY_STOCKS).forEach(candyId => {
+        const candy = CANDY_STOCKS[candyId];
+        candy.currentPrice = candy.basePrice;
+        // Fill history with base price for initial display
+        candy.history = Array(GAME_CONFIG.maxPriceHistory).fill(candy.basePrice);
+    });
+}
+
 // Initialize the game
 function initGame() {
     // Try to load saved game
     const savedGame = loadGame();
     if (savedGame) {
         Object.assign(gameState, savedGame);
+        // Ensure candy data is properly loaded
+        Object.keys(CANDY_STOCKS).forEach(candyId => {
+            if (!CANDY_STOCKS[candyId].currentPrice) {
+                CANDY_STOCKS[candyId].currentPrice = CANDY_STOCKS[candyId].basePrice;
+            }
+            if (!Array.isArray(CANDY_STOCKS[candyId].history) || CANDY_STOCKS[candyId].history.length === 0) {
+                CANDY_STOCKS[candyId].history = Array(GAME_CONFIG.maxPriceHistory).fill(CANDY_STOCKS[candyId].currentPrice);
+            }
+        });
         showMessage("Game loaded from save!");
     } else {
-        // Initialize price history for each candy
-        Object.keys(CANDY_STOCKS).forEach(candyId => {
-            const candy = CANDY_STOCKS[candyId];
-            candy.currentPrice = candy.basePrice;
-            candy.history = [candy.basePrice];
-        });
+        // Initialize new game data
+        initializeCandyData();
     }
 
     // Create charts for each candy
@@ -338,10 +353,30 @@ function setupTooltips() {
 // Create price charts for each candy
 function createCharts() {
     const chartsContainer = document.getElementById('charts-container');
+    if (!chartsContainer) {
+        console.error('Charts container not found');
+        return;
+    }
     chartsContainer.innerHTML = ''; // Clear existing charts
     
     Object.keys(CANDY_STOCKS).forEach(candyId => {
         const candy = CANDY_STOCKS[candyId];
+        
+        // Validate candy data
+        if (!candy || !candy.name || typeof candy.currentPrice === 'undefined' || !Array.isArray(candy.history)) {
+            console.error(`Invalid candy data for ${candyId}:`, candy);
+            return;
+        }
+
+        // Ensure we have valid price data
+        if (typeof candy.currentPrice !== 'number' || isNaN(candy.currentPrice)) {
+            candy.currentPrice = candy.basePrice;
+        }
+
+        // Ensure history array is properly filled
+        if (candy.history.length === 0) {
+            candy.history = Array(GAME_CONFIG.maxPriceHistory).fill(candy.currentPrice);
+        }
         
         // Create chart wrapper
         const chartWrapper = document.createElement('div');
@@ -400,26 +435,39 @@ function updateCharts() {
         const candy = CANDY_STOCKS[candyId];
         const chart = gameState.charts[candyId];
         
-        if (chart) {
+        // Validate data before updating
+        if (!candy || !Array.isArray(candy.history) || !chart) {
+            console.error(`Invalid data for updating ${candyId} chart`);
+            return;
+        }
+
+        // Ensure history array is properly filled
+        if (candy.history.length === 0) {
+            candy.history = Array(GAME_CONFIG.maxPriceHistory).fill(candy.currentPrice || candy.basePrice);
+        }
+        
+        try {
             // Update labels
             chart.data.labels = Array(candy.history.length).fill('').map((_, i) => 
                 `Day ${Math.max(1, gameState.day - candy.history.length + i + 1)}`
             );
-            
+
             // Update data
             chart.data.datasets[0].data = candy.history;
-            
+
             // Update chart
             chart.update();
-            
-            // Update price display
+
+            // Update price display (guard against invalid numbers)
             const chartElement = document.getElementById(`chart-${candyId}`);
             if (chartElement) {
                 const priceDisplay = chartElement.parentNode.querySelector('.price-display');
-                if (priceDisplay) {
+                if (priceDisplay && typeof candy.currentPrice === 'number' && !isNaN(candy.currentPrice)) {
                     priceDisplay.textContent = `Current: $${candy.currentPrice.toFixed(2)}`;
                 }
             }
+        } catch (err) {
+            console.error(`Failed to update chart for ${candyId}:`, err);
         }
     });
 }
