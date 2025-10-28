@@ -564,24 +564,58 @@ footer {
 }
 
 @media (max-width: 768px) {
+    #game-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    #game-content {
+        grid-template-columns: 1fr;
+    }
+
     #charts-container {
         grid-template-columns: 1fr;
     }
-    
+
     #trading-panel {
         margin-top: 10px;
+        position: static;
     }
-    
+
     .chart-wrapper {
         margin-bottom: 10px;
     }
-    
+
+    canvas {
+        height: 120px;
+    }
+
     #leaderboard-table {
         font-size: 0.9em;
     }
-    
+
     .modal-content {
         padding: 15px;
         width: 95%;
+    }
+}
+
+@media (max-width: 480px) {
+    #game-stats {
+        grid-template-columns: 1fr;
+    }
+
+    body {
+        padding: 10px;
+    }
+
+    #game-container {
+        padding: 10px;
+    }
+
+    #portfolio-table th,
+    #portfolio-table td {
+        padding: 6px;
+        font-size: 0.9em;
     }
 }

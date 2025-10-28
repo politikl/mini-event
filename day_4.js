@@ -273,13 +273,22 @@ function initGame() {
 
 // Save game state
 function saveGame() {
+    const prices = {};
+    Object.keys(CANDY_STOCKS).forEach(candyId => {
+        const candy = CANDY_STOCKS[candyId];
+        prices[candyId] = {
+            currentPrice: candy.currentPrice,
+            history: candy.history
+        };
+    });
     const saveData = {
         day: gameState.day,
         cash: gameState.cash,
         portfolio: gameState.portfolio,
         selectedCandy: gameState.selectedCandy,
         achievements: Array.from(gameState.achievements),
-        statistics: gameState.statistics
+        statistics: gameState.statistics,
+        prices: prices
     };
     localStorage.setItem('candyStockSave', JSON.stringify(saveData));
 }
@@ -290,6 +299,15 @@ function loadGame() {
     if (saveData) {
         const parsed = JSON.parse(saveData);
         parsed.achievements = new Set(parsed.achievements);
+        // Load prices
+        if (parsed.prices) {
+            Object.keys(parsed.prices).forEach(candyId => {
+                if (CANDY_STOCKS[candyId]) {
+                    CANDY_STOCKS[candyId].currentPrice = parsed.prices[candyId].currentPrice;
+                    CANDY_STOCKS[candyId].history = parsed.prices[candyId].history;
+                }
+            });
+        }
         return parsed;
     }
     return null;
@@ -516,9 +534,12 @@ function updateUI() {
     
     // Update portfolio table
     updatePortfolioTable();
-    
+
     // Update charts
     updateCharts();
+
+    // Update statistics panel
+    updateStatisticsPanel();
 }
 
 // Update the portfolio table
@@ -614,6 +635,31 @@ function unlockAchievement(achievementId) {
     updateAchievementsPanel();
 }
 
+// Update achievements panel
+function updateAchievementsPanel() {
+    const list = document.getElementById('achievements-list');
+    if (!list) return;
+    list.innerHTML = '';
+    gameState.achievements.forEach(id => {
+        const ach = GAME_CONFIG.achievements[id];
+        const div = document.createElement('div');
+        div.className = 'achievement unlocked';
+        div.innerHTML = `<strong>${ach.name}</strong><br>${ach.description}`;
+        list.appendChild(div);
+    });
+}
+
+// Update statistics panel
+function updateStatisticsPanel() {
+    const totalTradesElement = document.getElementById('total-trades');
+    const highestProfitElement = document.getElementById('highest-profit');
+    const totalProfitElement = document.getElementById('total-profit');
+
+    if (totalTradesElement) totalTradesElement.textContent = gameState.statistics.tradesCount;
+    if (highestProfitElement) highestProfitElement.textContent = `$${gameState.statistics.highestProfit.toFixed(2)}`;
+    if (totalProfitElement) totalProfitElement.textContent = `$${gameState.statistics.totalProfit.toFixed(2)}`;
+}
+
 // Buy candy stocks
 function buyStocks() {
     const quantityInput = document.getElementById('quantity');
@@ -661,26 +707,39 @@ function sellStocks() {
         showMessage("Please enter a valid quantity.");
         return;
     }
-    
+
     const holding = gameState.portfolio[gameState.selectedCandy];
     if (quantity > holding.shares) {
         showMessage("You don't own that many shares!");
         return;
     }
-    
+
     const selectedCandy = CANDY_STOCKS[gameState.selectedCandy];
     const saleValue = quantity * selectedCandy.currentPrice;
-    
+    const costBasis = quantity * holding.avgBuyPrice;
+    const realizedProfit = saleValue - costBasis;
+
     // Update portfolio
     holding.shares -= quantity;
     // Note: We don't change avgBuyPrice when selling
-    
+
     // Update cash
     gameState.cash += saleValue;
-    
+
+    // Update statistics
+    gameState.statistics.totalProfit += realizedProfit;
+    gameState.statistics.highestProfit = Math.max(gameState.statistics.highestProfit, realizedProfit);
+    gameState.statistics.tradesCount++;
+
+    // Check achievements
+    checkAchievements();
+
     // Update UI
     updateUI();
     showMessage(`Sold ${quantity} shares of ${selectedCandy.name} for $${saleValue.toFixed(2)}`);
+
+    // Autosave
+    saveGame();
 }
 
 // Advance to the next day
