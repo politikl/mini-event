@@ -279,6 +279,9 @@ const db = firebase.firestore();
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize the game
     initGame();
+    
+    // Initialize background elements
+    initBackgroundElements();
 });
 
 // Initialize candy data
@@ -1171,6 +1174,33 @@ function setupEventListeners() {
         backButton.addEventListener('click', () => {
             window.location.href = 'index.html';
         });
+    }
+}
+
+// Initialize background ornaments
+function initBackgroundElements() {
+    const backgroundRoot = document.getElementById('background');
+    if (!backgroundRoot || backgroundRoot.dataset.initted) return;
+    backgroundRoot.dataset.initted = '1';
+
+    // Add falling leaves
+    for (let i = 0; i < 20; i++) {
+        const leaf = document.createElement('div');
+        leaf.className = 'leaf';
+        leaf.style.left = `${Math.random() * 100}%`;
+        leaf.style.top = `${-10 - Math.random() * 60}%`;
+        leaf.style.animationDelay = `${Math.random() * 10}s`;
+        backgroundRoot.appendChild(leaf);
+    }
+
+    // Add falling pumpkins
+    for (let i = 0; i < 8; i++) {
+        const pk = document.createElement('div');
+        pk.className = 'bg-pumpkin';
+        pk.style.left = `${Math.random() * 100}%`;
+        pk.style.top = `${-20 - Math.random() * 60}%`;
+        pk.style.animationDelay = `${Math.random() * 12}s`;
+        backgroundRoot.appendChild(pk);
     }
 }
 
