@@ -157,6 +157,25 @@ const CANDY_STOCKS = {
         trend: 0.004,
         history: []
     }
+    ,
+    toffee: {
+        name: "Toffee Tango",
+        basePrice: 6.50,
+        volatility: 0.07,
+        color: "#c27b4a",
+        description: "Buttery toffee bites with a satisfying crunch.",
+        trend: 0.003,
+        history: []
+    },
+    jelly: {
+        name: "Jelly Jubes",
+        basePrice: 1.95,
+        volatility: 0.09,
+        color: "#8bd3ff",
+        description: "Small jelly candies in assorted fruity flavors.",
+        trend: 0.0025,
+        history: []
+    }
 };
 
 // News Events that affect stock prices
@@ -222,7 +241,9 @@ const gameState = {
         taffy: { shares: 0, avgBuyPrice: 0 },
         caramel: { shares: 0, avgBuyPrice: 0 },
         mint: { shares: 0, avgBuyPrice: 0 },
-        sprinkle: { shares: 0, avgBuyPrice: 0 }
+        sprinkle: { shares: 0, avgBuyPrice: 0 },
+        toffee: { shares: 0, avgBuyPrice: 0 },
+        jelly: { shares: 0, avgBuyPrice: 0 }
     },
     currentNews: [],
     gameOver: false,

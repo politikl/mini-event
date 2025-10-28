@@ -350,6 +350,42 @@ canvas {
     100% { transform: translateX(-100%); }
 }
 
+/* Background ornaments (copy from Day 2 theme) */
+#background { pointer-events: none; z-index: -1; position: fixed; inset: 0; }
+
+.leaf, .bg-pumpkin {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    pointer-events: none;
+    animation-name: fall;
+    animation-duration: 12s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+.leaf {
+    background: radial-gradient(circle at 35% 30%, #ffa94d, #7a3a00);
+    border-radius: 6px;
+    transform-origin: center;
+    opacity: 0.9;
+}
+
+.bg-pumpkin {
+    width: 36px;
+    height: 28px;
+    background: radial-gradient(circle at 50% 40%, #ff8c00, #c25a00);
+    border-radius: 50% 50% 40% 40%;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+    opacity: 0.95;
+}
+
+@keyframes fall {
+    0% { transform: translateY(-20vh) rotate(0deg); opacity: 0; }
+    10% { opacity: 1; }
+    100% { transform: translateY(120vh) rotate(360deg); opacity: 0.9; }
+}
+
 #instructions-panel {
     background-color: rgba(0, 0, 0, 0.7);
     padding: 15px;
