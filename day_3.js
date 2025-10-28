@@ -1,9 +1,9 @@
-// Spooky Crossy Road - Clean Implementation
+// Spooky Crossy Road - Fixed with Day 2 styling and features
 (() => {
 const PT_TZ = 'America/Los_Angeles';
 const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_TZ }));
 
-// blocked weekday ranges in minutes (08:15–11:00, 12:50–15:20 PT)
+// Blocked weekday ranges
 const BLOCKED_RANGES = [[8*60 + 15, 11*60], [12*60 + 50, 15*60 + 20]];
 function isWeekday(d){ const day = d.getDay(); return day >= 1 && day <= 5; }
 function inBlockedWindow(ptDate){
@@ -35,19 +35,17 @@ function hideTimeLockOverlay(){
   if(el) el.remove();
 }
 
-// set per-day unlock ISO (change as needed). Example for day_1:
-const UNLOCK_ISO = '2025-10-2900:00:00-07:00'; // adjust per-day
+const UNLOCK_ISO = '2025-10-29T00:00:00-07:00';
 const unlockDate = new Date(UNLOCK_ISO);
 
 const rn = nowPT();
 if(rn < unlockDate){
   showTimeLockOverlay(`This game will unlock on ${unlockDate.toLocaleString('en-US', { timeZone: PT_TZ })} PT.`);
-  return; // stop executing the rest of the day's script (paste inside the day's IIFE)
+  return;
 }
 
 if(inBlockedWindow(rn)){
   showTimeLockOverlay('This game is temporarily blocked for scheduled hours. Please try again later.');
-  // continue polling until outside blocked hours, remove overlay when allowed
 }
 
 const __timeLockChecker = setInterval(() => {
@@ -58,13 +56,10 @@ const __timeLockChecker = setInterval(() => {
     }
     return;
   }
-  // unlocked; hide overlay if not in blocked window
   if(!inBlockedWindow(n)){
     hideTimeLockOverlay();
-    // once unlocked and outside blocked window, we can stop checking
     clearInterval(__timeLockChecker);
   } else {
-    // still in blocked window: ensure overlay visible
     if(!document.getElementById('time-lock-overlay')){
       showTimeLockOverlay('This game is temporarily blocked for scheduled hours. Please try again later.');
     }
@@ -74,22 +69,35 @@ const __timeLockChecker = setInterval(() => {
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d');
   const playbound = document.getElementById('playbound');
-  const scoreEl = document.getElementById('score-display');
+  const scoreEl = document.getElementById('big-score');
   const playOverlay = document.getElementById('play-overlay');
   const playBtn = document.getElementById('play-btn');
   const gameOverModal = document.getElementById('game-over-modal');
+  const gameOverContent = gameOverModal ? gameOverModal.querySelector('.modal-content') : null;
   const finalScoreEl = document.getElementById('final-score');
   const retryBtn = document.getElementById('retry-btn');
+  const submitScoreBtn = document.getElementById('submit-score-btn');
+  const submitNote = document.getElementById('submit-note');
   const fullscreenBtn = document.getElementById('fullscreen-btn');
+  const dayLeaderboardBtn = document.getElementById('day-leaderboard-btn');
+  const dayLeaderboardModal = document.getElementById('day-leaderboard-modal');
+  const dayLeaderboardBody = document.getElementById('day-leaderboard-body');
+  const dayLeaderboardClose = document.getElementById('day-leaderboard-close');
+  const gameTimerHeader = document.getElementById('game-timer');
+  const backgroundRoot = document.getElementById('background');
 
-  // Game constants
+  const now = new Date();
+  const year = now.getFullYear();
+  const GAME_END_TS = Date.parse(`${year}-10-30T00:00:00-07:00`);
+
+  // Game constants - REBALANCED for higher scores
   const CANVAS_W = 480;
   const CANVAS_H = 720;
   const TILE_SIZE = 60;
   const PLAYER_SIZE = 40;
   const GRID_COLS = 8;
   const VISIBLE_ROWS = 16;
-  const SAFE_START_ROWS = 4;
+  const SAFE_START_ROWS = 3; // Reduced from 4
   const ROW_BUFFER = 8;
 
   canvas.width = CANVAS_W;
@@ -102,7 +110,6 @@ const __timeLockChecker = setInterval(() => {
   let highestRow = 0;
   let running = false;
   let gameLoop = null;
-  let keys = {};
   let cameraY = 0;
   let nextRowId = 0;
 
@@ -110,7 +117,7 @@ const __timeLockChecker = setInterval(() => {
   function createPlayer() {
     return {
       col: Math.floor(GRID_COLS / 2),
-      row: 0,
+      row: 0, // Start at row 0
       x: 0,
       y: 0,
       size: PLAYER_SIZE,
@@ -119,7 +126,7 @@ const __timeLockChecker = setInterval(() => {
     };
   }
 
-  // Row types and generation
+  // Row types and generation - REBALANCED
   function createRow(rowNum) {
     const row = {
       id: rowNum,
@@ -128,44 +135,34 @@ const __timeLockChecker = setInterval(() => {
       obstacles: []
     };
 
-    // Safe starting area
-    if (rowNum < 2) {
-      row.type = rowNum === 0 ? 'island' : 'grass';
+    // First row is always safe island
+    if (rowNum === 0) {
+      row.type = 'island';
       return row;
     }
 
-    // Gradual difficulty with more roads early
-    const difficulty = Math.min(1, (rowNum - 2) / 25);
+    // Safe starting area - only grass/island
+    if (rowNum < SAFE_START_ROWS) {
+      row.type = Math.random() < 0.5 ? 'grass' : 'island';
+      return row;
+    }
+
+    // Progressive difficulty
+    const difficulty = Math.min(1, (rowNum - SAFE_START_ROWS) / 30);
     
-    // Generate terrain - increased road probability
+    // Generate terrain with better distribution
     const rand = Math.random();
     
-    if (rowNum < SAFE_START_ROWS) {
-      // Early game: mix of grass, islands, and some roads
-      if (rand < 0.4) {
-        row.type = 'road';
-        generateRoadObstacles(row, rowNum, difficulty);
-      } else if (rand < 0.6) {
-        row.type = 'grass';
-      } else if (rand < 0.8) {
-        row.type = 'island';
-      } else {
-        row.type = 'river';
-        generateRiverObstacles(row, rowNum, difficulty);
-      }
+    if (rand < 0.15) {
+      row.type = 'grass';
+    } else if (rand < 0.30) {
+      row.type = 'island';
+    } else if (rand < 0.65) {
+      row.type = 'road';
+      generateRoadObstacles(row, rowNum, difficulty);
     } else {
-      // Normal game distribution
-      if (rand < 0.2) {
-        row.type = 'grass';
-      } else if (rand < 0.35) {
-        row.type = 'island';
-      } else if (rand < 0.65) {
-        row.type = 'road';
-        generateRoadObstacles(row, rowNum, difficulty);
-      } else {
-        row.type = 'river';
-        generateRiverObstacles(row, rowNum, difficulty);
-      }
+      row.type = 'river';
+      generateRiverObstacles(row, rowNum, difficulty);
     }
 
     return row;
@@ -175,20 +172,22 @@ const __timeLockChecker = setInterval(() => {
     const direction = Math.random() < 0.5 ? 1 : -1;
     const speedVariation = Math.random();
     let baseSpeed;
+    
+    // Speed tiers - slightly slower for more manageable gameplay
     if (speedVariation < 0.2) {
-      baseSpeed = 0.8 + Math.random() * 0.4;
+      baseSpeed = 0.7 + Math.random() * 0.3; // Fast
     } else if (speedVariation < 0.5) {
-      baseSpeed = 0.5 + Math.random() * 0.3;
+      baseSpeed = 0.4 + Math.random() * 0.3; // Medium
     } else {
-      baseSpeed = 0.3 + Math.random() * 0.3;
+      baseSpeed = 0.2 + Math.random() * 0.2; // Slow
     }
     
-    const speed = (baseSpeed + difficulty * 0.6) * direction;
-    const spacing = 160 + Math.random() * 80;
+    const speed = (baseSpeed + difficulty * 0.5) * direction;
+    const spacing = 170 + Math.random() * 90; // More spacing
     const count = Math.max(2, Math.ceil(CANVAS_W / spacing));
 
     for (let i = 0; i < count; i++) {
-      const isGhost = Math.random() < (0.3 + difficulty * 0.4);
+      const isGhost = Math.random() < (0.25 + difficulty * 0.35);
       row.obstacles.push({
         x: i * spacing + Math.random() * 60,
         speed: speed,
@@ -203,23 +202,24 @@ const __timeLockChecker = setInterval(() => {
     const direction = Math.random() < 0.5 ? 1 : -1;
     const speedVariation = Math.random();
     let baseSpeed;
+    
     if (speedVariation < 0.3) {
-      baseSpeed = 0.5 + Math.random() * 0.3;
+      baseSpeed = 0.4 + Math.random() * 0.3;
     } else if (speedVariation < 0.6) {
-      baseSpeed = 0.3 + Math.random() * 0.2;
+      baseSpeed = 0.25 + Math.random() * 0.15;
     } else {
-      baseSpeed = 0.1 + Math.random() * 0.2;
+      baseSpeed = 0.1 + Math.random() * 0.15;
     }
     
-    const speed = (baseSpeed + difficulty * 0.4) * direction;
-    const spacing = 150 + Math.random() * 60;
+    const speed = (baseSpeed + difficulty * 0.3) * direction;
+    const spacing = 160 + Math.random() * 70; // Better log spacing
     const count = Math.max(2, Math.ceil(CANVAS_W / spacing));
 
     for (let i = 0; i < count; i++) {
       row.obstacles.push({
         x: i * spacing + Math.random() * 30,
         speed: speed,
-        width: 120 + Math.random() * 40,
+        width: 130 + Math.random() * 50, // Wider logs
         height: 30,
         type: 'log'
       });
@@ -235,8 +235,8 @@ const __timeLockChecker = setInterval(() => {
     cameraY = 0;
     nextRowId = 0;
     
-    // Create initial rows around player
-    for (let i = -ROW_BUFFER; i < VISIBLE_ROWS + ROW_BUFFER; i++) {
+    // Create initial rows - FIX: Start from 0 instead of negative
+    for (let i = 0; i < VISIBLE_ROWS + ROW_BUFFER; i++) {
       const row = createRow(i);
       rows.set(i, row);
       nextRowId = Math.max(nextRowId, i + 1);
@@ -251,7 +251,7 @@ const __timeLockChecker = setInterval(() => {
     running = true;
     player.alive = true;
     hideModal(playOverlay);
-    hideModal(gameOverModal);
+    hideGameOverContent();
     if (gameLoop) cancelAnimationFrame(gameLoop);
     gameLoop = requestAnimationFrame(update);
   }
@@ -260,25 +260,44 @@ const __timeLockChecker = setInterval(() => {
     running = false;
     player.alive = false;
     finalScoreEl.textContent = score;
-    showModal(gameOverModal);
+    if(submitNote) submitNote.textContent = (Date.now() <= GAME_END_TS) ? 'This score is within the event window and can be submitted to the main leaderboard.' : 'Event window ended — score will not be counted';
+    
+    if(gameOverContent && playbound){
+      if(gameOverContent.parentElement !== playbound) playbound.appendChild(gameOverContent);
+      gameOverContent.style.position = 'absolute';
+      gameOverContent.style.left = '50%';
+      gameOverContent.style.top = '48%';
+      gameOverContent.style.transform = 'translate(-50%,-50%)';
+      gameOverContent.classList.remove('hidden');
+    } else if (gameOverModal){
+      gameOverModal.classList.remove('hidden');
+    }
   }
 
-  // Update camera to center on player's row
+  function hideGameOverContent(){
+    if(!gameOverContent) return;
+    gameOverContent.classList.add('hidden');
+    const wrapper = gameOverModal;
+    if(wrapper && gameOverContent.parentElement !== wrapper) wrapper.appendChild(gameOverContent);
+    gameOverContent.style.position = '';
+    gameOverContent.style.left = '';
+    gameOverContent.style.top = '';
+    gameOverContent.style.transform = '';
+  }
+
   function updateCamera() {
     if (!player) return;
-    
     const targetY = player.row * TILE_SIZE - (CANVAS_H / 2 - TILE_SIZE);
     cameraY = targetY;
   }
 
-  // Update player visual position
   function updatePlayerPosition() {
     if (!player) return;
     player.x = player.col * TILE_SIZE + (TILE_SIZE - PLAYER_SIZE) / 2;
     player.y = getRowY(player.row) + (TILE_SIZE - PLAYER_SIZE) / 2;
   }
 
-  // Movement
+  // Movement with IMPROVED SCORING
   function movePlayer(dcol, drow) {
     if (!player || !player.alive) return;
 
@@ -287,26 +306,27 @@ const __timeLockChecker = setInterval(() => {
 
     player.col = newCol;
     player.row = newRow;
-    player.ridingLog = null; // Reset when player moves manually
+    player.ridingLog = null;
 
     updateCamera();
     updatePlayerPosition();
 
-    // IMPROVED SCORING: More points the further you progress
+    // REBALANCED SCORING: Much higher to reach 10k+
     if (newRow > highestRow) {
       const rowsGained = newRow - highestRow;
       
-      // Progressive scoring: More points per row as you advance
-      let pointsPerRow = 10;
-      if (newRow > 50) pointsPerRow = 20;
-      if (newRow > 100) pointsPerRow = 30;
-      if (newRow > 150) pointsPerRow = 40;
-      if (newRow > 200) pointsPerRow = 50;
+      // Progressive scoring tiers
+      let pointsPerRow = 15; // Base increased from 10
+      if (newRow > 30) pointsPerRow = 25;
+      if (newRow > 60) pointsPerRow = 35;
+      if (newRow > 100) pointsPerRow = 50;
+      if (newRow > 150) pointsPerRow = 70;
+      if (newRow > 200) pointsPerRow = 100;
       
-      // Bonus for consecutive progress
-      const progressBonus = Math.floor(newRow / 10) * 5;
+      // Combo bonus for consecutive progress
+      const comboBonus = Math.floor(newRow / 5) * 8;
       
-      score += rowsGained * pointsPerRow + progressBonus;
+      score += rowsGained * pointsPerRow + comboBonus;
       highestRow = newRow;
       updateScore();
     }
@@ -314,25 +334,19 @@ const __timeLockChecker = setInterval(() => {
     ensureRowsExist();
   }
 
-  // SIMPLIFIED: Working raft movement
   function updateRaftMovement(dt) {
     if (!player || !player.alive || !player.ridingLog) return;
 
-    // Simply move the player with the raft's speed
     player.x += player.ridingLog.speed * dt * 0.1;
-    
-    // Update grid position
     player.col = Math.floor(player.x / TILE_SIZE);
     player.col = Math.max(0, Math.min(GRID_COLS - 1, player.col));
-    
-    // Update visual position
     updatePlayerPosition();
   }
 
   function ensureRowsExist() {
     if (!player) return;
 
-    const minRow = player.row - ROW_BUFFER;
+    const minRow = Math.max(0, player.row - ROW_BUFFER);
     const maxRow = player.row + VISIBLE_ROWS + ROW_BUFFER;
 
     for (let rowNum = player.row; rowNum <= maxRow; rowNum++) {
@@ -362,15 +376,11 @@ const __timeLockChecker = setInterval(() => {
     if (scoreEl) scoreEl.textContent = `Score: ${score}`;
   }
 
-  // SIMPLIFIED: Collision detection with working raft movement
   function checkCollisions() {
     if (!player || !player.alive) return;
 
     const currentRow = rows.get(player.row);
-    if (!currentRow) {
-      console.warn('Missing row for player:', player.row);
-      return;
-    }
+    if (!currentRow) return;
 
     if (currentRow.type === 'road') {
       for (const obs of currentRow.obstacles) {
@@ -385,7 +395,6 @@ const __timeLockChecker = setInterval(() => {
     } else if (currentRow.type === 'river') {
       let onLog = false;
       
-      // Check if player is on any log
       for (const obs of currentRow.obstacles) {
         const playerCenterX = player.x + player.size / 2;
         const obstacleY = getRowY(player.row) + (TILE_SIZE - obs.height) / 2;
@@ -393,28 +402,24 @@ const __timeLockChecker = setInterval(() => {
         if (playerCenterX > obs.x && playerCenterX < obs.x + obs.width &&
             player.y < obstacleY + obs.height && player.y + player.size > obstacleY) {
           onLog = true;
-          player.ridingLog = obs; // Set the current raft
+          player.ridingLog = obs;
           break;
         }
       }
       
-      // If not on a log and not already riding one, die
       if (!onLog && !player.ridingLog) {
         endGame();
         return;
       }
       
-      // If we were riding a log but no longer on any log, die
       if (player.ridingLog && !onLog) {
         endGame();
         return;
       }
     } else {
-      // Grass or island - safe, no raft
       player.ridingLog = null;
     }
 
-    // Boundary check
     if (player.x < -player.size || player.x > CANVAS_W) {
       endGame();
     }
@@ -430,12 +435,10 @@ const __timeLockChecker = setInterval(() => {
   }
 
   function updateObstacles(dt) {
-    // Update all obstacles including rafts
     for (const [rowNum, row] of rows) {
       for (const obs of row.obstacles) {
         obs.x += obs.speed * dt * 0.1;
         
-        // Wrap around
         if (obs.speed > 0 && obs.x > CANVAS_W + 100) {
           obs.x = -obs.width - 50;
         } else if (obs.speed < 0 && obs.x < -obs.width - 100) {
@@ -444,7 +447,6 @@ const __timeLockChecker = setInterval(() => {
       }
     }
 
-    // If player is on a raft, move them with it
     if (player && player.ridingLog) {
       updateRaftMovement(dt);
     }
@@ -463,16 +465,16 @@ const __timeLockChecker = setInterval(() => {
     const key = e.key.toLowerCase();
     let moved = false;
 
-    if (key === 'arrowleft' || key === 'a' || key === 'j') {
+    if (key === 'arrowleft' || key === 'a') {
       movePlayer(-1, 0);
       moved = true;
-    } else if (key === 'arrowright' || key === 'd' || key === 'l') {
+    } else if (key === 'arrowright' || key === 'd') {
       movePlayer(1, 0);
       moved = true;
-    } else if (key === 'arrowup' || key === 'w' || key === 'i') {
+    } else if (key === 'arrowup' || key === 'w') {
       movePlayer(0, -1);
       moved = true;
-    } else if (key === 'arrowdown' || key === 's' || key === 'k') {
+    } else if (key === 'arrowdown' || key === 's') {
       movePlayer(0, 1);
       moved = true;
     }
@@ -660,32 +662,164 @@ const __timeLockChecker = setInterval(() => {
   }
 
   // Modal helpers
-  function showModal(modal) {
-    modal.classList.remove('hidden');
-  }
-
   function hideModal(modal) {
     modal.classList.add('hidden');
   }
 
-  // UI Event listeners
-  playBtn.addEventListener('click', startGame);
-  retryBtn.addEventListener('click', startGame);
+  // Timer update
+  function updateTimers(){
+    if(!gameTimerHeader) return;
+    const left = GAME_END_TS - Date.now();
+    gameTimerHeader.textContent = left <= 0 ? 'Game Ended' : (() => {
+      const s = Math.floor(left/1000);
+      const hh = String(Math.floor(s/3600)).padStart(2,'0');
+      const mm = String(Math.floor((s%3600)/60)).padStart(2,'0');
+      const ss = String(s%60).padStart(2,'0');
+      return `${hh}:${mm}:${ss}`;
+    })();
+  }
 
-  fullscreenBtn.addEventListener('click', async () => {
-    try {
-      if (!document.fullscreenElement) {
+  // Toast notification
+  function showToast(msg, timeout=1800){
+    if(!playbound) return;
+    let t = playbound.querySelector('.save-toast');
+    if(!t){ t = document.createElement('div'); t.className='save-toast'; playbound.appendChild(t); }
+    t.textContent = msg;
+    clearTimeout(t._timeout);
+    t._timeout = setTimeout(()=> { t && t.remove(); }, timeout);
+  }
+
+  // Background elements
+  function initBackgroundElements(){
+    if(!backgroundRoot) return;
+    if(backgroundRoot.dataset.initted) return;
+    backgroundRoot.dataset.initted = '1';
+    for(let i=0;i<20;i++){
+      const leaf = document.createElement('div'); leaf.className='leaf';
+      leaf.style.left = `${Math.random()*100}%`;
+      leaf.style.top = `${-10 - Math.random()*60}%`;
+      leaf.style.animationDelay = `${Math.random()*10}s`;
+      backgroundRoot.appendChild(leaf);
+    }
+    for(let i=0;i<8;i++){
+      const pk = document.createElement('div'); pk.className='bg-pumpkin';
+      pk.style.left = `${Math.random()*100}%`;
+      pk.style.top = `${-20 - Math.random()*60}%`;
+      pk.style.animationDelay = `${Math.random()*12}s`;
+      backgroundRoot.appendChild(pk);
+    }
+  }
+
+  // Firebase save score
+  async function submitScoreToFirestoreDocs(entry){
+    try{
+      if(!window.firebaseDb || !window.firebaseDoc || !window.firebaseSetDoc) return { ok:false, reason:'no-firebase' };
+      const id = entry.uid ? entry.uid : `${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
+      const docRef = window.firebaseDoc(window.firebaseDb, 'day3_scores', id);
+      if(entry.uid && window.firebaseGetDoc){
+        const existing = await window.firebaseGetDoc(docRef);
+        if(existing && existing.exists && existing.exists()){
+          const data = existing.data();
+          if((data.score||0) < entry.score){
+            await window.firebaseSetDoc(docRef, entry);
+          }
+        } else {
+          await window.firebaseSetDoc(docRef, entry);
+        }
+      } else {
+        await window.firebaseSetDoc(docRef, entry);
+      }
+      if(entry.uid && window.firebaseGetDoc && window.firebaseSetDoc){
+        const userDocRef = window.firebaseDoc(window.firebaseDb, 'users', entry.uid);
+        const snap = await window.firebaseGetDoc(userDocRef);
+        let docData = {};
+        if(snap && snap.exists && snap.exists()) docData = snap.data();
+        else docData = { username: entry.playerName, email:'', createdAt:new Date(), scores:{ day1:0,day2:0,day3:0,day4:0,day5:0, total:0 } };
+        docData.scores = docData.scores || {};
+        docData.scores.day3 = Math.max(docData.scores.day3 || 0, entry.score);
+        const s = docData.scores;
+        docData.scores.total = (s.day1||0)+(s.day2||0)+(s.day3||0)+(s.day4||0)+(s.day5||0);
+        await window.firebaseSetDoc(userDocRef, docData);
+      }
+      return { ok:true };
+    } catch(err){
+      console.error('save error', err);
+      return { ok:false, reason: err && err.message || 'unknown' };
+    }
+  }
+
+  async function handleSubmitScore(){
+    const fbUser = (window.firebaseAuth && window.firebaseAuth.currentUser) ? window.firebaseAuth.currentUser : null;
+    let uid = fbUser ? fbUser.uid : null;
+    let playerName = (window.userData && window.userData.username) ? window.userData.username : (fbUser && fbUser.email ? fbUser.email.split('@')[0] : 'Anonymous');
+    const entry = { score, playerName, uid, ts: Date.now(), withinEvent: Date.now() <= GAME_END_TS };
+
+    if(!uid){
+      if(window.firebaseSignInWithPopup && window.firebaseAuth && window.googleProvider){
+        try{
+          const res = await window.firebaseSignInWithPopup(window.firebaseAuth, window.googleProvider);
+          const user = res.user;
+          uid = user.uid;
+          playerName = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
+          entry.uid = uid; entry.playerName = playerName;
+        } catch(e){
+          showToast('Sign-in failed'); return;
+        }
+      } else { showToast('Sign-in unavailable'); return; }
+    }
+
+    const r = await submitScoreToFirestoreDocs(entry);
+    if(!r.ok){ showToast('Save failed'); return; }
+    showToast('Score saved');
+    setTimeout(()=> startGame(), 600);
+  }
+
+  // Leaderboard
+  dayLeaderboardBtn && dayLeaderboardBtn.addEventListener('click', async () => {
+    if(dayLeaderboardModal.parentElement !== document.body) document.body.appendChild(dayLeaderboardModal);
+    dayLeaderboardBody.innerHTML = '<tr><td colspan="5">Loading…</td></tr>';
+    dayLeaderboardModal.classList.remove('hidden');
+    let remote = [];
+    if(window.firebaseDb && window.firebaseGetDocs && window.firebaseCollection && window.firebaseQuery && window.firebaseOrderBy){
+      try {
+        const q = window.firebaseQuery(window.firebaseCollection(window.firebaseDb,'day3_scores'), window.firebaseOrderBy('score','desc'));
+        const snap = await window.firebaseGetDocs(q);
+        snap.forEach(d => remote.push(d.data()));
+      } catch(e){ console.warn(e); }
+    }
+    const rows = (remote || []).slice(0,50).map((r,idx) => {
+      const when = new Date(r.ts).toLocaleString();
+      const within = r.withinEvent ? 'Yes' : 'No';
+      const name = r.playerName || (r.uid ? r.uid : 'Anonymous');
+      return `<tr class="${idx===0?'rank-1':idx===1?'rank-2':idx===2?'rank-3':''}"><td>${idx+1}</td><td>${escapeHtml(name)}</td><td>${r.score}</td><td>${when}</td><td>${within}</td></tr>`;
+    });
+    dayLeaderboardBody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="5">No scores yet</td></tr>';
+  });
+
+  dayLeaderboardClose && dayLeaderboardClose.addEventListener('click', ()=> { dayLeaderboardModal.classList.add('hidden'); });
+
+  function escapeHtml(str=''){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+
+  // Fullscreen
+  async function toggleFullscreen(){
+    try{
+      if(!document.fullscreenElement){
         await playbound.requestFullscreen();
       } else {
         await document.exitFullscreen();
       }
-    } catch (e) {
-      console.log('Fullscreen error:', e);
-    }
-  });
+    }catch(e){}
+  }
 
-  // Start with play overlay visible
-  initGame();
-  showModal(playOverlay);
+  // Event listeners
+  playBtn.addEventListener('click', startGame);
+  retryBtn.addEventListener('click', startGame);
+  submitScoreBtn && submitScoreBtn.addEventListener('click', async ()=> { await handleSubmitScore(); });
+  fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+  // Initialize
+  initBackgroundElements();
+  setInterval(updateTimers, 1000);
+  updateTimers();
   gameLoop = requestAnimationFrame(update);
 })();
