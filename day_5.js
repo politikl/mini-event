@@ -185,7 +185,10 @@
   { id:'phase_shift', title:'Phase Shift', desc:'Brief invulnerability (short cooldown).', type:'active', basePower:0, cooldown:15000, range:0, upgradePow:(lv)=>0 },
   // orbital removed (duplicate / deprecated)
     { id:'chain_lightning', title:'Chain Lightning', desc:'Strikes an enemy and chains to nearby enemies.', type:'projectile', basePower:16, cooldown:3200, range:540, upgradePow:(lv)=>16+lv*5 },
-    { id:'meteor', title:'Meteor', desc:'Calls down a meteor that deals huge explosion (long cooldown).', type:'projectile', basePower:60, cooldown:14000, range:900, upgradePow:(lv)=>60+lv*24 }
+  { id:'meteor', title:'Meteor', desc:'Calls down a meteor that deals huge explosion (long cooldown).', type:'projectile', basePower:60, cooldown:14000, range:900, upgradePow:(lv)=>60+lv*24 },
+  // small extras: overshield and life leech
+    { id:'overshield', title:'Overshield', desc:'Grants a temporary strong shield that absorbs damage for a short time.', type:'active', basePower:0, cooldown:18000, range:0, upgradePow:(lv)=>0 },
+    { id:'life_leech', title:'Life Leech', desc:'Your attacks heal a portion of damage dealt.', type:'passive', basePower:0, cooldown:0, range:0, upgradePow:(lv)=>0 },
   ];
   ABILITIES.forEach(a=> abilityDefs[a.id]=a);
 
@@ -236,11 +239,28 @@
       // apply knockback velocity
       this.applyVelocity(dt);
 
+      // keep within map
       this.x = clamp(this.x, 0, MAP_W); this.y = clamp(this.y, 0, MAP_H);
 
-      if(this.melee && d <= this.r + player.r + 4){
+      // Prevent enemies from clipping into player: if overlapping, shove the enemy outward
+      const d2 = Math.hypot(player.x - this.x, player.y - this.y) || 0.0001;
+      const minDist = this.r + player.r + 4;
+      if(d2 < minDist){
+        const overlap = (minDist - d2) + 0.5;
+        const nx = (this.x - player.x) / d2;
+        const ny = (this.y - player.y) / d2;
+        this.x += nx * overlap;
+        this.y += ny * overlap;
+        // give a small outward nudge to velocity so it doesn't immediately re-collide
+        this.vx += nx * 60;
+        this.vy += ny * 60;
+      }
+
+      // melee damage on contact (use explicit meleePower when provided)
+      if(this.melee && d2 <= this.r + player.r + 4){
         if(this.tickAcc <= 0){
-          player.takeDamage(Math.max(3, this.maxHp*0.06));
+          const dmg = this.meleePower || Math.max(3, this.maxHp*0.06);
+          player.takeDamage(dmg);
           this.tickAcc = 750;
         }
       }
@@ -688,17 +708,21 @@
   // new enemy: Charger (fast dash attacker)
   class Charger extends Enemy {
     constructor(x,y,lvl){
-      super(x,y, 40 + lvl*8, 110 + lvl*6, 10, 'charger', true, 20 + lvl*3);
-      this.chargeAcc = 1200 - lvl*30;
+      // nerfed: lower base HP/speed and explicit melee power; spawns later
+      super(x,y, 34 + lvl*6, 86 + Math.floor(lvl*4), 10, 'charger', true, 16 + lvl*2);
+      this.meleePower = 6; // lower contact damage
+      this.chargeAcc = 1600 - Math.max(0, lvl*20);
     }
     update(dt){
       Enemy.prototype.update.call(this, dt);
       this.chargeAcc -= dt;
       if(this.chargeAcc <= 0){
-        this.chargeAcc = 1400 + Math.random()*800;
+        this.chargeAcc = 1400 + Math.random()*1000;
         const dx = player.x - this.x, dy = player.y - this.y, m = Math.hypot(dx,dy)||1;
-        this.vx += (dx/m) * 520;
-        this.vy += (dy/m) * 520;
+        // smaller charge impulse so it is less punishing
+        const impulse = 380 + Math.floor(lvl*8);
+        this.vx += (dx/m) * impulse;
+        this.vy += (dy/m) * impulse;
       }
     }
   }
@@ -770,6 +794,34 @@
       if(this.hp < this.maxHp && Math.random() < 0.002) this.hp += 6;
       // keep within map
       this.x = clamp(this.x, 0, MAP_W); this.y = clamp(this.y, 0, MAP_H);
+    }
+  }
+
+  // new boss: Warlord — summons reinforcements and slams the ground
+  class Warlord extends Enemy {
+    constructor(x,y,lvl){
+      super(x,y, 650 + lvl*120, 6, 40, 'warlord', true, 300 + lvl*30);
+      this.summonAcc = 4200 - Math.min(2000, lvl*100);
+      this.slamAcc = 2800 - Math.min(1500, lvl*80);
+    }
+    update(dt){
+      Enemy.prototype.update.call(this, dt);
+      this.summonAcc -= dt; this.slamAcc -= dt;
+      if(this.summonAcc <= 0){
+        this.summonAcc = 4200 + Math.random()*1800;
+        // summon 1-2 brutes near the player to harass
+        for(let i=0;i<1+Math.floor(Math.random()*2);i++){
+          const s = new Enemy(this.x + randRange(-60,60), this.y + randRange(-60,60), 80 + Math.floor(this.xpValue/3), 28, 14, 'brute', true, 30 + Math.floor(this.xpValue/6));
+          enemies.push(s);
+        }
+        particles.push({ x:this.x, y:this.y, t:performance.now(), dur:800, col:'#ff9b6b' });
+      }
+      if(this.slamAcc <= 0){
+        this.slamAcc = 3200 + Math.random()*1400;
+        beams.push({ x1:this.x, y1:this.y, aoe:true, range:160, t:performance.now(), dur:420, power:80 });
+        for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) < 160) e.takeDamage(80 + Math.floor(player.level*3));
+        if(dist(this.x,this.y,player.x,player.y) < 160) player.takeDamage(70);
+      }
     }
   }
 
@@ -961,12 +1013,13 @@
     for(let i=0;i<count && enemies.length < maxEnemies;i++){
       const pt = findSpawnPoint( Math.max(VIEW_W, VIEW_H)/2 + 60, Math.max(VIEW_W, VIEW_H)/2 + 380 );
       const r = Math.random();
-      if(lvl >= 10 && Math.random() < 0.02){ enemies.push(new Boss(pt.sx,pt.sy,lvl)); continue; }
+  if(lvl >= 10 && Math.random() < 0.02){ enemies.push(new Boss(pt.sx,pt.sy,lvl)); continue; }
+  if(lvl >= 12 && Math.random() < 0.01){ enemies.push(new Warlord(pt.sx,pt.sy,lvl)); continue; }
       if(lvl >= 6 && Math.random() < 0.04){ enemies.push(new Necromancer(pt.sx,pt.sy,lvl)); continue; }
       if(lvl >=5 && Math.random() < 0.03){ enemies.push(new Enemy(pt.sx,pt.sy, 120 + lvl*30, 22, 26, 'mini', true, 100 + lvl*10)); continue; }
 
   // expanded enemy types with level scaling
-  if(r < 0.12){ enemies.push(new Charger(pt.sx,pt.sy,lvl)); }
+  if(lvl >= 6 && r < 0.12){ enemies.push(new Charger(pt.sx,pt.sy,lvl)); }
   else if(r < 0.25){ enemies.push(new Sniper(pt.sx,pt.sy,lvl)); }
   else if(r < 0.42){ enemies.push(new Enemy(pt.sx,pt.sy, 30 + lvl*6, 30 + lvl*1.2, 14, 'zombie', true, 12 + lvl*2)); }
   else if(r < 0.58){ enemies.push(new Enemy(pt.sx,pt.sy, 28 + lvl*6, 36, 12, 'skeleton', false, 18 + lvl*3)); }
@@ -1028,16 +1081,31 @@
   // --- level up UI & choices (no duplicates) ---
   function presentChoices(title, choices, onPick){
     overlayTitle.textContent = title;
-    choiceArea.innerHTML = ''; choiceArea.style.display='flex';
-    overlayDesc.style.display='none';
-    playBtn.style.display='none';
+    // show up to three main choices in the grid
+    choiceArea.innerHTML = ''; choiceArea.style.display = 'grid';
+    overlayDesc.style.display = 'none';
+    playBtn.style.display = 'none';
     playOverlay.classList.remove('hidden');
-    for(const opt of choices){
+    // ensure only the first three choices are shown in the grid
+    const main = choices.slice(0,3);
+    for(const opt of main){
       const div = document.createElement('div'); div.className='choice-card';
       div.innerHTML = `<h3>${opt.title}</h3><p>${opt.desc}</p><small style="color:#ffd8a8;">${opt.extra||''}</small>`;
-      div.addEventListener('click', ()=>{ choiceArea.style.display='none'; overlayDesc.style.display='block'; playOverlay.classList.add('hidden'); onPick(opt); });
+      div.addEventListener('click', ()=>{ choiceArea.style.display='none'; const extraEl = document.getElementById('choice-extra'); if(extraEl) extraEl.remove(); overlayDesc.style.display='block'; playOverlay.classList.add('hidden'); onPick(opt); });
       choiceArea.appendChild(div);
     }
+    // add a separate small stat/button row below the grid (e.g. +HP)
+    const old = document.getElementById('choice-extra'); if(old) old.remove();
+    const extra = document.createElement('div'); extra.id = 'choice-extra'; extra.className = 'choice-extra';
+    const hb = document.createElement('button'); hb.className = 'hp-boost'; hb.textContent = '+30 ❤';
+    hb.title = 'Increase max HP by 30 and heal 30';
+    hb.addEventListener('click', ()=>{
+      choiceArea.style.display='none'; extra.remove(); overlayDesc.style.display='block'; playOverlay.classList.add('hidden');
+      running = true; player.maxHp = (player.maxHp || 100) + 30; player.heal(30); updateHud();
+    });
+    extra.appendChild(hb);
+    const overlayBody = document.getElementById('overlay-body');
+    if(overlayBody) overlayBody.appendChild(extra);
   }
   function queueLevelUp(){
     const opts=[];
@@ -1055,23 +1123,11 @@
       opts.push({ id:c.id, title:c.title, desc:c.desc, extra: c.upgrade ? 'Upgrade' : (player.hasAbility(c.id) ? 'Upgrade' : 'New ability') });
       used.add(c.id);
     }
-    // ensure every level-up offers a Max HP increase option
-    const healthOpt = { id:'inc_hp', title: 'Increase Max HP', desc: 'Increase max health by 30 and heal by 30', extra: 'Stat' };
-    if(!opts.find(o=>o.id==='inc_hp')){
-      if(opts.length < 3) opts.push(healthOpt);
-      else opts[opts.length-1] = healthOpt; // replace last if full
-    }
     running = false;
+    // present three ability choices; +30 HP is shown as a separate button below by presentChoices
     presentChoices('Level Up', opts, (opt)=>{
-      if(opt.id === 'inc_hp'){
-        const inc = 30;
-        player.maxHp = Math.max(player.maxHp, player.maxHp + inc);
-        player.heal(inc);
-        running = true; updateHud();
-      } else {
-        player.addAbility(opt.id);
-        running = true; updateHud();
-      }
+      player.addAbility(opt.id);
+      running = true; updateHud();
     });
   }
 
