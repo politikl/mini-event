@@ -82,6 +82,7 @@ const GAME_CONFIG = {
     volatilityBase: 0.05,     // base volatility for price changes
     autosaveInterval: 30000,  // autosave every 30 seconds
     highScoreKey: 'candyStockHighScores',
+    highestCashKey: 'candyStockHighestCash',
     achievements: {
         firstPurchase: { name: 'First Purchase', description: 'Buy your first candy stock' },
         thousandProfit: { name: 'Sweet Profit', description: 'Make $1000 in profit' },
@@ -95,46 +96,65 @@ const CANDY_STOCKS = {
     choco: {
         name: "Choco Delights",
         basePrice: 10.00,
-        volatility: 0.08,
+        volatility: 0.065,
         color: "#8B4513", // brown
         description: "Premium chocolate candies with a smooth, rich flavor.",
-        trend: 0.01, // slight upward trend
+        trend: 0.006, // slight upward trend (dampened)
         history: []
     },
     gummy: {
         name: "Gummy Worms",
         basePrice: 5.50,
-        volatility: 0.12,
+        volatility: 0.095,
         color: "#FF5733", // orange-red
         description: "Colorful, chewy gummy worms that kids love.",
-        trend: 0.005, // stable with slight growth
+        trend: 0.003, // stable with slight growth (dampened)
         history: []
     },
     lollipop: {
         name: "Lollipop Dreams",
         basePrice: 3.25,
-        volatility: 0.15,
+        volatility: 0.12,
         color: "#FF69B4", // hot pink
         description: "Swirled lollipops in various flavors and colors.",
-        trend: -0.002, // slight downward trend
+        trend: -0.0012, // slight downward trend (dampened)
         history: []
     },
     taffy: {
         name: "Taffy Twists",
         basePrice: 7.75,
-        volatility: 0.10,
+        volatility: 0.08,
         color: "#9370DB", // medium purple
         description: "Soft, chewy taffy in assorted fruit flavors.",
-        trend: 0.008, // moderate growth
+        trend: 0.005, // moderate growth (dampened)
         history: []
     },
     caramel: {
         name: "Caramel Clouds",
         basePrice: 12.50,
-        volatility: 0.06,
+        volatility: 0.05,
         color: "#D2691E", // chocolate
         description: "Luxurious caramel candies with a hint of sea salt.",
-        trend: 0.015, // strong growth
+        trend: 0.009, // strong growth (dampened)
+        history: []
+    }
+    ,
+    mint: {
+        name: "Minty Morsels",
+        basePrice: 4.00,
+        volatility: 0.06,
+        color: "#9ee6b2",
+        description: "Refreshing mint candies with a cooling aftertaste.",
+        trend: 0.0012,
+        history: []
+    },
+    sprinkle: {
+        name: "Sprinkle Pops",
+        basePrice: 2.75,
+        volatility: 0.11,
+        color: "#ffd1e6",
+        description: "Colorful sprinkle-dusted pops loved by kids and adults alike.",
+        trend: 0.004,
         history: []
     }
 };
@@ -200,7 +220,9 @@ const gameState = {
         gummy: { shares: 0, avgBuyPrice: 0 },
         lollipop: { shares: 0, avgBuyPrice: 0 },
         taffy: { shares: 0, avgBuyPrice: 0 },
-        caramel: { shares: 0, avgBuyPrice: 0 }
+        caramel: { shares: 0, avgBuyPrice: 0 },
+        mint: { shares: 0, avgBuyPrice: 0 },
+        sprinkle: { shares: 0, avgBuyPrice: 0 }
     },
     currentNews: [],
     gameOver: false,
@@ -212,6 +234,9 @@ const gameState = {
         tradesCount: 0,
         highestProfit: 0
     }
+    ,
+    // Track the highest total worth (cash + portfolio) achieved during play
+    highestCash: GAME_CONFIG.initialCash
 };
 
 // DOM Elements
@@ -266,6 +291,10 @@ function initGame() {
         initializeCandyData();
     }
 
+    // Load persisted highest-cash (high score) and update UI
+    loadHighestCashFromStorage();
+    updateHighScoreDisplay();
+
     // Create charts for each candy
     createCharts();
 
@@ -281,6 +310,9 @@ function initGame() {
 
     // Start autosave
     setInterval(saveGame, GAME_CONFIG.autosaveInterval);
+
+    // Start the event countdown to 2025-10-31 00:00 PT
+    startEventCountdown();
 
     // Initialize tooltips
     setupTooltips();
@@ -303,7 +335,8 @@ function saveGame() {
         selectedCandy: gameState.selectedCandy,
         achievements: Array.from(gameState.achievements),
         statistics: gameState.statistics,
-        prices: prices
+        prices: prices,
+        highestCash: gameState.highestCash
     };
     localStorage.setItem('candyStockSave', JSON.stringify(saveData));
 }
@@ -322,6 +355,10 @@ function loadGame() {
                     CANDY_STOCKS[candyId].history = parsed.prices[candyId].history;
                 }
             });
+        }
+        // Load highestCash if present in save
+        if (typeof parsed.highestCash !== 'undefined') {
+            parsed.highestCash = parseFloat(parsed.highestCash) || GAME_CONFIG.initialCash;
         }
         return parsed;
     }
@@ -348,6 +385,42 @@ function setupTooltips() {
             if (tooltip) tooltip.remove();
         });
     });
+}
+
+// --- Highest-cash (high score) helpers ---
+function loadHighestCashFromStorage() {
+    const key = GAME_CONFIG.highestCashKey || 'candyStockHighestCash';
+    const v = localStorage.getItem(key);
+    if (v) {
+        const parsed = parseFloat(v);
+        if (!isNaN(parsed)) gameState.highestCash = parsed;
+    }
+}
+
+function saveHighestCashToStorage() {
+    const key = GAME_CONFIG.highestCashKey || 'candyStockHighestCash';
+    try {
+        localStorage.setItem(key, String(gameState.highestCash));
+    } catch (e) {
+        console.warn('Failed to save highest cash:', e);
+    }
+}
+
+function updateHighScoreDisplay() {
+    const el = document.getElementById('high-score-display');
+    if (!el) return;
+    el.textContent = `High: $${(gameState.highestCash || 0).toFixed(2)}`;
+}
+
+function checkAndUpdateHighScore() {
+    const totalWorth = gameState.cash + calculatePortfolioValue();
+    if (typeof gameState.highestCash === 'undefined' || totalWorth > gameState.highestCash) {
+        gameState.highestCash = totalWorth;
+        saveHighestCashToStorage();
+        updateHighScoreDisplay();
+        // Optionally show a small message
+        showMessage(`New high: $${gameState.highestCash.toFixed(2)}!`);
+    }
 }
 
 // Create price charts for each candy
@@ -474,19 +547,34 @@ function updateCharts() {
 
 // Generate new prices for all candies
 function generateNewPrices() {
+    // Mean-reverting price model with noise: smoother than pure random walk
+    const reversionStrength = 0.06; // how strongly prices pull back to basePrice
     Object.keys(CANDY_STOCKS).forEach(candyId => {
         const candy = CANDY_STOCKS[candyId];
-        
-        // Calculate price change based on volatility, trend, and randomness
-        const randomFactor = (Math.random() * 2 - 1); // Random value between -1 and 1
-        const volatilityFactor = candy.volatility * randomFactor;
-        const trendFactor = candy.trend;
-        
-        // Apply price change
-        const priceChange = candy.currentPrice * (volatilityFactor + trendFactor);
-        candy.currentPrice = Math.max(0.01, candy.currentPrice + priceChange);
-        
+        if (!candy) return;
+
+        // Ensure currentPrice exists
+        if (typeof candy.currentPrice !== 'number' || isNaN(candy.currentPrice)) {
+            candy.currentPrice = candy.basePrice;
+        }
+
+        // Random shock (smaller amplitude)
+        const shock = (Math.random() * 2 - 1) * candy.volatility * 0.6;
+
+        // Mean reversion toward basePrice
+        const meanRevert = (candy.basePrice - candy.currentPrice) * reversionStrength * (1 - Math.abs(candy.trend || 0));
+
+        // Trend nudges price slowly in the trend direction
+        const trendNudge = candy.currentPrice * (candy.trend || 0) * 0.5;
+
+        let newPrice = candy.currentPrice + (candy.currentPrice * shock) + meanRevert + trendNudge;
+        if (!isFinite(newPrice) || isNaN(newPrice)) newPrice = candy.basePrice;
+        newPrice = Math.max(0.01, newPrice);
+
+        candy.currentPrice = newPrice;
+
         // Add to history, keeping only the most recent prices
+        if (!Array.isArray(candy.history)) candy.history = [];
         candy.history.push(candy.currentPrice);
         if (candy.history.length > GAME_CONFIG.maxPriceHistory) {
             candy.history.shift();
@@ -588,6 +676,13 @@ function updateUI() {
 
     // Update statistics panel
     updateStatisticsPanel();
+
+    // Check and update high score if needed
+    try {
+        checkAndUpdateHighScore();
+    } catch (e) {
+        console.warn('High score check failed:', e);
+    }
 }
 
 // Update the portfolio table
@@ -875,6 +970,44 @@ function endGame() {
     document.getElementById('leaderboard-modal').classList.remove('hidden');
 }
 
+// --- Event countdown (to 2025-10-31 00:00 PT) ---
+function startEventCountdown() {
+    const displayEl = document.getElementById('game-timer');
+    if (!displayEl) return;
+
+    // Event end in PT (Pacific Time). PDT on 2025-10-31 is UTC-7, so use UTC time.
+    const endDate = new Date('2025-10-31T07:00:00Z');
+
+    const tick = () => {
+        const now = new Date();
+        let diff = endDate - now;
+        if (diff <= 0) {
+            displayEl.textContent = 'Event ended';
+            // Ensure game is ended
+            if (!gameState.gameOver) endGame();
+            clearInterval(__countdownTimer);
+            return;
+        }
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        diff -= days * (1000 * 60 * 60 * 24);
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        diff -= hours * (1000 * 60 * 60);
+        const minutes = Math.floor(diff / (1000 * 60));
+        diff -= minutes * (1000 * 60);
+        const seconds = Math.floor(diff / 1000);
+
+        let text = '';
+        if (days > 0) text += `${days}d `;
+        text += `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+        displayEl.textContent = `Ends in ${text} PT`;
+    };
+
+    // First tick and interval
+    tick();
+    const __countdownTimer = setInterval(tick, 1000);
+}
+
 // Reset the game
 function resetGame() {
     // Reset game state
@@ -988,6 +1121,24 @@ function setupEventListeners() {
             document.getElementById('leaderboard-modal').classList.add('hidden');
         });
     }
+
+    // Open leaderboard modal (header button)
+    const dayLeaderboardBtn = document.getElementById('day-leaderboard-btn');
+    if (dayLeaderboardBtn) {
+        dayLeaderboardBtn.addEventListener('click', () => {
+            updateLeaderboard();
+            document.getElementById('leaderboard-modal').classList.remove('hidden');
+        });
+    }
+
+    // Manual save button
+    const saveBtn = document.getElementById('save-btn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            saveGame();
+            showMessage('Game saved.');
+        });
+    }
     
     // Play again button
     if (playAgainButton) {
@@ -1004,81 +1155,8 @@ function setupEventListeners() {
 
 // Draw price chart for a specific candy
 function drawChart(candyId) {
-    const chart = gameState.charts[candyId];
-    const ctx = chart.ctx;
-    const canvas = chart.canvas;
-    const stock = candyStocks[candyId];
-    const priceHistory = stock.priceHistory;
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw grid
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 0.5;
-    
-    // Horizontal grid lines
-    for (let i = 0; i <= 4; i++) {
-        const y = i * (canvas.height / 4);
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-    }
-    
-    // Vertical grid lines
-    for (let i = 0; i <= 6; i++) {
-        const x = i * (canvas.width / 6);
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-    }
-    
-    // Draw price line
-    if (priceHistory.length > 1) {
-        const maxPrice = Math.max(...priceHistory) * 1.1;
-        const minPrice = Math.min(...priceHistory) * 0.9;
-        const priceRange = maxPrice - minPrice;
-        
-        ctx.strokeStyle = stock.color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        
-        // Draw price line
-        for (let i = 0; i < priceHistory.length; i++) {
-            const x = (i / (priceHistory.length - 1)) * canvas.width;
-            const y = canvas.height - ((priceHistory[i] - minPrice) / priceRange) * canvas.height;
-            
-            if (i === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
-            }
-        }
-        
-        ctx.stroke();
-    }
-    
-    // Update price display
-    const priceLabel = chart.wrapper.querySelector('.price-label');
-    if (priceLabel) {
-        priceLabel.textContent = `$${stock.price.toFixed(2)}`;
-    }
-    
-    // Update shares display
-    const sharesDisplay = chart.wrapper.querySelector('.shares-display');
-    if (sharesDisplay) {
-        sharesDisplay.textContent = `${stock.owned} shares`;
-    }
-    
-    // Update profit display
-    const profitDisplay = chart.wrapper.querySelector('.profit-display');
-    if (profitDisplay) {
-        const currentValue = stock.owned * stock.price;
-        const profit = currentValue - stock.purchaseValue;
-        const profitText = profit >= 0 ? `+$${profit.toFixed(2)}` : `-$${Math.abs(profit).toFixed(2)}`;
-        profitDisplay.textContent = profitText;
-        profitDisplay.style.color = profit >= 0 ? '#00ff9d' : '#ff6b6b';
-    }
+    // Deprecated legacy drawing function. The project now uses Chart.js instances
+    // stored in gameState.charts. This stub prevents runtime errors from any
+    // remaining callers that expect drawChart to exist.
+    console.warn('drawChart() is deprecated. Use Chart.js charts via gameState.charts.');
 }

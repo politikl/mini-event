@@ -11,11 +11,45 @@ body {
     overflow-x: hidden;
 }
 
+:root {
+    --accent: #ff6b35;
+    --accent-light: #ff9a3d;
+    --dark: #0a0606;
+}
+
 #game-container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
 }
+
+/* top-controls and header-box from day_2 theme */
+.top-controls {
+    position: fixed;
+    top: 12px;
+    z-index: 220;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    pointer-events: auto;
+    left: 18px;
+    right: 18px;
+    justify-content: space-between;
+}
+.top-controls #left-controls { display:flex; gap:8px; align-items:center; }
+.top-controls #right-controls { display:flex; gap:8px; align-items:center; }
+.header-box {
+    background: rgba(0,0,0,0.72);
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 2px solid var(--accent);
+    color: #ffd8a8;
+    font-family: monospace;
+    font-weight: 700;
+}
+
+/* make the page area reserve space for header controls (keeps layout consistent) */
+#game-container { padding-top: 70px; }
 
 h1 {
     margin-bottom: 5px;
@@ -509,7 +543,7 @@ footer {
     background-color: rgba(0, 0, 0, 0.95);
     padding: 20px;
     border-radius: 10px;
-    border: 2px solid #ffaa00;
+    border: 2px solid var(--accent-light);
     max-width: 600px;
     width: 90%;
     max-height: 80vh;
@@ -531,7 +565,7 @@ footer {
 }
 
 #leaderboard-table th {
-    color: #ffaa00;
+    color: var(--accent-light);
     font-weight: bold;
 }
 
