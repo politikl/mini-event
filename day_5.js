@@ -177,6 +177,12 @@
   { id:'stun_grenade', title:'Stun Grenade', desc:'Throws a grenade that stuns enemies in an area.', type:'projectile', basePower:0, cooldown:6000, range:420, upgradePow:(lv)=>0+lv*0 },
   // ricochet shot: bounces between nearby enemies
   { id:'ricochet', title:'Ricochet Shot', desc:'Fires a projectile that ricochets to another nearby enemy.', type:'projectile', basePower:14, cooldown:2000, range:640, upgradePow:(lv)=>14+lv*5 },
+  // defensive abilities
+  { id:'barrier', title:'Barrier', desc:'Create a short-lived barrier that greatly reduces incoming damage.', type:'active', basePower:0, cooldown:12000, range:0, upgradePow:(lv)=>0 },
+  { id:'heal_pulse', title:'Heal Pulse', desc:'Heal yourself and spawn small healing orbs.', type:'active', basePower:0, cooldown:9000, range:160, upgradePow:(lv)=>0 },
+  { id:'reflect_shield', title:'Reflect Shield', desc:'Reflect incoming enemy projectiles for a short time.', type:'active', basePower:0, cooldown:12000, range:0, upgradePow:(lv)=>0 },
+  { id:'guardian_spirit', title:'Guardian Spirit', desc:'Summon a friendly spirit that fires at enemies.', type:'deploy', basePower:18, cooldown:12000, range:0, upgradePow:(lv)=>18+lv*6 },
+  { id:'phase_shift', title:'Phase Shift', desc:'Brief invulnerability (short cooldown).', type:'active', basePower:0, cooldown:15000, range:0, upgradePow:(lv)=>0 },
   // orbital removed (duplicate / deprecated)
     { id:'chain_lightning', title:'Chain Lightning', desc:'Strikes an enemy and chains to nearby enemies.', type:'projectile', basePower:16, cooldown:3200, range:540, upgradePow:(lv)=>16+lv*5 },
     { id:'meteor', title:'Meteor', desc:'Calls down a meteor that deals huge explosion (long cooldown).', type:'projectile', basePower:60, cooldown:14000, range:900, upgradePow:(lv)=>60+lv*24 }
@@ -342,6 +348,7 @@
     constructor(x,y){
       this.x=x; this.y=y; this.r=18;
       this.hp=120; this.maxHp=120;
+  this.reflectUntil = 0; // for reflect_shield ability
       this.xp=0; this.level=1;
       this.nextXp = 50;
       this.abilities = [];
@@ -523,6 +530,15 @@
               for(const e of enemies) if(e.alive && !e.friendly && dist(px,py,e.x,e.y) <= rad){ e.stunUntil = performance.now() + stunMs; }
               particles.push({ x:px, y:py, t:performance.now(), dur:700, col:'#d6f2ff' });
             },
+            onHit: (enemy)=>{
+              // explode at enemy and stun nearby
+              const px = enemy.x, py = enemy.y;
+              const rad = 64 + lvl*8;
+              const stunMs = 1100 + lvl*350;
+              beams.push({ x1:px, y1:py, aoe:true, range:rad, t:performance.now(), dur:360, power:0, stun:true });
+              for(const e of enemies) if(e.alive && !e.friendly && dist(px,py,e.x,e.y) <= rad){ e.stunUntil = performance.now() + stunMs; }
+              particles.push({ x:px, y:py, t:performance.now(), dur:700, col:'#d6f2ff' });
+            },
             visual:'stun'
           }));
         } else if(id === 'ricochet'){
@@ -600,6 +616,10 @@
           const t = new Turret(this.x + 20, this.y, power, 7000 + lvl*1500); t.friendly = true; enemies.push(t);
         } else if(id === 'homing_mine'){
           enemies.push(new HomingMine(this.x + randRange(-18,18), this.y + randRange(-18,18), power, 7000 + lvl*1000));
+        } else if(id === 'guardian_spirit'){
+          // guardian is a friendly turret-like helper
+          const g = new Turret(this.x + randRange(-20,20), this.y + randRange(-20,20), power + Math.floor(lvl*2), 9000 + lvl*2000);
+          g.type = 'guardian'; g.friendly = true; enemies.push(g);
         }
         return true;
       }
@@ -616,7 +636,24 @@
         return true;
       }
       if(def.type==='active'){
-        this.shieldUntil = performance.now() + 2000 + lvl*600;
+        // per-ability active behavior
+        if(id === 'barrier'){
+          // strong short barrier
+          this.shieldUntil = performance.now() + 1400 + lvl*600;
+        } else if(id === 'reflect_shield'){
+          // reflect incoming projectiles for a short time
+          this.reflectUntil = performance.now() + 800 + lvl*450;
+        } else if(id === 'heal_pulse'){
+          // immediate heal + spawn a few small heal orbs
+          const healAmt = 12 + lvl*6;
+          this.heal(healAmt);
+          for(let i=0;i<4;i++) orbs.push(new Orb(this.x + randRange(-18,18), this.y + randRange(-18,18), Math.max(4, Math.floor(6 + lvl*3)), 'heal'));
+        } else if(id === 'phase_shift'){
+          // short invulnerability (reuse shield flag)
+          this.shieldUntil = performance.now() + 600 + lvl*400;
+        } else {
+          this.shieldUntil = performance.now() + 2000 + lvl*600;
+        }
         return true;
       }
       if(def.type==='aoe'){
@@ -644,6 +681,63 @@
           enemies.push(s);
           particles.push({ x:this.x, y:this.y, t:performance.now(), dur:520, col:'#9b8cff' });
         }
+      }
+    }
+  }
+
+  // new enemy: Charger (fast dash attacker)
+  class Charger extends Enemy {
+    constructor(x,y,lvl){
+      super(x,y, 40 + lvl*8, 110 + lvl*6, 10, 'charger', true, 20 + lvl*3);
+      this.chargeAcc = 1200 - lvl*30;
+    }
+    update(dt){
+      Enemy.prototype.update.call(this, dt);
+      this.chargeAcc -= dt;
+      if(this.chargeAcc <= 0){
+        this.chargeAcc = 1400 + Math.random()*800;
+        const dx = player.x - this.x, dy = player.y - this.y, m = Math.hypot(dx,dy)||1;
+        this.vx += (dx/m) * 520;
+        this.vy += (dy/m) * 520;
+      }
+    }
+  }
+
+  // new enemy: Sniper (telegraphed long range shot)
+  class Sniper extends Enemy {
+    constructor(x,y,lvl){
+      super(x,y, 38 + lvl*6, 12 + lvl*1.2, 12, 'sniper', false, 26 + lvl*4);
+      this.snipeAcc = 1800 - lvl*60;
+    }
+    update(dt){
+      Enemy.prototype.update.call(this, dt);
+      this.snipeAcc -= dt;
+      if(this.snipeAcc <= 0){
+        this.snipeAcc = 1800 + Math.random()*1000;
+        if(onScreen(this.x,this.y)){
+          // telegraph then fire
+          const tx = player.x, ty = player.y;
+          beams.push({ x1:tx, y1:ty, aoe:false, range:6, t:performance.now(), dur:420, power:0 });
+          setTimeout(()=>{
+            const dx = tx - this.x, dy = ty - this.y, m = Math.hypot(dx,dy)||1;
+            // spawn an enemy projectile (respects ENEMY_PROJECTILE_CAP elsewhere)
+            projectiles.push(new Projectile(this.x, this.y, dx/m*220, dy/m*220, Math.max(8, 8 + Math.floor(player.level*0.6)), 6, 'enemy', 640));
+          }, 400);
+        }
+      }
+    }
+  }
+
+  // new enemy: Tank (big slow enemy)
+  class Tank extends Enemy {
+    constructor(x,y,lvl){
+      super(x,y, 220 + lvl*50, 8 + Math.floor(lvl*0.5), 36, 'tank', true, 180 + lvl*12);
+    }
+    update(dt){
+      Enemy.prototype.update.call(this, dt);
+      // occasionally slam area
+      if(Math.random() < 0.002){
+        for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) < 80) e.takeDamage(18 + Math.floor(player.level*2));
       }
     }
   }
@@ -759,7 +853,21 @@
           this.alive=false; break;
         }
       } else if(this.owner === 'enemy'){
-        if(dist(this.x,this.y,player.x,player.y) <= player.r + this.r){ player.takeDamage(this.power); this.alive=false; }
+        if(dist(this.x,this.y,player.x,player.y) <= player.r + this.r){
+          const now = performance.now();
+          // reflect behavior when player has reflect active
+          if(player && player.reflectUntil && player.reflectUntil > now){
+            // flip ownership and reverse velocity so it heads back toward enemies
+            this.owner = 'player';
+            this.vx = -this.vx; this.vy = -this.vy;
+            this.life = Math.max(300, this.range / Math.hypot(this.vx||1,this.vy||1) * 1000);
+            // small visual cue
+            beams.push({ x1:player.x, y1:player.y, aoe:false, t:now, dur:220, power:0 });
+          } else {
+            player.takeDamage(this.power);
+            this.alive=false;
+          }
+        }
       }
     }
     draw(ctx,cam){
@@ -857,10 +965,14 @@
       if(lvl >= 6 && Math.random() < 0.04){ enemies.push(new Necromancer(pt.sx,pt.sy,lvl)); continue; }
       if(lvl >=5 && Math.random() < 0.03){ enemies.push(new Enemy(pt.sx,pt.sy, 120 + lvl*30, 22, 26, 'mini', true, 100 + lvl*10)); continue; }
 
-      if(r < 0.2){ enemies.push(new Enemy(pt.sx,pt.sy, 30 + lvl*6, 30 + lvl*1.2, 14, 'zombie', true, 12 + lvl*2)); }
-      else if(r < 0.45){ enemies.push(new Enemy(pt.sx,pt.sy, 28 + lvl*6, 36, 12, 'skeleton', false, 18 + lvl*3)); }
-      else if(r < 0.7){ enemies.push(new Enemy(pt.sx,pt.sy, 60 + lvl*10, 22 + lvl*1.2, 28, 'brute', true, 40 + lvl*6)); }
-      else { enemies.push(new Enemy(pt.sx,pt.sy, 24 + lvl*5, 86 + lvl*4, 10, 'demon', true, 18 + lvl*3)); }
+  // expanded enemy types with level scaling
+  if(r < 0.12){ enemies.push(new Charger(pt.sx,pt.sy,lvl)); }
+  else if(r < 0.25){ enemies.push(new Sniper(pt.sx,pt.sy,lvl)); }
+  else if(r < 0.42){ enemies.push(new Enemy(pt.sx,pt.sy, 30 + lvl*6, 30 + lvl*1.2, 14, 'zombie', true, 12 + lvl*2)); }
+  else if(r < 0.58){ enemies.push(new Enemy(pt.sx,pt.sy, 28 + lvl*6, 36, 12, 'skeleton', false, 18 + lvl*3)); }
+  else if(r < 0.78){ enemies.push(new Enemy(pt.sx,pt.sy, 60 + lvl*10, 22 + lvl*1.2, 28, 'brute', true, 40 + lvl*6)); }
+  else if(r < 0.93){ enemies.push(new Tank(pt.sx,pt.sy,lvl)); }
+  else { enemies.push(new Enemy(pt.sx,pt.sy, 24 + lvl*5, 86 + lvl*4, 10, 'demon', true, 18 + lvl*3)); }
     }
   }
 
@@ -943,8 +1055,24 @@
       opts.push({ id:c.id, title:c.title, desc:c.desc, extra: c.upgrade ? 'Upgrade' : (player.hasAbility(c.id) ? 'Upgrade' : 'New ability') });
       used.add(c.id);
     }
+    // ensure every level-up offers a Max HP increase option
+    const healthOpt = { id:'inc_hp', title: 'Increase Max HP', desc: 'Increase max health by 30 and heal by 30', extra: 'Stat' };
+    if(!opts.find(o=>o.id==='inc_hp')){
+      if(opts.length < 3) opts.push(healthOpt);
+      else opts[opts.length-1] = healthOpt; // replace last if full
+    }
     running = false;
-    presentChoices('Level Up', opts, (opt)=>{ player.addAbility(opt.id); running = true; updateHud(); });
+    presentChoices('Level Up', opts, (opt)=>{
+      if(opt.id === 'inc_hp'){
+        const inc = 30;
+        player.maxHp = Math.max(player.maxHp, player.maxHp + inc);
+        player.heal(inc);
+        running = true; updateHud();
+      } else {
+        player.addAbility(opt.id);
+        running = true; updateHud();
+      }
+    });
   }
 
   // --- ranged enemy behaviour: skeleton shoots, only on-screen and weaker --- 

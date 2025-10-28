@@ -184,7 +184,8 @@ html, body {
 /* Choice grid and cards used for ability pick / level-up */
 .choice-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  /* Force three equal columns so each option gets exactly 1/3 of the area when 3 options are shown */
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   width: 100%;
   max-width: 880px;
