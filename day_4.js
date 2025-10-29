@@ -944,6 +944,30 @@ async function submitScore(playerName, score) {
     }
 }
 
+// Load high scores from Firebase
+async function loadHighScores() {
+    if (!db) return [];
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const snapshot = await db.collection('scores')
+            .doc(today)
+            .collection('entries')
+            .where('day', '==', 4)
+            .orderBy('score', 'desc')
+            .limit(10)
+            .get();
+        
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+    } catch (error) {
+        console.error("Error loading high scores:", error);
+        return [];
+    }
+}
+
+// Update leaderboard display
 async function updateLeaderboard() {
     if (!db) {
         const leaderboardBody = document.getElementById('leaderboard-body');
@@ -955,21 +979,23 @@ async function updateLeaderboard() {
 
     try {
         const leaderboardBody = document.getElementById('leaderboard-body');
+        if (!leaderboardBody) return;
+        
         leaderboardBody.innerHTML = '';
+        const highScores = await loadHighScores();
 
-        const snapshot = await db.collection('candyStockScores')
-            .orderBy('score', 'desc')
-            .limit(10)
-            .get();
+        if (highScores.length === 0) {
+            leaderboardBody.innerHTML = '<tr><td colspan="4">No scores yet today!</td></tr>';
+            return;
+        }
 
-        snapshot.docs.forEach((doc, index) => {
-            const data = doc.data();
+        highScores.forEach((score, index) => {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${index + 1}</td>
-                <td>${data.player}</td>
-                <td>$${data.score.toFixed(2)}</td>
-                <td>${data.date.toDate().toLocaleDateString()}</td>
+                <td>Player ${index + 1}</td>
+                <td>$${score.score.toFixed(2)}</td>
+                <td>${score.date.toDate().toLocaleTimeString()}</td>
             `;
             leaderboardBody.appendChild(row);
         });
@@ -982,21 +1008,74 @@ async function updateLeaderboard() {
     }
 }
 
-// End the game
-function endGame() {
+// End the game and handle high score submission
+async function endGame() {
+    if (gameState.gameOver) return; // Prevent multiple submissions
     gameState.gameOver = true;
     
-    const finalScore = gameState.cash + calculatePortfolioValue();
+    const finalScore = Math.floor(gameState.cash + calculatePortfolioValue());
     const finalScoreElement = document.getElementById('final-score');
     const scoreSubmission = document.getElementById('score-submission');
     
     if (finalScoreElement) finalScoreElement.textContent = `$${finalScore.toFixed(2)}`;
     if (scoreSubmission) scoreSubmission.classList.remove('hidden');
     
-    // Update leaderboard
-    updateLeaderboard();
+    // Check if this is a high score
+    const highScores = await loadHighScores();
+    const isHighScore = highScores.length < 10 || finalScore > highScores[highScores.length - 1]?.score;
     
-    showMessage("Game Over! Check your final score.");
+    showMessage(`Game Over! ${isHighScore ? 'New High Score!' : 'Check your final score.'}`);
+    
+    // Auto-submit score to Firebase
+    try {
+        if (db) {
+            const score = {
+                score: finalScore,
+                date: firebase.firestore.Timestamp.now(),
+                day: 4,
+                details: {
+                    cash: gameState.cash,
+                    portfolio: gameState.portfolio,
+                    achievements: Array.from(gameState.achievements),
+                    statistics: gameState.statistics,
+                    finalDay: gameState.day
+                }
+            };
+
+            // Add score to today's scores collection
+            const today = new Date().toISOString().split('T')[0];
+            await db.collection('scores').doc(today).collection('entries').add(score);
+            
+            // Update daily stats
+            const statsRef = db.collection('scores').doc(today);
+            await db.runTransaction(async (transaction) => {
+                const statsDoc = await transaction.get(statsRef);
+                if (!statsDoc.exists) {
+                    transaction.set(statsRef, {
+                        day: 4,
+                        highScore: finalScore,
+                        totalPlays: 1,
+                        avgScore: finalScore
+                    });
+                } else {
+                    const data = statsDoc.data();
+                    const newTotal = data.totalPlays + 1;
+                    const newAvg = (data.avgScore * data.totalPlays + finalScore) / newTotal;
+                    transaction.update(statsRef, {
+                        highScore: Math.max(data.highScore, finalScore),
+                        totalPlays: newTotal,
+                        avgScore: newAvg
+                    });
+                }
+            });
+            
+            showMessage("Score submitted successfully!");
+            updateLeaderboard();
+        }
+    } catch (error) {
+        console.error("Error submitting score:", error);
+        showMessage("Error submitting score");
+    }
     
     // Show leaderboard modal
     document.getElementById('leaderboard-modal').classList.remove('hidden');
