@@ -38,11 +38,11 @@ function hideTimeLockOverlay(){
 const UNLOCK_ISO = '2025-10-29T00:00:00-07:00';
 const unlockDate = new Date(UNLOCK_ISO);
 
-/*const rn = nowPT();
+const rn = nowPT();
 if(rn < unlockDate){
   showTimeLockOverlay(`This game will unlock on ${unlockDate.toLocaleString('en-US', { timeZone: PT_TZ })} PT.`);
   return;
-}*/
+}
 
 if(inBlockedWindow(rn)){
   showTimeLockOverlay('This game is temporarily blocked for scheduled hours. Please try again later.');
@@ -90,14 +90,14 @@ const __timeLockChecker = setInterval(() => {
   const year = now.getFullYear();
   const GAME_END_TS = Date.parse(`${year}-10-30T00:00:00-07:00`);
 
-  // Game constants
+  // Game constants - REBALANCED for higher scores
   const CANVAS_W = 480;
   const CANVAS_H = 720;
   const TILE_SIZE = 60;
   const PLAYER_SIZE = 40;
   const GRID_COLS = 8;
   const VISIBLE_ROWS = 16;
-  const SAFE_START_ROWS = 3;
+  const SAFE_START_ROWS = 3; // Reduced from 4
   const ROW_BUFFER = 8;
 
   canvas.width = CANVAS_W;
@@ -117,7 +117,7 @@ const __timeLockChecker = setInterval(() => {
   function createPlayer() {
     return {
       col: Math.floor(GRID_COLS / 2),
-      row: 0,
+      row: 0, // Start at row 0
       x: 0,
       y: 0,
       size: PLAYER_SIZE,
@@ -126,7 +126,7 @@ const __timeLockChecker = setInterval(() => {
     };
   }
 
-  // Row types and generation
+  // Row types and generation - REBALANCED
   function createRow(rowNum) {
     const row = {
       id: rowNum,
@@ -150,7 +150,7 @@ const __timeLockChecker = setInterval(() => {
     // Progressive difficulty
     const difficulty = Math.min(1, (rowNum - SAFE_START_ROWS) / 30);
     
-    // Generate terrain with balanced distribution
+    // Generate terrain with better distribution
     const rand = Math.random();
     
     if (rand < 0.15) {
@@ -173,21 +173,21 @@ const __timeLockChecker = setInterval(() => {
     const speedVariation = Math.random();
     let baseSpeed;
     
-    // Speed tiers - keep challenging
+    // Speed tiers - slightly slower for more manageable gameplay
     if (speedVariation < 0.2) {
-      baseSpeed = 0.8 + Math.random() * 0.4; // Fast
+      baseSpeed = 0.7 + Math.random() * 0.3; // Fast
     } else if (speedVariation < 0.5) {
-      baseSpeed = 0.5 + Math.random() * 0.3; // Medium
+      baseSpeed = 0.4 + Math.random() * 0.3; // Medium
     } else {
-      baseSpeed = 0.3 + Math.random() * 0.3; // Slow
+      baseSpeed = 0.2 + Math.random() * 0.2; // Slow
     }
     
-    const speed = (baseSpeed + difficulty * 0.6) * direction;
-    const spacing = 160 + Math.random() * 80; // Original spacing
+    const speed = (baseSpeed + difficulty * 0.5) * direction;
+    const spacing = 170 + Math.random() * 90; // More spacing
     const count = Math.max(2, Math.ceil(CANVAS_W / spacing));
 
     for (let i = 0; i < count; i++) {
-      const isGhost = Math.random() < (0.3 + difficulty * 0.4);
+      const isGhost = Math.random() < (0.25 + difficulty * 0.35);
       row.obstacles.push({
         x: i * spacing + Math.random() * 60,
         speed: speed,
@@ -204,29 +204,29 @@ const __timeLockChecker = setInterval(() => {
     let baseSpeed;
     
     if (speedVariation < 0.3) {
-      baseSpeed = 0.5 + Math.random() * 0.3;
+      baseSpeed = 0.4 + Math.random() * 0.3;
     } else if (speedVariation < 0.6) {
-      baseSpeed = 0.3 + Math.random() * 0.2;
+      baseSpeed = 0.25 + Math.random() * 0.15;
     } else {
-      baseSpeed = 0.1 + Math.random() * 0.2;
+      baseSpeed = 0.1 + Math.random() * 0.15;
     }
     
-    const speed = (baseSpeed + difficulty * 0.4) * direction;
-    const spacing = 150 + Math.random() * 60; // Original spacing
+    const speed = (baseSpeed + difficulty * 0.3) * direction;
+    const spacing = 160 + Math.random() * 70; // Better log spacing
     const count = Math.max(2, Math.ceil(CANVAS_W / spacing));
 
     for (let i = 0; i < count; i++) {
       row.obstacles.push({
         x: i * spacing + Math.random() * 30,
         speed: speed,
-        width: 120 + Math.random() * 40, // Original log width
+        width: 130 + Math.random() * 50, // Wider logs
         height: 30,
         type: 'log'
       });
     }
   }
 
-  // Initialize game - FIX spawn bug completely
+  // Initialize game
   function initGame() {
     player = createPlayer();
     rows = new Map();
@@ -235,23 +235,14 @@ const __timeLockChecker = setInterval(() => {
     cameraY = 0;
     nextRowId = 0;
     
-    // Create initial rows starting from row 0
+    // Create initial rows - FIX: Start from 0 instead of negative
     for (let i = 0; i < VISIBLE_ROWS + ROW_BUFFER; i++) {
       const row = createRow(i);
       rows.set(i, row);
       nextRowId = Math.max(nextRowId, i + 1);
     }
     
-    // Place player at row 0 and update position BEFORE camera
-    player.row = 0;
-    player.col = Math.floor(GRID_COLS / 2);
-    
-    // Update positions first
     updatePlayerPosition();
-    
-    // Then set camera to player's position
-    cameraY = 0;
-    
     updateScore();
   }
 
@@ -306,7 +297,7 @@ const __timeLockChecker = setInterval(() => {
     player.y = getRowY(player.row) + (TILE_SIZE - PLAYER_SIZE) / 2;
   }
 
-  // Movement with HIGH SCORING (without making it easier)
+  // Movement with IMPROVED SCORING
   function movePlayer(dcol, drow) {
     if (!player || !player.alive) return;
 
@@ -320,21 +311,20 @@ const __timeLockChecker = setInterval(() => {
     updateCamera();
     updatePlayerPosition();
 
-    // MASSIVELY INCREASED SCORING: Much higher points per row
+    // REBALANCED SCORING: Much higher to reach 10k+
     if (newRow > highestRow) {
       const rowsGained = newRow - highestRow;
       
-      // Aggressive point scaling to reach 10k+
-      let pointsPerRow = 50; // Base increased from 10 to 50
-      if (newRow > 20) pointsPerRow = 75;
-      if (newRow > 40) pointsPerRow = 100;
-      if (newRow > 60) pointsPerRow = 150;
-      if (newRow > 80) pointsPerRow = 200;
-      if (newRow > 100) pointsPerRow = 300;
-      if (newRow > 120) pointsPerRow = 400;
+      // Progressive scoring tiers
+      let pointsPerRow = 15; // Base increased from 10
+      if (newRow > 30) pointsPerRow = 25;
+      if (newRow > 60) pointsPerRow = 35;
+      if (newRow > 100) pointsPerRow = 50;
+      if (newRow > 150) pointsPerRow = 70;
+      if (newRow > 200) pointsPerRow = 100;
       
-      // Large combo bonus for consecutive progress
-      const comboBonus = Math.floor(newRow / 3) * 20;
+      // Combo bonus for consecutive progress
+      const comboBonus = Math.floor(newRow / 5) * 8;
       
       score += rowsGained * pointsPerRow + comboBonus;
       highestRow = newRow;
@@ -720,49 +710,31 @@ const __timeLockChecker = setInterval(() => {
     }
   }
 
-  // Firebase save score - FIXED to actually save
+  // Firebase save score
   async function submitScoreToFirestoreDocs(entry){
     try{
-      if(!window.firebaseDb || !window.firebaseDoc || !window.firebaseSetDoc) {
-        console.error('Firebase not initialized');
-        return { ok:false, reason:'no-firebase' };
-      }
-      
+      if(!window.firebaseDb || !window.firebaseDoc || !window.firebaseSetDoc) return { ok:false, reason:'no-firebase' };
       const id = entry.uid ? entry.uid : `${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
       const docRef = window.firebaseDoc(window.firebaseDb, 'day3_scores', id);
-      
       if(entry.uid && window.firebaseGetDoc){
         const existing = await window.firebaseGetDoc(docRef);
         if(existing && existing.exists && existing.exists()){
           const data = existing.data();
-          // Always update if new score is higher OR if score doesn't exist
-          if(!data.score || data.score < entry.score){
+          if((data.score||0) < entry.score){
             await window.firebaseSetDoc(docRef, entry);
           }
         } else {
-          // Document doesn't exist, create it
           await window.firebaseSetDoc(docRef, entry);
         }
       } else {
-        // Anonymous user, just save
         await window.firebaseSetDoc(docRef, entry);
       }
-      
-      // Update user document for authenticated users
       if(entry.uid && window.firebaseGetDoc && window.firebaseSetDoc){
         const userDocRef = window.firebaseDoc(window.firebaseDb, 'users', entry.uid);
         const snap = await window.firebaseGetDoc(userDocRef);
         let docData = {};
-        if(snap && snap.exists && snap.exists()) {
-          docData = snap.data();
-        } else {
-          docData = { 
-            username: entry.playerName, 
-            email: '', 
-            createdAt: new Date(), 
-            scores: { day1:0, day2:0, day3:0, day4:0, day5:0, total:0 } 
-          };
-        }
+        if(snap && snap.exists && snap.exists()) docData = snap.data();
+        else docData = { username: entry.playerName, email:'', createdAt:new Date(), scores:{ day1:0,day2:0,day3:0,day4:0,day5:0, total:0 } };
         docData.scores = docData.scores || {};
         docData.scores.day3 = Math.max(docData.scores.day3 || 0, entry.score);
         const s = docData.scores;
@@ -771,7 +743,7 @@ const __timeLockChecker = setInterval(() => {
       }
       return { ok:true };
     } catch(err){
-      console.error('Save error:', err);
+      console.error('save error', err);
       return { ok:false, reason: err && err.message || 'unknown' };
     }
   }
@@ -789,25 +761,16 @@ const __timeLockChecker = setInterval(() => {
           const user = res.user;
           uid = user.uid;
           playerName = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
-          entry.uid = uid; 
-          entry.playerName = playerName;
+          entry.uid = uid; entry.playerName = playerName;
         } catch(e){
-          console.error('Sign-in error:', e);
-          showToast('Sign-in failed'); 
-          return;
+          showToast('Sign-in failed'); return;
         }
-      } else { 
-        showToast('Sign-in unavailable'); 
-        return; 
-      }
+      } else { showToast('Sign-in unavailable'); return; }
     }
 
     const r = await submitScoreToFirestoreDocs(entry);
-    if(!r.ok){ 
-      showToast('Save failed: ' + (r.reason || 'unknown')); 
-      return; 
-    }
-    showToast('Score saved!');
+    if(!r.ok){ showToast('Save failed'); return; }
+    showToast('Score saved');
     setTimeout(()=> startGame(), 600);
   }
 
