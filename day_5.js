@@ -1056,17 +1056,34 @@
   });
 
   if(canvas){
+    // pointerdown: left-click => projectile (if available) / dash fallback
+    // right-click => use a primary active ability (heal, barrier, reflect) if available
     canvas.addEventListener('pointerdown', (ev)=>{
       if(!player) return;
       const rect = canvas.getBoundingClientRect();
       const sx = (ev.clientX - rect.left) * (VIEW_W / rect.width) + camera.x;
       const sy = (ev.clientY - rect.top) * (VIEW_H / rect.height) + camera.y;
       const dx = sx - player.x, dy = sy - player.y; const m = Math.hypot(dx,dy)||1;
-      // Prefer projectile abilities on click
-      const proj = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && d.type==='projectile'; });
-      if(proj) player.tryUseAbility(proj.id, dx/m, dy/m);
-      else if(player.hasAbility('dash_strike')) player.tryUseAbility('dash_strike', dx/m, dy/m);
+      // left click
+      if(ev.button === 0){
+        const proj = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && d.type==='projectile'; });
+        if(proj) player.tryUseAbility(proj.id, dx/m, dy/m);
+        else if(player.hasAbility('dash_strike')) player.tryUseAbility('dash_strike', dx/m, dy/m);
+      } else if(ev.button === 2){
+        // right click: attempt to use a useful active ability first
+        ev.preventDefault();
+        const prefer = ['heal_pulse','barrier','reflect_shield','phase_shift','shield'];
+        let used = false;
+        for(const id of prefer){ if(player.hasAbility(id)) { used = player.tryUseAbility(id); if(used) break; } }
+        if(!used){
+          // fallback to projectile if nothing active
+          const proj = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && d.type==='projectile'; });
+          if(proj) player.tryUseAbility(proj.id, dx/m, dy/m);
+        }
+      }
     });
+    // prevent context menu on right-click inside canvas so right-click can be used for abilities
+    canvas.addEventListener('contextmenu', e => { e.preventDefault(); });
   }
 
   function getMoveDir(){
