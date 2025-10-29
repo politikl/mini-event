@@ -21,6 +21,14 @@ body {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 0 40px rgba(0,0,0,0.3);
+    border-radius: 20px;
+    background: linear-gradient(180deg, 
+        rgba(10,6,6,0.85) 0%,
+        rgba(26,10,10,0.92) 45%,
+        rgba(10,6,6,0.85) 100%
+    );
 }
 
 /* top-controls and header-box from day_2 theme */
@@ -35,6 +43,10 @@ body {
     left: 18px;
     right: 18px;
     justify-content: space-between;
+    backdrop-filter: blur(8px);
+    padding: 4px;
+    border-radius: 16px;
+    background: rgba(0,0,0,0.4);
 }
 .top-controls #left-controls { display:flex; gap:8px; align-items:center; }
 .top-controls #right-controls { display:flex; gap:8px; align-items:center; }
@@ -139,11 +151,23 @@ p {
 
 .chart-wrapper {
     margin-bottom: 20px;
-    background-color: rgba(0, 0, 0, 0.7);
+    background: linear-gradient(180deg, 
+        rgba(0,0,0,0.75) 0%,
+        rgba(0,0,0,0.85) 100%
+    );
     padding: 15px;
     border-radius: 10px;
     border: 2px solid #ff6b35;
     min-height: 200px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3),
+                inset 0 1px rgba(255,255,255,0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chart-wrapper:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.4),
+                inset 0 1px rgba(255,255,255,0.1);
 }
 
 #market-view {

@@ -279,9 +279,6 @@ const db = firebase.firestore();
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize the game
     initGame();
-    
-    // Initialize background elements
-    initBackgroundElements();
 });
 
 // Initialize candy data
@@ -292,6 +289,43 @@ function initializeCandyData() {
         // Fill history with base price for initial display
         candy.history = Array(GAME_CONFIG.maxPriceHistory).fill(candy.basePrice);
     });
+}
+
+// Initialize background decorations
+function initBackgroundDecorations() {
+    const background = document.getElementById('background');
+    if (!background) return;
+
+    // Clear existing decorations
+    background.innerHTML = '';
+
+    // Parameters for decoration generation
+    const totalLeaves = 12;
+    const totalPumpkins = 8;
+    const viewportWidth = window.innerWidth;
+
+    // Helper to get random number within a range
+    const random = (min, max) => Math.random() * (max - min) + min;
+
+    // Create leaves
+    for (let i = 0; i < totalLeaves; i++) {
+        const leaf = document.createElement('div');
+        leaf.className = 'leaf';
+        leaf.style.left = `${random(5, 95)}%`;
+        leaf.style.animationDelay = `${random(0, 12)}s`;
+        leaf.style.transform = `scale(${random(0.8, 1.2)})`;
+        background.appendChild(leaf);
+    }
+
+    // Create pumpkins
+    for (let i = 0; i < totalPumpkins; i++) {
+        const pumpkin = document.createElement('div');
+        pumpkin.className = 'bg-pumpkin';
+        pumpkin.style.left = `${random(5, 95)}%`;
+        pumpkin.style.animationDelay = `${random(0, 12)}s`;
+        pumpkin.style.transform = `scale(${random(0.8, 1.2)})`;
+        background.appendChild(pumpkin);
+    }
 }
 
 // Initialize the game
@@ -314,6 +348,9 @@ function initGame() {
         // Initialize new game data
         initializeCandyData();
     }
+    
+    // Initialize background decorations
+    initBackgroundDecorations();
 
     // Load persisted highest-cash (high score) and update UI
     loadHighestCashFromStorage();
@@ -1174,33 +1211,6 @@ function setupEventListeners() {
         backButton.addEventListener('click', () => {
             window.location.href = 'index.html';
         });
-    }
-}
-
-// Initialize background ornaments
-function initBackgroundElements() {
-    const backgroundRoot = document.getElementById('background');
-    if (!backgroundRoot || backgroundRoot.dataset.initted) return;
-    backgroundRoot.dataset.initted = '1';
-
-    // Add falling leaves
-    for (let i = 0; i < 20; i++) {
-        const leaf = document.createElement('div');
-        leaf.className = 'leaf';
-        leaf.style.left = `${Math.random() * 100}%`;
-        leaf.style.top = `${-10 - Math.random() * 60}%`;
-        leaf.style.animationDelay = `${Math.random() * 10}s`;
-        backgroundRoot.appendChild(leaf);
-    }
-
-    // Add falling pumpkins
-    for (let i = 0; i < 8; i++) {
-        const pk = document.createElement('div');
-        pk.className = 'bg-pumpkin';
-        pk.style.left = `${Math.random() * 100}%`;
-        pk.style.top = `${-20 - Math.random() * 60}%`;
-        pk.style.animationDelay = `${Math.random() * 12}s`;
-        backgroundRoot.appendChild(pk);
     }
 }
 
