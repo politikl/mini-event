@@ -422,18 +422,25 @@ function createCharts() {
             candy.history = Array(GAME_CONFIG.maxPriceHistory).fill(candy.currentPrice);
         }
         
-        // Create chart wrapper
-        const chartWrapper = document.createElement('div');
-        chartWrapper.className = 'chart-wrapper';
+    // Create chart wrapper (card)
+    const chartWrapper = document.createElement('div');
+    chartWrapper.className = 'chart-card';
         chartWrapper.innerHTML = `
-            <h3>${candy.name}</h3>
-            <canvas id="chart-${candyId}"></canvas>
+            <div class="card-header">
+                <div class="card-name">${candy.name}</div>
+            </div>
+            <div class="card-canvas"><canvas id="chart-${candyId}"></canvas></div>
+            <div class="card-controls">
+                <button class="btn-buy" data-candy="${candyId}">BUY</button>
+                <button class="btn-sell" data-candy="${candyId}">SELL</button>
+                <div class="owned-badge" id="owned-${candyId}">0 owned</div>
+            </div>
             <div class="price-display">Current: $${candy.currentPrice.toFixed(2)}</div>
         `;
         chartsContainer.appendChild(chartWrapper);
         
-        // Create chart
-        const ctx = document.getElementById(`chart-${candyId}`).getContext('2d');
+            // Create chart canvas context
+            const ctx = document.getElementById(`chart-${candyId}`).getContext('2d');
         gameState.charts[candyId] = new Chart(ctx, {
             type: 'line',
             data: {
@@ -473,6 +480,22 @@ function createCharts() {
     });
 }
 
+// Buy/sell one share via card buttons
+function buyOne(candyId) {
+    // set selected candy and temporarily set quantity to 1
+    gameState.selectedCandy = candyId;
+    const qty = document.getElementById('quantity');
+    if (qty) qty.value = 1;
+    buyStocks();
+}
+
+function sellOne(candyId) {
+    gameState.selectedCandy = candyId;
+    const qty = document.getElementById('quantity');
+    if (qty) qty.value = 1;
+    sellStocks();
+}
+
 // Update charts with new price data
 function updateCharts() {
     Object.keys(CANDY_STOCKS).forEach(candyId => {
@@ -508,6 +531,11 @@ function updateCharts() {
                 const priceDisplay = chartElement.parentNode.querySelector('.price-display');
                 if (priceDisplay && typeof candy.currentPrice === 'number' && !isNaN(candy.currentPrice)) {
                     priceDisplay.textContent = `Current: $${candy.currentPrice.toFixed(2)}`;
+                }
+                // Update owned badge if present
+                const ownedEl = document.getElementById(`owned-${candyId}`);
+                if (ownedEl && gameState.portfolio && gameState.portfolio[candyId]) {
+                    ownedEl.textContent = `${gameState.portfolio[candyId].shares || 0} owned`;
                 }
             }
         } catch (err) {
@@ -1099,6 +1127,23 @@ function setupEventListeners() {
         dayLeaderboardBtn.addEventListener('click', () => {
             updateLeaderboard();
             document.getElementById('leaderboard-modal').classList.remove('hidden');
+        });
+    }
+
+    // Card-level buy/sell buttons (delegated)
+    const chartsContainerEl = document.getElementById('charts-container');
+    if (chartsContainerEl) {
+        chartsContainerEl.addEventListener('click', (ev) => {
+            const buyBtn = ev.target.closest('.btn-buy');
+            const sellBtn = ev.target.closest('.btn-sell');
+            if (buyBtn) {
+                const candyId = buyBtn.dataset.candy;
+                if (candyId) buyOne(candyId);
+            }
+            if (sellBtn) {
+                const candyId = sellBtn.dataset.candy;
+                if (candyId) sellOne(candyId);
+            }
         });
     }
 
