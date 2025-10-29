@@ -1,5 +1,4 @@
 // Candy Stock Market Simulation Game
-/*
 const PT_TZ = 'America/Los_Angeles';
 const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_TZ }));
 
@@ -70,7 +69,6 @@ const __timeLockChecker = setInterval(() => {
     }
   }
 }, 30_000);
-*/
 // Game Configuration
 const GAME_CONFIG = {
     initialCash: 1000,
@@ -78,17 +76,8 @@ const GAME_CONFIG = {
     priceUpdateInterval: 1000, // milliseconds
     newsUpdateInterval: 5000,  // milliseconds
     chartUpdateInterval: 1000, // milliseconds
-    maxPriceHistory: 30,      // number of days to show in charts
-    volatilityBase: 0.05,     // base volatility for price changes
-    autosaveInterval: 30000,  // autosave every 30 seconds
-    highScoreKey: 'candyStockHighScores',
-    highestCashKey: 'candyStockHighestCash',
-    achievements: {
-        firstPurchase: { name: 'First Purchase', description: 'Buy your first candy stock' },
-        thousandProfit: { name: 'Sweet Profit', description: 'Make $1000 in profit' },
-        diversified: { name: 'Candy Connoisseur', description: 'Own all types of candy stocks' },
-        bigSpender: { name: 'Big Spender', description: 'Have $5000 total worth' }
-    }
+    maxPriceHistory: 30,       // number of days to show in charts
+    volatilityBase: 0.05,      // base volatility for price changes
 };
 
 // Candy Stock Data
@@ -96,37 +85,46 @@ const CANDY_STOCKS = {
     choco: {
         name: "Choco Delights",
         basePrice: 10.00,
-        volatility: 0.065,
+        volatility: 0.08,
         color: "#8B4513", // brown
         description: "Premium chocolate candies with a smooth, rich flavor.",
-        trend: 0.006, // slight upward trend (dampened)
+        trend: 0.01, // slight upward trend
         history: []
     },
     gummy: {
         name: "Gummy Worms",
         basePrice: 5.50,
-        volatility: 0.095,
+        volatility: 0.12,
         color: "#FF5733", // orange-red
         description: "Colorful, chewy gummy worms that kids love.",
-        trend: 0.003, // stable with slight growth (dampened)
+        trend: 0.005, // stable with slight growth
         history: []
     },
     lollipop: {
         name: "Lollipop Dreams",
         basePrice: 3.25,
-        volatility: 0.12,
+        volatility: 0.15,
         color: "#FF69B4", // hot pink
         description: "Swirled lollipops in various flavors and colors.",
-        trend: -0.0012, // slight downward trend (dampened)
+        trend: -0.002, // slight downward trend
+        history: []
+    },
+    taffy: {
+        name: "Taffy Twists",
+        basePrice: 7.75,
+        volatility: 0.10,
+        color: "#9370DB", // medium purple
+        description: "Soft, chewy taffy in assorted fruit flavors.",
+        trend: 0.008, // moderate growth
         history: []
     },
     caramel: {
         name: "Caramel Clouds",
         basePrice: 12.50,
-        volatility: 0.05,
+        volatility: 0.06,
         color: "#D2691E", // chocolate
         description: "Luxurious caramel candies with a hint of sea salt.",
-        trend: 0.009, // strong growth (dampened)
+        trend: 0.015, // strong growth
         history: []
     }
 };
@@ -187,96 +185,34 @@ const NEWS_EVENTS = [
 const gameState = {
     day: 1,
     cash: GAME_CONFIG.initialCash,
-    portfolio: Object.fromEntries(
-        Object.keys(CANDY_STOCKS).map(id => [id, { shares: 0, avgBuyPrice: 0 }])
-    ),
+    portfolio: {
+        choco: { shares: 0, avgBuyPrice: 0 },
+        gummy: { shares: 0, avgBuyPrice: 0 },
+        lollipop: { shares: 0, avgBuyPrice: 0 },
+        taffy: { shares: 0, avgBuyPrice: 0 },
+        caramel: { shares: 0, avgBuyPrice: 0 }
+    },
     currentNews: [],
     gameOver: false,
     selectedCandy: 'choco',
-    charts: {},
-    achievements: new Set(),
-    statistics: {
-        totalProfit: 0,
-        tradesCount: 0,
-        highestProfit: 0
-    }
-    ,
-    // Track the highest total worth (cash + portfolio) achieved during play
-    highestCash: GAME_CONFIG.initialCash
+    charts: {}
 };
 
 // DOM Elements
 // Candy-themed Stock Market Game
-// Firebase Configuration
-const firebaseConfig = {
-    apiKey: "AIzaSyDYcUOKFG2OH7LXrS1YpMB04YMBrT9w4Yc",
-    authDomain: "mini-event-a5460.firebaseapp.com",
-    projectId: "mini-event-a5460",
-    storageBucket: "mini-event-a5460.appspot.com",
-    messagingSenderId: "402811747405",
-    appId: "1:402811747405:web:7701ee5e962e5a6b89f4c4"
-};
-
-// Initialize Firebase (but don't fail if unavailable)
-let db;
-try {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-} catch (err) {
-    console.warn('Firebase unavailable - leaderboard disabled:', err);
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize the game
     initGame();
-    // Initialize background decorations
-    initBackgroundDecorations();
 });
-
-// Initialize candy data
-function initializeCandyData() {
-    Object.keys(CANDY_STOCKS).forEach(candyId => {
-        const candy = CANDY_STOCKS[candyId];
-        candy.currentPrice = candy.basePrice;
-        // Fill history with base price for initial display
-        candy.history = Array(GAME_CONFIG.maxPriceHistory).fill(candy.basePrice);
-    });
-}
 
 // Initialize the game
 function initGame() {
-    // Try to load saved game
-    const savedGame = loadGame();
-    if (savedGame) {
-        // Safely merge saved game state, ensuring portfolio only contains valid candies
-        const validPortfolio = {};
-        Object.keys(CANDY_STOCKS).forEach(candyId => {
-            if (savedGame.portfolio?.[candyId]) {
-                validPortfolio[candyId] = savedGame.portfolio[candyId];
-            } else {
-                validPortfolio[candyId] = { shares: 0, avgBuyPrice: 0 };
-            }
-        });
-        savedGame.portfolio = validPortfolio;
-        Object.assign(gameState, savedGame);
-        // Ensure candy data is properly loaded
-        Object.keys(CANDY_STOCKS).forEach(candyId => {
-            if (!CANDY_STOCKS[candyId].currentPrice) {
-                CANDY_STOCKS[candyId].currentPrice = CANDY_STOCKS[candyId].basePrice;
-            }
-            if (!Array.isArray(CANDY_STOCKS[candyId].history) || CANDY_STOCKS[candyId].history.length === 0) {
-                CANDY_STOCKS[candyId].history = Array(GAME_CONFIG.maxPriceHistory).fill(CANDY_STOCKS[candyId].currentPrice);
-            }
-        });
-        showMessage("Game loaded from save!");
-    } else {
-        // Initialize new game data
-        initializeCandyData();
-    }
-
-    // Load persisted highest-cash (high score) and update UI
-    loadHighestCashFromStorage();
-    updateHighScoreDisplay();
+    // Initialize price history for each candy
+    Object.keys(CANDY_STOCKS).forEach(candyId => {
+        const candy = CANDY_STOCKS[candyId];
+        candy.currentPrice = candy.basePrice;
+        candy.history = [candy.basePrice];
+    });
 
     // Create charts for each candy
     createCharts();
@@ -290,169 +226,28 @@ function initGame() {
     // Start news ticker
     updateNewsTicker();
     setInterval(updateNewsTicker, GAME_CONFIG.newsUpdateInterval);
-
-    // Start autosave
-    setInterval(saveGame, GAME_CONFIG.autosaveInterval);
-
-    // Start the event countdown to 2025-10-31 00:00 PT
-    startEventCountdown();
-
-    // Initialize tooltips
-    setupTooltips();
-}
-
-// Save game state
-function saveGame() {
-    const prices = {};
-    Object.keys(CANDY_STOCKS).forEach(candyId => {
-        const candy = CANDY_STOCKS[candyId];
-        prices[candyId] = {
-            currentPrice: candy.currentPrice,
-            history: candy.history
-        };
-    });
-    const saveData = {
-        day: gameState.day,
-        cash: gameState.cash,
-        portfolio: gameState.portfolio,
-        selectedCandy: gameState.selectedCandy,
-        achievements: Array.from(gameState.achievements),
-        statistics: gameState.statistics,
-        prices: prices,
-        highestCash: gameState.highestCash
-    };
-    localStorage.setItem('candyStockSave', JSON.stringify(saveData));
-}
-
-// Load game state
-function loadGame() {
-    const saveData = localStorage.getItem('candyStockSave');
-    if (saveData) {
-        const parsed = JSON.parse(saveData);
-        parsed.achievements = new Set(parsed.achievements);
-        // Load prices
-        if (parsed.prices) {
-            Object.keys(parsed.prices).forEach(candyId => {
-                if (CANDY_STOCKS[candyId]) {
-                    CANDY_STOCKS[candyId].currentPrice = parsed.prices[candyId].currentPrice;
-                    CANDY_STOCKS[candyId].history = parsed.prices[candyId].history;
-                }
-            });
-        }
-        // Load highestCash if present in save
-        if (typeof parsed.highestCash !== 'undefined') {
-            parsed.highestCash = parseFloat(parsed.highestCash) || GAME_CONFIG.initialCash;
-        }
-        return parsed;
-    }
-    return null;
-}
-
-// Setup tooltips
-function setupTooltips() {
-    const tooltips = document.querySelectorAll('[data-tooltip]');
-    tooltips.forEach(element => {
-        element.addEventListener('mouseenter', e => {
-            const tooltip = document.createElement('div');
-            tooltip.className = 'tooltip';
-            tooltip.textContent = e.target.dataset.tooltip;
-            document.body.appendChild(tooltip);
-
-            const rect = e.target.getBoundingClientRect();
-            tooltip.style.left = rect.left + (rect.width / 2) - (tooltip.offsetWidth / 2) + 'px';
-            tooltip.style.top = rect.bottom + 5 + 'px';
-        });
-
-        element.addEventListener('mouseleave', () => {
-            const tooltip = document.querySelector('.tooltip');
-            if (tooltip) tooltip.remove();
-        });
-    });
-}
-
-// --- Highest-cash (high score) helpers ---
-function loadHighestCashFromStorage() {
-    const key = GAME_CONFIG.highestCashKey || 'candyStockHighestCash';
-    const v = localStorage.getItem(key);
-    if (v) {
-        const parsed = parseFloat(v);
-        if (!isNaN(parsed)) gameState.highestCash = parsed;
-    }
-}
-
-function saveHighestCashToStorage() {
-    const key = GAME_CONFIG.highestCashKey || 'candyStockHighestCash';
-    try {
-        localStorage.setItem(key, String(gameState.highestCash));
-    } catch (e) {
-        console.warn('Failed to save highest cash:', e);
-    }
-}
-
-function updateHighScoreDisplay() {
-    const el = document.getElementById('high-score-display');
-    if (!el) return;
-    el.textContent = `High: $${(gameState.highestCash || 0).toFixed(2)}`;
-}
-
-function checkAndUpdateHighScore() {
-    const totalWorth = gameState.cash + calculatePortfolioValue();
-    if (typeof gameState.highestCash === 'undefined' || totalWorth > gameState.highestCash) {
-        gameState.highestCash = totalWorth;
-        saveHighestCashToStorage();
-        updateHighScoreDisplay();
-        // Optionally show a small message
-        showMessage(`New high: $${gameState.highestCash.toFixed(2)}!`);
-    }
 }
 
 // Create price charts for each candy
 function createCharts() {
     const chartsContainer = document.getElementById('charts-container');
-    if (!chartsContainer) {
-        console.error('Charts container not found');
-        return;
-    }
     chartsContainer.innerHTML = ''; // Clear existing charts
     
     Object.keys(CANDY_STOCKS).forEach(candyId => {
         const candy = CANDY_STOCKS[candyId];
         
-        // Validate candy data
-        if (!candy || !candy.name || typeof candy.currentPrice === 'undefined' || !Array.isArray(candy.history)) {
-            console.error(`Invalid candy data for ${candyId}:`, candy);
-            return;
-        }
-
-        // Ensure we have valid price data
-        if (typeof candy.currentPrice !== 'number' || isNaN(candy.currentPrice)) {
-            candy.currentPrice = candy.basePrice;
-        }
-
-        // Ensure history array is properly filled
-        if (candy.history.length === 0) {
-            candy.history = Array(GAME_CONFIG.maxPriceHistory).fill(candy.currentPrice);
-        }
-        
-    // Create chart wrapper (card)
-    const chartWrapper = document.createElement('div');
-    chartWrapper.className = 'chart-card';
+        // Create chart wrapper
+        const chartWrapper = document.createElement('div');
+        chartWrapper.className = 'chart-wrapper';
         chartWrapper.innerHTML = `
-            <div class="card-header">
-                <div class="card-name">${candy.name}</div>
-            </div>
-            <div class="card-canvas"><canvas id="chart-${candyId}"></canvas></div>
-            <div class="card-controls">
-                <button class="btn-buy" data-candy="${candyId}">BUY</button>
-                <button class="btn-sell" data-candy="${candyId}">SELL</button>
-                <div class="owned-badge" id="owned-${candyId}">0 owned</div>
-            </div>
+            <h3>${candy.name}</h3>
+            <canvas id="chart-${candyId}"></canvas>
             <div class="price-display">Current: $${candy.currentPrice.toFixed(2)}</div>
         `;
         chartsContainer.appendChild(chartWrapper);
         
-            // Create chart canvas context
-            const ctx = document.getElementById(`chart-${candyId}`).getContext('2d');
+        // Create chart
+        const ctx = document.getElementById(`chart-${candyId}`).getContext('2d');
         gameState.charts[candyId] = new Chart(ctx, {
             type: 'line',
             data: {
@@ -492,100 +287,51 @@ function createCharts() {
     });
 }
 
-// Buy/sell one share via card buttons
-function buyOne(candyId) {
-    // set selected candy and temporarily set quantity to 1
-    gameState.selectedCandy = candyId;
-    const qty = document.getElementById('quantity');
-    if (qty) qty.value = 1;
-    buyStocks();
-}
-
-function sellOne(candyId) {
-    gameState.selectedCandy = candyId;
-    const qty = document.getElementById('quantity');
-    if (qty) qty.value = 1;
-    sellStocks();
-}
-
 // Update charts with new price data
 function updateCharts() {
     Object.keys(CANDY_STOCKS).forEach(candyId => {
         const candy = CANDY_STOCKS[candyId];
         const chart = gameState.charts[candyId];
         
-        // Validate data before updating
-        if (!candy || !Array.isArray(candy.history) || !chart) {
-            console.error(`Invalid data for updating ${candyId} chart`);
-            return;
-        }
-
-        // Ensure history array is properly filled
-        if (candy.history.length === 0) {
-            candy.history = Array(GAME_CONFIG.maxPriceHistory).fill(candy.currentPrice || candy.basePrice);
-        }
-        
-        try {
+        if (chart) {
             // Update labels
             chart.data.labels = Array(candy.history.length).fill('').map((_, i) => 
                 `Day ${Math.max(1, gameState.day - candy.history.length + i + 1)}`
             );
-
+            
             // Update data
             chart.data.datasets[0].data = candy.history;
-
+            
             // Update chart
             chart.update();
-
-            // Update price display (guard against invalid numbers)
+            
+            // Update price display
             const chartElement = document.getElementById(`chart-${candyId}`);
             if (chartElement) {
                 const priceDisplay = chartElement.parentNode.querySelector('.price-display');
-                if (priceDisplay && typeof candy.currentPrice === 'number' && !isNaN(candy.currentPrice)) {
+                if (priceDisplay) {
                     priceDisplay.textContent = `Current: $${candy.currentPrice.toFixed(2)}`;
                 }
-                // Update owned badge if present
-                const ownedEl = document.getElementById(`owned-${candyId}`);
-                if (ownedEl && gameState.portfolio && gameState.portfolio[candyId]) {
-                    ownedEl.textContent = `${gameState.portfolio[candyId].shares || 0} owned`;
-                }
             }
-        } catch (err) {
-            console.error(`Failed to update chart for ${candyId}:`, err);
         }
     });
 }
 
 // Generate new prices for all candies
 function generateNewPrices() {
-    // Mean-reverting price model with noise: smoother than pure random walk
-    const reversionStrength = 0.06; // how strongly prices pull back to basePrice
     Object.keys(CANDY_STOCKS).forEach(candyId => {
         const candy = CANDY_STOCKS[candyId];
-        if (!candy) return;
-
-        // Ensure currentPrice exists
-        if (typeof candy.currentPrice !== 'number' || isNaN(candy.currentPrice)) {
-            candy.currentPrice = candy.basePrice;
-        }
-
-        // Random shock (smaller amplitude)
-        const shock = (Math.random() * 2 - 1) * candy.volatility * 0.6;
-
-        // Mean reversion toward basePrice
-        const meanRevert = (candy.basePrice - candy.currentPrice) * reversionStrength * (1 - Math.abs(candy.trend || 0));
-
-        // Trend nudges price slowly in the trend direction
-        const trendNudge = candy.currentPrice * (candy.trend || 0) * 0.5;
-
-        let newPrice = candy.currentPrice + (candy.currentPrice * shock) + meanRevert + trendNudge;
-        if (!isFinite(newPrice) || isNaN(newPrice)) newPrice = candy.basePrice;
-        newPrice = Math.max(0.01, newPrice);
-
-        candy.currentPrice = newPrice;
-
+        
+        // Calculate price change based on volatility, trend, and randomness
+        const randomFactor = (Math.random() * 2 - 1); // Random value between -1 and 1
+        const volatilityFactor = candy.volatility * randomFactor;
+        const trendFactor = candy.trend;
+        
+        // Apply price change
+        const priceChange = candy.currentPrice * (volatilityFactor + trendFactor);
+        candy.currentPrice = Math.max(0.01, candy.currentPrice + priceChange);
+        
         // Add to history, keeping only the most recent prices
-        if (!Array.isArray(candy.history)) candy.history = [];
         candy.history.push(candy.currentPrice);
         if (candy.history.length > GAME_CONFIG.maxPriceHistory) {
             candy.history.shift();
@@ -635,14 +381,10 @@ function updateNewsTicker() {
 function calculatePortfolioValue() {
     let totalValue = 0;
     
-    if (!gameState.portfolio) return totalValue;
-    
     Object.keys(gameState.portfolio).forEach(candyId => {
         const holding = gameState.portfolio[candyId];
-        const stock = CANDY_STOCKS[candyId];
-        if (!stock || typeof stock.currentPrice !== 'number' || !holding) return;
-        
-        totalValue += holding.shares * stock.currentPrice;
+        const currentPrice = CANDY_STOCKS[candyId].currentPrice;
+        totalValue += holding.shares * currentPrice;
     });
     
     return totalValue;
@@ -685,19 +427,9 @@ function updateUI() {
     
     // Update portfolio table
     updatePortfolioTable();
-
+    
     // Update charts
     updateCharts();
-
-    // Update statistics panel
-    updateStatisticsPanel();
-
-    // Check and update high score if needed
-    try {
-        checkAndUpdateHighScore();
-    } catch (e) {
-        console.warn('High score check failed:', e);
-    }
 }
 
 // Update the portfolio table
@@ -740,84 +472,6 @@ function updatePortfolioTable() {
     }
 }
 
-// Check for achievements
-function checkAchievements() {
-    const totalWorth = gameState.cash + calculatePortfolioValue();
-    
-    // First Purchase
-    if (!gameState.achievements.has('firstPurchase') && 
-        Object.values(gameState.portfolio).some(h => h.shares > 0)) {
-        unlockAchievement('firstPurchase');
-    }
-    
-    // Thousand Profit
-    if (!gameState.achievements.has('thousandProfit') && 
-        gameState.statistics.totalProfit >= 1000) {
-        unlockAchievement('thousandProfit');
-    }
-    
-    // Diversified Portfolio
-    if (!gameState.achievements.has('diversified') && 
-        Object.values(gameState.portfolio).every(h => h.shares > 0)) {
-        unlockAchievement('diversified');
-    }
-    
-    // Big Spender
-    if (!gameState.achievements.has('bigSpender') && totalWorth >= 5000) {
-        unlockAchievement('bigSpender');
-    }
-}
-
-// Unlock achievement
-function unlockAchievement(achievementId) {
-    if (gameState.achievements.has(achievementId)) return;
-    
-    gameState.achievements.add(achievementId);
-    const achievement = GAME_CONFIG.achievements[achievementId];
-    
-    // Show achievement popup
-    const popup = document.getElementById('achievement-popup');
-    const name = document.getElementById('achievement-name');
-    const description = document.getElementById('achievement-description');
-    
-    name.textContent = achievement.name;
-    description.textContent = achievement.description;
-    popup.classList.remove('hidden');
-    
-    // Hide popup after 3 seconds
-    setTimeout(() => {
-        popup.classList.add('hidden');
-    }, 3000);
-    
-    // Update achievements panel
-    updateAchievementsPanel();
-}
-
-// Update achievements panel
-function updateAchievementsPanel() {
-    const list = document.getElementById('achievements-list');
-    if (!list) return;
-    list.innerHTML = '';
-    gameState.achievements.forEach(id => {
-        const ach = GAME_CONFIG.achievements[id];
-        const div = document.createElement('div');
-        div.className = 'achievement unlocked';
-        div.innerHTML = `<strong>${ach.name}</strong><br>${ach.description}`;
-        list.appendChild(div);
-    });
-}
-
-// Update statistics panel
-function updateStatisticsPanel() {
-    const totalTradesElement = document.getElementById('total-trades');
-    const highestProfitElement = document.getElementById('highest-profit');
-    const totalProfitElement = document.getElementById('total-profit');
-
-    if (totalTradesElement) totalTradesElement.textContent = gameState.statistics.tradesCount;
-    if (highestProfitElement) highestProfitElement.textContent = `$${gameState.statistics.highestProfit.toFixed(2)}`;
-    if (totalProfitElement) totalProfitElement.textContent = `$${gameState.statistics.totalProfit.toFixed(2)}`;
-}
-
 // Buy candy stocks
 function buyStocks() {
     const quantityInput = document.getElementById('quantity');
@@ -842,19 +496,12 @@ function buyStocks() {
     holding.avgBuyPrice = newTotalCost / newTotalShares;
     holding.shares = newTotalShares;
     
-    // Update cash and statistics
+    // Update cash
     gameState.cash -= totalCost;
-    gameState.statistics.tradesCount++;
-    
-    // Check achievements
-    checkAchievements();
     
     // Update UI
     updateUI();
     showMessage(`Bought ${quantity} shares of ${selectedCandy.name} for $${totalCost.toFixed(2)}`);
-    
-    // Autosave
-    saveGame();
 }
 
 // Sell candy stocks
@@ -865,39 +512,26 @@ function sellStocks() {
         showMessage("Please enter a valid quantity.");
         return;
     }
-
+    
     const holding = gameState.portfolio[gameState.selectedCandy];
     if (quantity > holding.shares) {
         showMessage("You don't own that many shares!");
         return;
     }
-
+    
     const selectedCandy = CANDY_STOCKS[gameState.selectedCandy];
     const saleValue = quantity * selectedCandy.currentPrice;
-    const costBasis = quantity * holding.avgBuyPrice;
-    const realizedProfit = saleValue - costBasis;
-
+    
     // Update portfolio
     holding.shares -= quantity;
     // Note: We don't change avgBuyPrice when selling
-
+    
     // Update cash
     gameState.cash += saleValue;
-
-    // Update statistics
-    gameState.statistics.totalProfit += realizedProfit;
-    gameState.statistics.highestProfit = Math.max(gameState.statistics.highestProfit, realizedProfit);
-    gameState.statistics.tradesCount++;
-
-    // Check achievements
-    checkAchievements();
-
+    
     // Update UI
     updateUI();
     showMessage(`Sold ${quantity} shares of ${selectedCandy.name} for $${saleValue.toFixed(2)}`);
-
-    // Autosave
-    saveGame();
 }
 
 // Advance to the next day
@@ -919,204 +553,18 @@ function nextDay() {
     }
 }
 
-// Leaderboard functions
-async function submitScore(playerName, score) {
-    if (!db) {
-        showMessage("Leaderboard unavailable - Firebase not connected");
-        return;
-    }
-    
-    try {
-        const scoreData = {
-            player: playerName,
-            score: score,
-            date: firebase.firestore.Timestamp.now(),
-            achievements: Array.from(gameState.achievements),
-            statistics: gameState.statistics
-        };
-
-        await db.collection('candyStockScores').add(scoreData);
-        showMessage("Score submitted successfully!");
-        updateLeaderboard();
-    } catch (error) {
-        console.error("Error submitting score:", error);
-        showMessage("Error submitting score. Please try again.");
-    }
-}
-
-// Load high scores from Firebase
-async function loadHighScores() {
-    if (!db) return [];
-    try {
-        const today = new Date().toISOString().split('T')[0];
-        const snapshot = await db.collection('scores')
-            .doc(today)
-            .collection('entries')
-            .where('day', '==', 4)
-            .orderBy('score', 'desc')
-            .limit(10)
-            .get();
-        
-        return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-    } catch (error) {
-        console.error("Error loading high scores:", error);
-        return [];
-    }
-}
-
-// Update leaderboard display
-async function updateLeaderboard() {
-    if (!db) {
-        const leaderboardBody = document.getElementById('leaderboard-body');
-        if (leaderboardBody) {
-            leaderboardBody.innerHTML = '<tr><td colspan="4">Leaderboard unavailable - Firebase not connected</td></tr>';
-        }
-        return;
-    }
-
-    try {
-        const leaderboardBody = document.getElementById('leaderboard-body');
-        if (!leaderboardBody) return;
-        
-        leaderboardBody.innerHTML = '';
-        const highScores = await loadHighScores();
-
-        if (highScores.length === 0) {
-            leaderboardBody.innerHTML = '<tr><td colspan="4">No scores yet today!</td></tr>';
-            return;
-        }
-
-        highScores.forEach((score, index) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${index + 1}</td>
-                <td>Player ${index + 1}</td>
-                <td>$${score.score.toFixed(2)}</td>
-                <td>${score.date.toDate().toLocaleTimeString()}</td>
-            `;
-            leaderboardBody.appendChild(row);
-        });
-    } catch (error) {
-        console.error("Error updating leaderboard:", error);
-        const leaderboardBody = document.getElementById('leaderboard-body');
-        if (leaderboardBody) {
-            leaderboardBody.innerHTML = '<tr><td colspan="4">Error loading leaderboard</td></tr>';
-        }
-    }
-}
-
-// End the game and handle high score submission
-async function endGame() {
-    if (gameState.gameOver) return; // Prevent multiple submissions
+// End the game
+function endGame() {
     gameState.gameOver = true;
     
-    const finalScore = Math.floor(gameState.cash + calculatePortfolioValue());
+    const finalScore = gameState.cash + calculatePortfolioValue();
     const finalScoreElement = document.getElementById('final-score');
     const scoreSubmission = document.getElementById('score-submission');
     
     if (finalScoreElement) finalScoreElement.textContent = `$${finalScore.toFixed(2)}`;
     if (scoreSubmission) scoreSubmission.classList.remove('hidden');
     
-    // Check if this is a high score
-    const highScores = await loadHighScores();
-    const isHighScore = highScores.length < 10 || finalScore > highScores[highScores.length - 1]?.score;
-    
-    showMessage(`Game Over! ${isHighScore ? 'New High Score!' : 'Check your final score.'}`);
-    
-    // Auto-submit score to Firebase
-    try {
-        if (db) {
-            const score = {
-                score: finalScore,
-                date: firebase.firestore.Timestamp.now(),
-                day: 4,
-                details: {
-                    cash: gameState.cash,
-                    portfolio: gameState.portfolio,
-                    achievements: Array.from(gameState.achievements),
-                    statistics: gameState.statistics,
-                    finalDay: gameState.day
-                }
-            };
-
-            // Add score to today's scores collection
-            const today = new Date().toISOString().split('T')[0];
-            await db.collection('scores').doc(today).collection('entries').add(score);
-            
-            // Update daily stats
-            const statsRef = db.collection('scores').doc(today);
-            await db.runTransaction(async (transaction) => {
-                const statsDoc = await transaction.get(statsRef);
-                if (!statsDoc.exists) {
-                    transaction.set(statsRef, {
-                        day: 4,
-                        highScore: finalScore,
-                        totalPlays: 1,
-                        avgScore: finalScore
-                    });
-                } else {
-                    const data = statsDoc.data();
-                    const newTotal = data.totalPlays + 1;
-                    const newAvg = (data.avgScore * data.totalPlays + finalScore) / newTotal;
-                    transaction.update(statsRef, {
-                        highScore: Math.max(data.highScore, finalScore),
-                        totalPlays: newTotal,
-                        avgScore: newAvg
-                    });
-                }
-            });
-            
-            showMessage("Score submitted successfully!");
-            updateLeaderboard();
-        }
-    } catch (error) {
-        console.error("Error submitting score:", error);
-        showMessage("Error submitting score");
-    }
-    
-    // Show leaderboard modal
-    document.getElementById('leaderboard-modal').classList.remove('hidden');
-}
-
-// --- Event countdown (to 2025-10-31 00:00 PT) ---
-function startEventCountdown() {
-    const displayEl = document.getElementById('game-timer');
-    if (!displayEl) return;
-
-    // Event end in PT (Pacific Time). PDT on 2025-10-31 is UTC-7, so use UTC time.
-    const endDate = new Date('2025-10-31T07:00:00Z');
-
-    const tick = () => {
-        const now = new Date();
-        let diff = endDate - now;
-        if (diff <= 0) {
-            displayEl.textContent = 'Event ended';
-            // Ensure game is ended
-            if (!gameState.gameOver) endGame();
-            clearInterval(__countdownTimer);
-            return;
-        }
-
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        diff -= days * (1000 * 60 * 60 * 24);
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        diff -= hours * (1000 * 60 * 60);
-        const minutes = Math.floor(diff / (1000 * 60));
-        diff -= minutes * (1000 * 60);
-        const seconds = Math.floor(diff / 1000);
-
-        let text = '';
-        if (days > 0) text += `${days}d `;
-        text += `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
-        displayEl.textContent = `Ends in ${text} PT`;
-    };
-
-    // First tick and interval
-    tick();
-    const __countdownTimer = setInterval(tick, 1000);
+    showMessage("Game Over! Check your final score.");
 }
 
 // Reset the game
@@ -1127,10 +575,10 @@ function resetGame() {
     gameState.currentNews = [];
     gameState.gameOver = false;
     
-    // Reset portfolio (only for valid candy types)
-    gameState.portfolio = Object.fromEntries(
-        Object.keys(CANDY_STOCKS).map(id => [id, { shares: 0, avgBuyPrice: 0 }])
-    );
+    // Reset portfolio
+    Object.keys(gameState.portfolio).forEach(candyId => {
+        gameState.portfolio[candyId] = { shares: 0, avgBuyPrice: 0 };
+    });
     
     // Reset candy prices
     Object.keys(CANDY_STOCKS).forEach(candyId => {
@@ -1215,56 +663,10 @@ function setupEventListeners() {
     
     // Submit score button
     if (submitScoreButton) {
-        submitScoreButton.addEventListener('click', async () => {
+        submitScoreButton.addEventListener('click', () => {
             const finalScore = gameState.cash + calculatePortfolioValue();
-            const playerName = prompt("Enter your name for the leaderboard:");
-            
-            if (playerName && playerName.trim()) {
-                await submitScore(playerName.trim(), finalScore);
-            }
-        });
-    }
-    
-    // Close leaderboard button
-    const closeLeaderboardBtn = document.getElementById('close-leaderboard');
-    if (closeLeaderboardBtn) {
-        closeLeaderboardBtn.addEventListener('click', () => {
-            document.getElementById('leaderboard-modal').classList.add('hidden');
-        });
-    }
-
-    // Open leaderboard modal (header button)
-    const dayLeaderboardBtn = document.getElementById('day-leaderboard-btn');
-    if (dayLeaderboardBtn) {
-        dayLeaderboardBtn.addEventListener('click', () => {
-            updateLeaderboard();
-            document.getElementById('leaderboard-modal').classList.remove('hidden');
-        });
-    }
-
-    // Card-level buy/sell buttons (delegated)
-    const chartsContainerEl = document.getElementById('charts-container');
-    if (chartsContainerEl) {
-        chartsContainerEl.addEventListener('click', (ev) => {
-            const buyBtn = ev.target.closest('.btn-buy');
-            const sellBtn = ev.target.closest('.btn-sell');
-            if (buyBtn) {
-                const candyId = buyBtn.dataset.candy;
-                if (candyId) buyOne(candyId);
-            }
-            if (sellBtn) {
-                const candyId = sellBtn.dataset.candy;
-                if (candyId) sellOne(candyId);
-            }
-        });
-    }
-
-    // Manual save button
-    const saveBtn = document.getElementById('save-btn');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', () => {
-            saveGame();
-            showMessage('Game saved.');
+            // Here you would typically send the score to a server
+            alert(`Score submitted: $${finalScore.toFixed(2)}`);
         });
     }
     
@@ -1281,44 +683,83 @@ function setupEventListeners() {
     }
 }
 
-// Initialize background decorations
-function initBackgroundDecorations() {
-    const background = document.getElementById('background');
-    if (!background) return;
-
-    // Create initial set of elements
-    const elementCount = 12; // 8 leaves + 4 pumpkins
-    
-    for (let i = 0; i < elementCount; i++) {
-        const isLeaf = i < 8; // first 8 are leaves, rest are pumpkins
-        const elem = document.createElement('div');
-        elem.className = isLeaf ? 'leaf' : 'bg-pumpkin';
-        
-        // Randomize starting positions
-        const startX = Math.random() * 100; // 0-100%
-        const startY = -Math.random() * 20; // start above viewport
-        elem.style.left = `${startX}%`;
-        elem.style.top = `${startY}vh`;
-        
-        // Randomize animation
-        const duration = 10 + Math.random() * 10; // 10-20s
-        const delay = -Math.random() * 10; // start at different points
-        elem.style.animationDuration = `${duration}s`;
-        elem.style.animationDelay = `${delay}s`;
-        
-        // Add some rotation variation for leaves
-        if (isLeaf) {
-            elem.style.transform = `rotate(${Math.random() * 360}deg)`;
-        }
-        
-        background.appendChild(elem);
-    }
-}
-
 // Draw price chart for a specific candy
 function drawChart(candyId) {
-    // Deprecated legacy drawing function. The project now uses Chart.js instances
-    // stored in gameState.charts. This stub prevents runtime errors from any
-    // remaining callers that expect drawChart to exist.
-    console.warn('drawChart() is deprecated. Use Chart.js charts via gameState.charts.');
+    const chart = gameState.charts[candyId];
+    const ctx = chart.ctx;
+    const canvas = chart.canvas;
+    const stock = candyStocks[candyId];
+    const priceHistory = stock.priceHistory;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw grid
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 0.5;
+    
+    // Horizontal grid lines
+    for (let i = 0; i <= 4; i++) {
+        const y = i * (canvas.height / 4);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+    }
+    
+    // Vertical grid lines
+    for (let i = 0; i <= 6; i++) {
+        const x = i * (canvas.width / 6);
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+    }
+    
+    // Draw price line
+    if (priceHistory.length > 1) {
+        const maxPrice = Math.max(...priceHistory) * 1.1;
+        const minPrice = Math.min(...priceHistory) * 0.9;
+        const priceRange = maxPrice - minPrice;
+        
+        ctx.strokeStyle = stock.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        
+        // Draw price line
+        for (let i = 0; i < priceHistory.length; i++) {
+            const x = (i / (priceHistory.length - 1)) * canvas.width;
+            const y = canvas.height - ((priceHistory[i] - minPrice) / priceRange) * canvas.height;
+            
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        
+        ctx.stroke();
+    }
+    
+    // Update price display
+    const priceLabel = chart.wrapper.querySelector('.price-label');
+    if (priceLabel) {
+        priceLabel.textContent = `$${stock.price.toFixed(2)}`;
+    }
+    
+    // Update shares display
+    const sharesDisplay = chart.wrapper.querySelector('.shares-display');
+    if (sharesDisplay) {
+        sharesDisplay.textContent = `${stock.owned} shares`;
+    }
+    
+    // Update profit display
+    const profitDisplay = chart.wrapper.querySelector('.profit-display');
+    if (profitDisplay) {
+        const currentValue = stock.owned * stock.price;
+        const profit = currentValue - stock.purchaseValue;
+        const profitText = profit >= 0 ? `+$${profit.toFixed(2)}` : `-$${Math.abs(profit).toFixed(2)}`;
+        profitDisplay.textContent = profitText;
+        profitDisplay.style.color = profit >= 0 ? '#00ff9d' : '#ff6b6b';
+    }
 }
