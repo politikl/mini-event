@@ -217,9 +217,14 @@ const firebaseConfig = {
     appId: "1:402811747405:web:7701ee5e962e5a6b89f4c4"
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+// Initialize Firebase (but don't fail if unavailable)
+let db;
+try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+} catch (err) {
+    console.warn('Firebase unavailable - leaderboard disabled:', err);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize the game
@@ -916,6 +921,11 @@ function nextDay() {
 
 // Leaderboard functions
 async function submitScore(playerName, score) {
+    if (!db) {
+        showMessage("Leaderboard unavailable - Firebase not connected");
+        return;
+    }
+    
     try {
         const scoreData = {
             player: playerName,
@@ -935,6 +945,14 @@ async function submitScore(playerName, score) {
 }
 
 async function updateLeaderboard() {
+    if (!db) {
+        const leaderboardBody = document.getElementById('leaderboard-body');
+        if (leaderboardBody) {
+            leaderboardBody.innerHTML = '<tr><td colspan="4">Leaderboard unavailable - Firebase not connected</td></tr>';
+        }
+        return;
+    }
+
     try {
         const leaderboardBody = document.getElementById('leaderboard-body');
         leaderboardBody.innerHTML = '';
@@ -957,6 +975,10 @@ async function updateLeaderboard() {
         });
     } catch (error) {
         console.error("Error updating leaderboard:", error);
+        const leaderboardBody = document.getElementById('leaderboard-body');
+        if (leaderboardBody) {
+            leaderboardBody.innerHTML = '<tr><td colspan="4">Error loading leaderboard</td></tr>';
+        }
     }
 }
 
