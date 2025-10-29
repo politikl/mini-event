@@ -141,9 +141,17 @@ p {
     margin-bottom: 20px;
     background-color: rgba(0, 0, 0, 0.7);
     padding: 15px;
-    border-radius: 10px;
+    border-radius: 12px;
     border: 2px solid #ff6b35;
     min-height: 200px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.chart-wrapper:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+    border-color: var(--accent-light);
 }
 
 #market-view {
@@ -416,11 +424,35 @@ button {
     font-family: 'Shadows Into Light', cursive;
     font-size: 1.1em;
     transition: all 0.3s ease;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+button::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom right, rgba(255,255,255,0.1), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 button:hover {
-    transform: scale(1.05);
+    transform: translateY(-2px);
     filter: brightness(1.1);
+    border-color: var(--accent);
+}
+
+button:hover::after {
+    opacity: 1;
+}
+
+button:active {
+    transform: translateY(1px);
+    filter: brightness(0.95);
 }
 
 #portfolio-table {

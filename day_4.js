@@ -279,6 +279,8 @@ const db = firebase.firestore();
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize the game
     initGame();
+    // Initialize background decorations
+    initBackgroundDecorations();
 });
 
 // Initialize candy data
@@ -1171,6 +1173,40 @@ function setupEventListeners() {
         backButton.addEventListener('click', () => {
             window.location.href = 'index.html';
         });
+    }
+}
+
+// Initialize background decorations
+function initBackgroundDecorations() {
+    const background = document.getElementById('background');
+    if (!background) return;
+
+    // Create initial set of elements
+    const elementCount = 12; // 8 leaves + 4 pumpkins
+    
+    for (let i = 0; i < elementCount; i++) {
+        const isLeaf = i < 8; // first 8 are leaves, rest are pumpkins
+        const elem = document.createElement('div');
+        elem.className = isLeaf ? 'leaf' : 'bg-pumpkin';
+        
+        // Randomize starting positions
+        const startX = Math.random() * 100; // 0-100%
+        const startY = -Math.random() * 20; // start above viewport
+        elem.style.left = `${startX}%`;
+        elem.style.top = `${startY}vh`;
+        
+        // Randomize animation
+        const duration = 10 + Math.random() * 10; // 10-20s
+        const delay = -Math.random() * 10; // start at different points
+        elem.style.animationDuration = `${duration}s`;
+        elem.style.animationDelay = `${delay}s`;
+        
+        // Add some rotation variation for leaves
+        if (isLeaf) {
+            elem.style.transform = `rotate(${Math.random() * 360}deg)`;
+        }
+        
+        background.appendChild(elem);
     }
 }
 
