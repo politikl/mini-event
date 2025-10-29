@@ -78,6 +78,7 @@ const GAME_CONFIG = {
     chartUpdateInterval: 1000, // milliseconds
     maxPriceHistory: 30,       // number of days to show in charts
     volatilityBase: 0.05,      // base volatility for price changes
+    autoAdvanceInterval: 5000, // milliseconds between automatic day advances
 };
 
 // Candy Stock Data
@@ -224,8 +225,47 @@ function initGame() {
     setupEventListeners();
 
     // Start news ticker
+    // Start news ticker and keep its interval id so we can clear/restart later
+    if (gameState._newsTimer) clearInterval(gameState._newsTimer);
     updateNewsTicker();
-    setInterval(updateNewsTicker, GAME_CONFIG.newsUpdateInterval);
+    gameState._newsTimer = setInterval(updateNewsTicker, GAME_CONFIG.newsUpdateInterval);
+
+    // Start price tick and auto-advance timers
+    startGameTimers();
+}
+
+// Start and stop helper functions for timers (price ticks and auto-advance)
+function startGameTimers() {
+    // clear any existing timers first
+    stopGameTimers();
+
+    // Price update (intraday ticks)
+    gameState._priceTimer = setInterval(() => {
+        if (gameState.gameOver) return;
+        generateNewPrices();
+        updateUI();
+    }, GAME_CONFIG.priceUpdateInterval);
+
+    // Auto-advance days at a readable interval
+    gameState._autoAdvanceTimer = setInterval(() => {
+        if (gameState.gameOver) return;
+        nextDay();
+    }, GAME_CONFIG.autoAdvanceInterval);
+}
+
+function stopGameTimers() {
+    if (gameState._priceTimer) {
+        clearInterval(gameState._priceTimer);
+        delete gameState._priceTimer;
+    }
+    if (gameState._autoAdvanceTimer) {
+        clearInterval(gameState._autoAdvanceTimer);
+        delete gameState._autoAdvanceTimer;
+    }
+    if (gameState._newsTimer) {
+        clearInterval(gameState._newsTimer);
+        delete gameState._newsTimer;
+    }
 }
 
 // Create price charts for each candy
@@ -447,7 +487,7 @@ function updatePortfolioTable() {
             const currentValue = holding.shares * candy.currentPrice;
             const costBasis = holding.shares * holding.avgBuyPrice;
             const profitLoss = currentValue - costBasis;
-            const profitLossPercent = (profitLoss / costBasis) * 100;
+            const profitLossPercent = costBasis ? (profitLoss / costBasis) * 100 : 0;
             
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -556,6 +596,8 @@ function nextDay() {
 // End the game
 function endGame() {
     gameState.gameOver = true;
+    // stop timers to prevent further updates/auto-advances
+    stopGameTimers();
     
     const finalScore = gameState.cash + calculatePortfolioValue();
     const finalScoreElement = document.getElementById('final-score');
@@ -569,6 +611,9 @@ function endGame() {
 
 // Reset the game
 function resetGame() {
+    // Stop timers, then reset game state
+    stopGameTimers();
+
     // Reset game state
     gameState.day = 1;
     gameState.cash = GAME_CONFIG.initialCash;
@@ -594,6 +639,12 @@ function resetGame() {
     // Update UI
     updateUI();
     showMessage("Game reset! You have $1000 to invest.");
+
+    // Restart news ticker and timers
+    if (gameState._newsTimer) clearInterval(gameState._newsTimer);
+    updateNewsTicker();
+    gameState._newsTimer = setInterval(updateNewsTicker, GAME_CONFIG.newsUpdateInterval);
+    startGameTimers();
 }
 
 // Show a message to the player
@@ -680,86 +731,5 @@ function setupEventListeners() {
         backButton.addEventListener('click', () => {
             window.location.href = 'index.html';
         });
-    }
-}
-
-// Draw price chart for a specific candy
-function drawChart(candyId) {
-    const chart = gameState.charts[candyId];
-    const ctx = chart.ctx;
-    const canvas = chart.canvas;
-    const stock = candyStocks[candyId];
-    const priceHistory = stock.priceHistory;
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw grid
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 0.5;
-    
-    // Horizontal grid lines
-    for (let i = 0; i <= 4; i++) {
-        const y = i * (canvas.height / 4);
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-    }
-    
-    // Vertical grid lines
-    for (let i = 0; i <= 6; i++) {
-        const x = i * (canvas.width / 6);
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-    }
-    
-    // Draw price line
-    if (priceHistory.length > 1) {
-        const maxPrice = Math.max(...priceHistory) * 1.1;
-        const minPrice = Math.min(...priceHistory) * 0.9;
-        const priceRange = maxPrice - minPrice;
-        
-        ctx.strokeStyle = stock.color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        
-        // Draw price line
-        for (let i = 0; i < priceHistory.length; i++) {
-            const x = (i / (priceHistory.length - 1)) * canvas.width;
-            const y = canvas.height - ((priceHistory[i] - minPrice) / priceRange) * canvas.height;
-            
-            if (i === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
-            }
-        }
-        
-        ctx.stroke();
-    }
-    
-    // Update price display
-    const priceLabel = chart.wrapper.querySelector('.price-label');
-    if (priceLabel) {
-        priceLabel.textContent = `$${stock.price.toFixed(2)}`;
-    }
-    
-    // Update shares display
-    const sharesDisplay = chart.wrapper.querySelector('.shares-display');
-    if (sharesDisplay) {
-        sharesDisplay.textContent = `${stock.owned} shares`;
-    }
-    
-    // Update profit display
-    const profitDisplay = chart.wrapper.querySelector('.profit-display');
-    if (profitDisplay) {
-        const currentValue = stock.owned * stock.price;
-        const profit = currentValue - stock.purchaseValue;
-        const profitText = profit >= 0 ? `+$${profit.toFixed(2)}` : `-$${Math.abs(profit).toFixed(2)}`;
-        profitDisplay.textContent = profitText;
-        profitDisplay.style.color = profit >= 0 ? '#00ff9d' : '#ff6b6b';
     }
 }
