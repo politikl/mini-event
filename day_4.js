@@ -187,12 +187,9 @@ const NEWS_EVENTS = [
 const gameState = {
     day: 1,
     cash: GAME_CONFIG.initialCash,
-    portfolio: {
-        choco: { shares: 0, avgBuyPrice: 0 },
-        gummy: { shares: 0, avgBuyPrice: 0 },
-        lollipop: { shares: 0, avgBuyPrice: 0 },
-        caramel: { shares: 0, avgBuyPrice: 0 }
-    },
+    portfolio: Object.fromEntries(
+        Object.keys(CANDY_STOCKS).map(id => [id, { shares: 0, avgBuyPrice: 0 }])
+    ),
     currentNews: [],
     gameOver: false,
     selectedCandy: 'choco',
@@ -246,6 +243,16 @@ function initGame() {
     // Try to load saved game
     const savedGame = loadGame();
     if (savedGame) {
+        // Safely merge saved game state, ensuring portfolio only contains valid candies
+        const validPortfolio = {};
+        Object.keys(CANDY_STOCKS).forEach(candyId => {
+            if (savedGame.portfolio?.[candyId]) {
+                validPortfolio[candyId] = savedGame.portfolio[candyId];
+            } else {
+                validPortfolio[candyId] = { shares: 0, avgBuyPrice: 0 };
+            }
+        });
+        savedGame.portfolio = validPortfolio;
         Object.assign(gameState, savedGame);
         // Ensure candy data is properly loaded
         Object.keys(CANDY_STOCKS).forEach(candyId => {
@@ -623,10 +630,14 @@ function updateNewsTicker() {
 function calculatePortfolioValue() {
     let totalValue = 0;
     
+    if (!gameState.portfolio) return totalValue;
+    
     Object.keys(gameState.portfolio).forEach(candyId => {
         const holding = gameState.portfolio[candyId];
-        const currentPrice = CANDY_STOCKS[candyId].currentPrice;
-        totalValue += holding.shares * currentPrice;
+        const stock = CANDY_STOCKS[candyId];
+        if (!stock || typeof stock.currentPrice !== 'number' || !holding) return;
+        
+        totalValue += holding.shares * stock.currentPrice;
     });
     
     return totalValue;
@@ -1015,10 +1026,10 @@ function resetGame() {
     gameState.currentNews = [];
     gameState.gameOver = false;
     
-    // Reset portfolio
-    Object.keys(gameState.portfolio).forEach(candyId => {
-        gameState.portfolio[candyId] = { shares: 0, avgBuyPrice: 0 };
-    });
+    // Reset portfolio (only for valid candy types)
+    gameState.portfolio = Object.fromEntries(
+        Object.keys(CANDY_STOCKS).map(id => [id, { shares: 0, avgBuyPrice: 0 }])
+    );
     
     // Reset candy prices
     Object.keys(CANDY_STOCKS).forEach(candyId => {
