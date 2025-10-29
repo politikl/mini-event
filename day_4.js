@@ -291,43 +291,6 @@ function initializeCandyData() {
     });
 }
 
-// Initialize background decorations
-function initBackgroundDecorations() {
-    const background = document.getElementById('background');
-    if (!background) return;
-
-    // Clear existing decorations
-    background.innerHTML = '';
-
-    // Parameters for decoration generation
-    const totalLeaves = 12;
-    const totalPumpkins = 8;
-    const viewportWidth = window.innerWidth;
-
-    // Helper to get random number within a range
-    const random = (min, max) => Math.random() * (max - min) + min;
-
-    // Create leaves
-    for (let i = 0; i < totalLeaves; i++) {
-        const leaf = document.createElement('div');
-        leaf.className = 'leaf';
-        leaf.style.left = `${random(5, 95)}%`;
-        leaf.style.animationDelay = `${random(0, 12)}s`;
-        leaf.style.transform = `scale(${random(0.8, 1.2)})`;
-        background.appendChild(leaf);
-    }
-
-    // Create pumpkins
-    for (let i = 0; i < totalPumpkins; i++) {
-        const pumpkin = document.createElement('div');
-        pumpkin.className = 'bg-pumpkin';
-        pumpkin.style.left = `${random(5, 95)}%`;
-        pumpkin.style.animationDelay = `${random(0, 12)}s`;
-        pumpkin.style.transform = `scale(${random(0.8, 1.2)})`;
-        background.appendChild(pumpkin);
-    }
-}
-
 // Initialize the game
 function initGame() {
     // Try to load saved game
@@ -348,9 +311,6 @@ function initGame() {
         // Initialize new game data
         initializeCandyData();
     }
-    
-    // Initialize background decorations
-    initBackgroundDecorations();
 
     // Load persisted highest-cash (high score) and update UI
     loadHighestCashFromStorage();
