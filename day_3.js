@@ -465,16 +465,16 @@ const __timeLockChecker = setInterval(() => {
     const key = e.key.toLowerCase();
     let moved = false;
 
-    if (key === 'arrowleft' || key === 'a') {
+    if (key === 'arrowleft' || key === 'a' || key === 'j') {
       movePlayer(-1, 0);
       moved = true;
-    } else if (key === 'arrowright' || key === 'd') {
+    } else if (key === 'arrowright' || key === 'd' || key === 'l') {
       movePlayer(1, 0);
       moved = true;
-    } else if (key === 'arrowup' || key === 'w') {
+    } else if (key === 'arrowup' || key === 'w' || key === 'i') {
       movePlayer(0, -1);
       moved = true;
-    } else if (key === 'arrowdown' || key === 's') {
+    } else if (key === 'arrowdown' || key === 's' || key === 'k') {
       movePlayer(0, 1);
       moved = true;
     }
