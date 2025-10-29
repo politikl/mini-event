@@ -120,15 +120,6 @@ const CANDY_STOCKS = {
         trend: -0.0012, // slight downward trend (dampened)
         history: []
     },
-    taffy: {
-        name: "Taffy Twists",
-        basePrice: 7.75,
-        volatility: 0.08,
-        color: "#9370DB", // medium purple
-        description: "Soft, chewy taffy in assorted fruit flavors.",
-        trend: 0.005, // moderate growth (dampened)
-        history: []
-    },
     caramel: {
         name: "Caramel Clouds",
         basePrice: 12.50,
@@ -136,44 +127,6 @@ const CANDY_STOCKS = {
         color: "#D2691E", // chocolate
         description: "Luxurious caramel candies with a hint of sea salt.",
         trend: 0.009, // strong growth (dampened)
-        history: []
-    }
-    ,
-    mint: {
-        name: "Minty Morsels",
-        basePrice: 4.00,
-        volatility: 0.06,
-        color: "#9ee6b2",
-        description: "Refreshing mint candies with a cooling aftertaste.",
-        trend: 0.0012,
-        history: []
-    },
-    sprinkle: {
-        name: "Sprinkle Pops",
-        basePrice: 2.75,
-        volatility: 0.11,
-        color: "#ffd1e6",
-        description: "Colorful sprinkle-dusted pops loved by kids and adults alike.",
-        trend: 0.004,
-        history: []
-    }
-    ,
-    toffee: {
-        name: "Toffee Tango",
-        basePrice: 6.50,
-        volatility: 0.07,
-        color: "#c27b4a",
-        description: "Buttery toffee bites with a satisfying crunch.",
-        trend: 0.003,
-        history: []
-    },
-    jelly: {
-        name: "Jelly Jubes",
-        basePrice: 1.95,
-        volatility: 0.09,
-        color: "#8bd3ff",
-        description: "Small jelly candies in assorted fruity flavors.",
-        trend: 0.0025,
         history: []
     }
 };
@@ -238,12 +191,7 @@ const gameState = {
         choco: { shares: 0, avgBuyPrice: 0 },
         gummy: { shares: 0, avgBuyPrice: 0 },
         lollipop: { shares: 0, avgBuyPrice: 0 },
-        taffy: { shares: 0, avgBuyPrice: 0 },
-        caramel: { shares: 0, avgBuyPrice: 0 },
-        mint: { shares: 0, avgBuyPrice: 0 },
-        sprinkle: { shares: 0, avgBuyPrice: 0 },
-        toffee: { shares: 0, avgBuyPrice: 0 },
-        jelly: { shares: 0, avgBuyPrice: 0 }
+        caramel: { shares: 0, avgBuyPrice: 0 }
     },
     currentNews: [],
     gameOver: false,
