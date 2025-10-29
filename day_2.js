@@ -109,10 +109,10 @@ const __timeLockChecker = setInterval(() => {
 
   const now = new Date();
   const year = now.getFullYear();
-  const GAME_END_TS = Date.parse(`${year}-10-30T00:00:00-07:00`);
+  const GAME_END_TS = Date.parse(`${year}-10-29T00:00:00-07:00`);
 
   // base logical resolution (game world coordinates)
-  const LOGICAL_W = 640;
+  const LOGICAL_W 
   const LOGICAL_H = 480;
 
   // runtime state
