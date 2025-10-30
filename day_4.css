@@ -17,7 +17,7 @@ body {
 }
 
 .app-shell { 
-    max-width: 1200px; 
+    width: 900px; 
     margin: 0 auto;
     background: white;
     border-radius: 20px;
@@ -51,17 +51,39 @@ body {
     font-weight: 700; 
 }
 
-.main-frame { background: white; border-radius: 18px; margin-top: 12px; padding: 18px; border: 4px solid var(--card-border); }
-.page-head { margin-bottom: 12px; }
-.back-and-title { display:flex; gap:12px; align-items:center; }
-.back-btn { background: var(--muted); border: 2px solid var(--card-border); padding: 8px 12px; border-radius: 10px; }
-.page-title { font-weight:700; background: #fff; border-radius: 10px; padding: 8px 12px; border: 2px solid var(--card-border); }
+.main-frame { 
+    background: white; 
+    margin-top: 12px; 
+    padding: 18px 0; 
+}
+
+.nav-buttons {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    gap: 10px;
+}
+
+.content-area {
+    margin-top: 60px;
+}
 
 /* content area rules are set via .content-area and .main-frame */
-.content-area { display:block; }
+.content-area { 
+    display: block;
+    max-width: 860px;
+    margin: 0 auto;
+}
 
-.content-area .left-col { width: calc(100% - 320px); float:left; }
-.content-area .right-col { width: 300px; float:right; }
+.content-area .left-col { 
+    width: 580px; 
+    float: left; 
+}
+.content-area .right-col { 
+    width: 260px; 
+    float: right; 
+}
 
 .stats-box { 
     background: var(--muted); 
@@ -92,7 +114,12 @@ body {
 }
 
 /* cards grid */
-.cards-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+.cards-grid { 
+    display: grid; 
+    grid-template-columns: repeat(2, 1fr); 
+    gap: 18px;
+    max-width: 580px;
+}
 .chart-card { 
     background: white; 
     border-radius: 16px; 
