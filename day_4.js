@@ -1,70 +1,7 @@
 // day_4.js — single coherent trading dashboard file (clean)
 // Time-lock checks followed by a small Chart.js-powered card UI.
 
-// const PT_TZ = 'America/Los_Angeles';
-// const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_TZ }));
-
-// const BLOCKED_RANGES = [[8*60 + 15, 11*60], [12*60 + 50, 15*60 + 20]];
-// function isWeekday(d){ const day = d.getDay(); return day >= 1 && day <= 5; }
-// function inBlockedWindow(ptDate){
-//     if(!isWeekday(ptDate)) return false;
-//     const mins = ptDate.getHours()*60 + ptDate.getMinutes();
-//     return BLOCKED_RANGES.some(([a,b]) => mins >= a && mins < b);
-// }
-
-// function showTimeLockOverlay(message){
-//     if(document.getElementById('time-lock-overlay')) return;
-//     const o = document.createElement('div');
-//     o.id = 'time-lock-overlay';
-//     Object.assign(o.style, {
-//         position: 'fixed', inset: '0', zIndex: 99999,
-//         display: 'flex', alignItems: 'center', justifyContent: 'center',
-//         background: 'rgba(0,0,0,0.92)', color: '#ffdca8', textAlign: 'center',
-//         padding: '24px', fontFamily: 'system-ui, "Segoe UI", Roboto, sans-serif'
-//     });
-//     o.innerHTML = `<div style="max-width:820px">
-//         <h2 style="margin:0 0 8px">Game temporarily unavailable</h2>
-//         <p style="margin:0 0 12px">${message}</p>
-//         <div style="opacity:.85;font-size:.9rem">Blocked PT weekday hours: 08:15–11:00 and 12:50–15:20</div>
-//     </div>`;
-//     document.body.appendChild(o);
-// }
-
-// function hideTimeLockOverlay(){
-//     const el = document.getElementById('time-lock-overlay');
-//     if(el) el.remove();
-// }
-
-
-// const UNLOCK_ISO = '2025-10-30T00:00:00-07:00';
-// const unlockDate = new Date(UNLOCK_ISO);
-
-// const rn = nowPT();
-// if(rn < unlockDate){
-//     showTimeLockOverlay(`This game will unlock on ${unlockDate.toLocaleString('en-US', { timeZone: PT_TZ })} PT.`);
-// } else if(inBlockedWindow(rn)){
-//     showTimeLockOverlay('This game is temporarily blocked for scheduled hours. Please try again later.');
-// }
-
-// const __timeLockChecker = setInterval(() => {
-//     const n = nowPT();
-//     if(n < unlockDate){
-//         if(!document.getElementById('time-lock-overlay')){
-//             showTimeLockOverlay(`This game will unlock on ${unlockDate.toLocaleString('en-US', { timeZone: PT_TZ })} PT.`);
-//         }
-//         return;
-//     }
-//     if(inBlockedWindow(n)){
-//         if(!document.getElementById('time-lock-overlay')){
-//             showTimeLockOverlay('This game is temporarily blocked for scheduled hours. Please try again later.');
-//         }
-//         return;
-//     }
-//     // allowed — remove overlay and stop checking
-//     hideTimeLockOverlay();
-//     clearInterval(__timeLockChecker);
-// }, 10000);
-
+// 
 
 // Trading dashboard - card based UI
 (function(){
@@ -257,7 +194,7 @@
         if(statHoldingsEl) statHoldingsEl.textContent = totalHoldings;
         if(statBestStockEl) statBestStockEl.textContent = bestStock || '-';
         if(statAchievementsEl) statAchievementsEl.textContent = achievementCount;
-        if(statNetChangeEl) statNetChangeEl.textContent = '$' + (totalValue - 1000).toFixed(2);
+        if(statNetChangeEl) statNetChangeEl.textContent = '$' + (totalValue - 100).toFixed(2);
 
         updatePortfolioTable();
 
@@ -361,7 +298,8 @@
         if(window.firebaseDb && window.firebaseGetDocs && window.firebaseCollection && window.firebaseQuery && window.firebaseOrderBy){
             (async ()=>{
                 try{
-                    const q = window.firebaseQuery(window.firebaseCollection(window.firebaseDb,'day4_scores'), window.firebaseOrderBy('score','desc'));
+                    // order by highestScore (per-user) descending
+                    const q = window.firebaseQuery(window.firebaseCollection(window.firebaseDb,'day4_scores'), window.firebaseOrderBy('highestScore','desc'));
                     const snap = await window.firebaseGetDocs(q);
                     const rows = [];
                     snap.forEach(d => rows.push(d.data()));
@@ -372,47 +310,48 @@
                 }
             })();
         } else {
-            const stored = localStorage.getItem('candyTraderLeaderboard');
-            leaderboardData = stored ? JSON.parse(stored) : [];
-            renderLeaderboard();
+            // If Firebase isn't configured, show a hint to sign in / enable leaderboard
+            tbody.innerHTML = '<tr><td colspan="4">Leaderboard requires sign-in / Firebase.</td></tr>';
         }
     }
 
     async function saveScore(){
         const totalValue = state.cash + Object.keys(state.portfolio).reduce((sum, id) => sum + (state.portfolio[id] || 0) * (STOCKS.find(s => s.id === id)?.price || 0), 0);
-        const id = getPlayerDocId();
-        const entry = { player: 'Player', score: totalValue, highestCash: state.highestCash || 0, date: new Date().toLocaleDateString(), ts: Date.now() };
-        // Save under the player's id so updates replace previous entries instead of piling up
-        if(window.firebaseDb && window.firebaseSetDoc && window.firebaseDoc){
-            // ensure player is signed in before saving to Firestore
-            try{
-                if(window.firebaseAuth && !window.firebaseAuth.currentUser){
-                    // prompt sign-in
-                    try{ await window.firebaseSignInWithPopup(window.firebaseAuth, window.googleProvider); }catch(e){ console.warn('signin cancelled', e); }
-                }
-                await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, 'day4_scores', id), entry);
-            }catch(e){ console.warn('save score', e); }
-        } else {
-            // local fallback: maintain a map by id
-            try{
-                const stored = localStorage.getItem('candyTraderLeaderboard');
-                let list = stored ? JSON.parse(stored) : [];
-                list = list.filter(r => r.id !== id);
-                entry.id = id;
-                list.push(entry);
-                list.sort((a,b)=> (b.score || 0) - (a.score || 0));
-                list = list.slice(0, 50);
-                localStorage.setItem('candyTraderLeaderboard', JSON.stringify(list));
-            }catch(e){ console.warn('local leaderboard save', e); }
+        // Only save leaderboard entries for signed-in users
+        if(!(window.firebaseDb && window.firebaseSetDoc && window.firebaseDoc && window.firebaseAuth && window.firebaseAuth.currentUser && window.firebaseGetDoc)){
+            // Not signed in or no Firebase available — do not save leaderboard
+            return;
         }
+        try{
+            const user = window.firebaseAuth.currentUser;
+            const uid = user.uid;
+            const username = user.displayName || (user.email ? user.email.split('@')[0] : 'Player');
+            const docRef = window.firebaseDoc(window.firebaseDb, 'day4_scores', uid);
+            let existing = null;
+            try{
+                const snap = await window.firebaseGetDoc(docRef);
+                if(snap && typeof snap.exists === 'function' && snap.exists()) existing = snap.data();
+            }catch(e){ /* ignore missing doc */ }
+
+            const prevHighest = existing?.highestScore || 0;
+            const prevTotal = existing?.totalScore || 0;
+            const newHighest = Math.max(prevHighest, totalValue);
+            const newTotal = prevTotal + totalValue;
+
+            const entry = { username, highestScore: newHighest, totalScore: newTotal, lastUpdated: Date.now(), ts: Date.now() };
+            await window.firebaseSetDoc(docRef, entry);
+        }catch(e){ console.warn('save score', e); }
     }
 
     function renderLeaderboardRows(rows){
         const tbody = document.getElementById('leaderboard-body'); if(!tbody) return;
         tbody.innerHTML = '';
         rows.slice(0,50).forEach((r, idx)=>{
+            const name = r.username || r.player || 'Player';
+            const score = (typeof r.highestScore === 'number') ? r.highestScore : (r.score || 0);
+            const when = r.ts ? new Date(r.ts).toLocaleString() : (r.date || '');
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${idx+1}</td><td>${(r.player||'Player')}</td><td>$${(r.score||0).toFixed? r.score.toFixed(2): r.score}</td><td>${new Date(r.ts||Date.now()).toLocaleString()}</td>`;
+            tr.innerHTML = `<td>${idx+1}</td><td>${name}</td><td>$${(score.toFixed ? score.toFixed(2) : score)}</td><td>${when}</td>`;
             tbody.appendChild(tr);
         });
     }
@@ -422,8 +361,11 @@
         if(!tbody) return;
         tbody.innerHTML = '';
         leaderboardData.forEach((entry, index) => {
+            const name = entry.username || entry.player || 'Player';
+            const score = (typeof entry.highestScore === 'number') ? entry.highestScore : (entry.score || 0);
+            const when = entry.ts ? new Date(entry.ts).toLocaleString() : (entry.date || '');
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${index + 1}</td><td>${entry.player}</td><td>$${entry.score.toFixed(2)}</td><td>${entry.date}</td>`;
+            tr.innerHTML = `<td>${index + 1}</td><td>${name}</td><td>$${(score.toFixed ? score.toFixed(2) : score)}</td><td>${when}</td>`;
             tbody.appendChild(tr);
         });
     }
@@ -611,7 +553,7 @@
         localStorage.removeItem('candyTraderLeaderboard');
         localStorage.removeItem('candyTraderAnonId');
     // reset client state and UI (start at day 0)
-    state = { cash: 1000, day: 0, portfolio: {}, history: {}, achievements: {}, highestCash: 1000 };
+    state = { cash: 100, day: 0, portfolio: {}, history: {}, achievements: {}, highestCash: 100 };
         initStocks(); createCharts(); updateUI();
         showMessage('Saved state wiped and game restarted');
     }
@@ -636,24 +578,25 @@
 
     // Start up
     window.addEventListener('load', async () => {
+        // Initialize stocks and load any saved state, but always re-randomize
+        // the market by stepping 31 simulated days so each fresh start has
+        // randomized trends/history.
         initStocks();
-        const restored = await loadState();
-        // If there was no saved state, create a randomized starting market by stepping 31 days
-        if(!restored){
-            // simulate 31 days to randomize the market, but show Day 0 to player.
-            // We'll increment state.day during simulation so history reflects real days,
-            // then reset the visible counter to 0.
-            const origDay = state.day || 0;
-            state.day = 1;
-            for(let i=0;i<31;i++){
-                advanceStocksForNextDay();
-                state.day++;
-            }
-            // after simulation, set displayed day back to 0
-            state.day = 0;
-            // persist the randomized start so reloads will restore it
-            scheduleAutosave(true);
+        await loadState();
+        // Re-init stocks to ensure random trends regardless of restored state
+        initStocks();
+        // simulate 31 days to randomize the market, but show Day 0 to player.
+        // We'll increment state.day during simulation so history reflects real days,
+        // then reset the visible counter to 0.
+        state.day = 1;
+        for(let i=0;i<31;i++){
+            advanceStocksForNextDay();
+            state.day++;
         }
+        // after simulation, set displayed day back to 0
+        state.day = 0;
+        // persist the randomized start so reloads will restore it
+        scheduleAutosave(true);
         createCharts();
         updateUI();
         setupEventListeners();
