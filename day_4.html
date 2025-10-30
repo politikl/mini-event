@@ -14,6 +14,14 @@
             <button id="leaderboard-btn" class="tab">Today's Leaderboard</button>
         </div>
 
+        <!-- top-right timer (from day_3 theme) -->
+        <div id="right-controls" class="top-controls" style="right:18px;">
+            <div id="game-countdown" class="header-box">
+                <div class="small-label">Game Ends</div>
+                <div id="game-timer">--:--:--</div>
+            </div>
+        </div>
+
         <main class="main-frame">
 
                             <section class="content-area">
@@ -111,6 +119,60 @@
                             <button id="close-leaderboard" class="modal-close">Close</button>
                         </div>
                     </div>
+
+                    <!-- Firebase init (copied from day_3) -->
+                    <script type="module">
+                      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+                      import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
+                      import { 
+                          getAuth, 
+                          GoogleAuthProvider, 
+                          signInWithPopup, 
+                          signOut, 
+                          onAuthStateChanged 
+                      } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+                      import { 
+                          getFirestore, 
+                          doc, 
+                          setDoc, 
+                          getDoc,
+                          collection,
+                          getDocs,
+                          orderBy,
+                          query 
+                      } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+                      const firebaseConfig = {
+                          apiKey: "AIzaSyARY96nrH2Aio8rOiLkewSXtTS40TZLrAw",
+                          authDomain: "nerd-mini-events.firebaseapp.com",
+                          projectId: "nerd-mini-events",
+                          storageBucket: "nerd-mini-events.firebasestorage.app",
+                          messagingSenderId: "974357416633",
+                          appId: "1:974357416633:web:e190de60553a685d03e968",
+                          measurementId: "G-V9NGCSEY8J"
+                      };
+                      const app = initializeApp(firebaseConfig);
+                      const analytics = getAnalytics(app);
+                      const auth = getAuth(app);
+                      const db = getFirestore(app);
+                      const provider = new GoogleAuthProvider();
+
+                      window.firebaseApp = app;
+                      window.firebaseAuth = auth;
+                      window.firebaseDb = db;
+                      window.googleProvider = provider;
+                      window.firebaseSignInWithPopup = signInWithPopup;
+                      window.firebaseSignOut = signOut;
+                      window.firebaseOnAuthStateChanged = onAuthStateChanged;
+                      window.firebaseDoc = doc;
+                      window.firebaseSetDoc = setDoc;
+                      window.firebaseGetDoc = getDoc;
+                      window.firebaseCollection = collection;
+                      window.firebaseGetDocs = getDocs;
+                      window.firebaseQuery = query;
+                      window.firebaseOrderBy = orderBy;
+                      window.firebaseReady = true;
+                    </script>
 
                     <!-- Required scripts -->
                     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
