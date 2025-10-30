@@ -260,7 +260,7 @@
       if(this.melee && d2 <= this.r + player.r + 4){
         if(this.tickAcc <= 0){
           const dmg = this.meleePower || Math.max(3, this.maxHp*0.06);
-          player.takeDamage(dmg);
+          player.takeDamage(dmg, { x: this.x, y: this.y, type: 'melee' });
           this.tickAcc = 750;
         }
       }
@@ -277,8 +277,9 @@
       if(!this.alive) return;
       const x = this.x - cam.x, y = this.y - cam.y;
       ctx.save(); ctx.translate(x,y);
-      // style by type
-      if(this.type==='skeleton'){ ctx.fillStyle = '#dfe8e9'; }
+      // style by type, and friendly entities render in distinct color
+      if(this.friendly){ ctx.fillStyle = '#6be37b'; }
+      else if(this.type==='skeleton'){ ctx.fillStyle = '#dfe8e9'; }
       else if(this.type==='demon'){ ctx.fillStyle = '#b14a4a'; }
       else if(this.type==='brute'){ ctx.fillStyle = '#7b3a3a'; }
       else if(this.type==='wolf'){ ctx.fillStyle = '#88aacc'; }
@@ -347,7 +348,7 @@
         setTimeout(()=>{
           beams.push({ x1:tx, y1:ty, aoe:true, range:160, t:performance.now(), dur:420, power:80 + Math.floor(this.xpValue/2) });
           for(const e of enemies) if(e.alive && !e.friendly && dist(tx,ty,e.x,e.y) <= 160){ e.takeDamage(80 + Math.floor(this.xpValue/2)); }
-          if(dist(tx,ty,player.x,player.y) <= 160) player.takeDamage(60);
+          if(dist(tx,ty,player.x,player.y) <= 160) player.takeDamage(60, { x: tx, y: ty, type: 'meteor' });
           particles.push({ x:tx, y:ty, t:performance.now(), dur:1200, col:'#ff6b6b' });
         }, 3000);
       }
@@ -444,8 +445,26 @@
         }
       }
     }
-    takeDamage(dmg){
+    takeDamage(dmg, src){
+      // optional source-aware damage: if no source provided, verify there is a nearby visible threat
       if(this.shieldUntil > performance.now()) dmg *= 0.45;
+      if(!src){
+        // look for nearby enemy projectiles or enemies that could reasonably have caused damage
+        let threat = false;
+        try{
+          for(const p of projectiles) if(p.alive && p.owner === 'enemy' && dist(p.x,p.y,this.x,this.y) <= (p.r + this.r + 8)){ threat = true; break; }
+          if(!threat){
+            for(const e of enemies) if(e.alive && !e.friendly && dist(e.x,e.y,this.x,this.y) <= (e.r + this.r + 8)){ threat = true; break; }
+          }
+        }catch(ex){ threat = true; }
+        if(!threat){
+          // throttle console warnings to avoid spamming
+          const now = performance.now();
+          this._lastPhantomLog = this._lastPhantomLog || 0;
+          if(now - this._lastPhantomLog > 2500){ this._lastPhantomLog = now; console.warn('Ignored phantom damage: no nearby visible source'); }
+          return;
+        }
+      }
       this.hp -= dmg;
       if(this.hp <= 0){ this.hp = 0; this.die(); }
     }
@@ -503,6 +522,26 @@
         return true;
       }
       if(def.type==='projectile'){
+            // special-case for seeker shot
+            if(id === 'seeker_shot'){
+              // create a homing projectile that updates its velocity toward nearest on-screen enemy
+              const nx = dirx/mag, ny = diry/mag;
+              const proj = new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*420, ny*420, power, 7, 'player', def.range, {
+                homing:true,
+                homingStrength: 420 + lvl*20,
+                visual:'spark',
+                onUpdate: function(p, dt){
+                  // find nearest enemy on screen
+                  let target = null, td = Infinity;
+                  for(const e of enemies) if(e.alive && !e.friendly && onScreen(e.x,e.y)){
+                    const d = dist(p.x,p.y,e.x,e.y); if(d<td){ td=d; target=e; }
+                  }
+                  if(target){ const dx = target.x - p.x, dy = target.y - p.y, m2 = Math.hypot(dx,dy)||1; p.vx += (dx/m2) * (p.opt.homingStrength/100) * dt/1000; p.vy += (dy/m2) * (p.opt.homingStrength/100) * dt/1000; }
+                }
+              });
+              projectiles.push(proj);
+              return true;
+            }
         if(id === 'multi_arrow'){
           // number of arrows scales with level
           const spread = 3 + Math.max(0, lvl-1);
@@ -784,7 +823,7 @@
         // damage nearby on impact after short delay
         setTimeout(()=>{
           for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) < 120) e.takeDamage(90);
-          if(dist(this.x,this.y,player.x,player.y) < 120) player.takeDamage(80);
+          if(dist(this.x,this.y,player.x,player.y) < 120) player.takeDamage(80, { x: this.x, y: this.y, type: 'boss_dash' });
           particles.push({ x:this.x, y:this.y, t:performance.now(), dur:900, col:'#ff9b6b' });
         }, 300);
       }
@@ -820,7 +859,7 @@
         this.slamAcc = 3200 + Math.random()*1400;
         beams.push({ x1:this.x, y1:this.y, aoe:true, range:160, t:performance.now(), dur:420, power:80 });
         for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) < 160) e.takeDamage(80 + Math.floor(player.level*3));
-        if(dist(this.x,this.y,player.x,player.y) < 160) player.takeDamage(70);
+  if(dist(this.x,this.y,player.x,player.y) < 160) player.takeDamage(70, { x: this.x, y: this.y, type: 'warlord_slam' });
       }
     }
   }
@@ -870,7 +909,7 @@
       if(!this.alive) return;
       const x=this.x-cam.x, y=this.y-cam.y;
       ctx.save(); ctx.translate(x,y);
-      ctx.fillStyle = '#cc9a2e'; ctx.beginPath(); ctx.arc(0,0,this.r,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = this.friendly ? '#6be37b' : '#cc9a2e'; ctx.beginPath(); ctx.arc(0,0,this.r,0,Math.PI*2); ctx.fill();
       ctx.restore();
     }
   }
@@ -883,6 +922,10 @@
     }
     update(dt){
       if(!this.alive) return;
+      // allow optional per-projectile onUpdate hook (for homing)
+      if(this.opt && typeof this.opt.onUpdate === 'function'){
+        try{ this.opt.onUpdate(this, dt); }catch(e){}
+      }
       this.x += this.vx * dt/1000; this.y += this.vy * dt/1000;
       this.trail.push({x:this.x, y:this.y, t:performance.now()});
       while(this.trail.length>14) this.trail.shift();
@@ -891,10 +934,15 @@
         this.alive=false;
         if(this.opt.onExpire) this.opt.onExpire(this.x, this.y);
       }
+      // ensure projectiles have valid owners; sanitize stray projectiles that have unexpected owner
+      if(!(this.owner === 'player' || this.owner === 'enemy')){
+        // if a projectile has no owner, drop visual-only trace and remove
+        this.alive = false; return;
+      }
       if(this.owner === 'player'){
         for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) <= e.r + this.r){
           // apply damage and visual/hit callbacks
-          e.takeDamage(this.power);
+          e.takeDamage(this.power, { x: this.x, y: this.y, type: 'proj' });
           if(this.opt.onHit) this.opt.onHit(e);
           // siphon: heal player a small fraction on hit
           try{ if(window && window.Day5Game && typeof window.Day5Game.playerRef === 'function'){ const pl = window.Day5Game.playerRef(); if(pl && pl.hasAbility && pl.hasAbility('siphon')) pl.heal(Math.max(1, Math.floor(this.power * 0.12))); } }catch(ex){}
@@ -916,7 +964,7 @@
             // small visual cue
             beams.push({ x1:player.x, y1:player.y, aoe:false, t:now, dur:220, power:0 });
           } else {
-            player.takeDamage(this.power);
+            player.takeDamage(this.power, { x: this.x, y: this.y, type: 'enemy_proj' });
             this.alive=false;
           }
         }
@@ -929,6 +977,7 @@
       // trail
       for(let i=0;i<this.trail.length;i++){
         const p=this.trail[i]; const alpha = (i+1)/this.trail.length * 0.55;
+        // draw trail points relative to camera
         ctx.fillStyle = this.owner==='player' ? `rgba(255,216,77,${alpha})` : `rgba(240,128,128,${alpha})`;
         ctx.beginPath(); ctx.arc(p.x-cam.x,p.y-cam.y, Math.max(1, this.r * i/this.trail.length),0,Math.PI*2); ctx.fill();
       }
@@ -940,7 +989,8 @@
       } else if(this.opt.visual === 'spark'){
         ctx.fillStyle = '#f2f9ff'; ctx.beginPath(); ctx.arc(0,0,this.r,0,Math.PI*2); ctx.fill();
       } else {
-        ctx.fillStyle = this.owner==='player' ? '#ffd84d' : '#f08080';
+        // ensure enemy projectiles look distinct but not generate confusing streaks
+        ctx.fillStyle = this.owner==='player' ? '#ffd84d' : (this.owner === 'enemy' ? '#f08080' : '#bbbbbb');
         ctx.beginPath(); ctx.arc(0,0,this.r,0,Math.PI*2); ctx.fill();
       }
       ctx.restore();
@@ -949,7 +999,18 @@
 
   class Orb {
     constructor(x,y,amt,type='xp'){ this.x=x; this.y=y; this.amt=amt; this.type=type; this.r=8; this.alive=true; this.float=Math.random()*Math.PI*2; }
-    update(dt){ this.float += dt/300; }
+    update(dt){
+      this.float += dt/300;
+      // if visible on screen, slowly attract to player so orbs naturally pull in
+      if(player && onScreen(this.x, this.y)){
+        const dx = player.x - this.x, dy = player.y - this.y; const m = Math.hypot(dx,dy)||1;
+        // attraction strength scales with proximity
+        const distToPlayer = m;
+        const pull = clamp(1200 / Math.max(60, distToPlayer), 16, 220);
+        this.x += (dx/m) * pull * dt/1000;
+        this.y += (dy/m) * pull * dt/1000;
+      }
+    }
     draw(ctx,cam){
       if(!this.alive) return;
       const x=this.x-cam.x, y=this.y-cam.y + Math.sin(this.float)*2;
@@ -1045,11 +1106,10 @@
   window.addEventListener('keydown', (e)=>{
     if(e.code === 'Space'){ e.preventDefault();
       if(!player) return;
-      // prioritize dash, then melee, then projectile, then active
+      // Space is now an explicit dash/primary action key: prefer dash_strike if owned, otherwise use the first 'active' or 'melee' ability
       if(player.hasAbility('dash_strike')) player.tryUseAbility('dash_strike');
       else {
-        // try first available damaging ability
-        const pref = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && ['melee','projectile','cone','auto','dash','aoe'].includes(d.type); });
+        const pref = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && (['melee','active'].includes(d.type)); });
         if(pref) player.tryUseAbility(pref.id);
       }
     }
@@ -1066,9 +1126,10 @@
       const dx = sx - player.x, dy = sy - player.y; const m = Math.hypot(dx,dy)||1;
       // left click
       if(ev.button === 0){
-        const proj = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && d.type==='projectile'; });
-        if(proj) player.tryUseAbility(proj.id, dx/m, dy/m);
-        else if(player.hasAbility('dash_strike')) player.tryUseAbility('dash_strike', dx/m, dy/m);
+          // Left-click should trigger a click-bound projectile ability if present, otherwise fire default 'fireball' if available
+          const clickProj = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && d.type==='projectile'; });
+          if(clickProj) player.tryUseAbility(clickProj.id, dx/m, dy/m);
+          else if(player.hasAbility('fireball')) player.tryUseAbility('fireball', dx/m, dy/m);
       } else if(ev.button === 2){
         // right click: attempt to use a useful active ability first
         ev.preventDefault();
@@ -1241,14 +1302,21 @@
 
     // passives: (poison_trail and frost_aura removed)
 
-    // directional abilities use lastDir when stopped and will fire with cooldowns
+    // directional abilities: DO NOT auto-trigger dash or projectiles; only auto types should run
     for(const a of player.abilities){
       const def = abilityDefs[a.id]; if(!def) continue;
-      if(['projectile','cone','dash','deploy','aoe','active','melee'].includes(def.type)){
-        const useDir = dir ? {x:dir.x,y:dir.y} : {x:player.lastDir.x, y:player.lastDir.y};
-        // projectiles and cone are allowed to auto-trigger when cd available (player desires auto)
-        if(def.type === 'projectile' || def.type === 'cone' || def.type === 'dash'){
-          player.tryUseAbility(a.id, useDir.x, useDir.y);
+      if(def.type === 'auto'){
+        // auto abilities are triggered in player.tick already (triggerAuto)
+      }
+      // deploy abilities still auto-place (turret/mine/guardian)
+      if(def.type === 'deploy' && a.cd <= 0){
+        // avoid placing duplicate turret/mine nearby
+        if(a.id === 'turret'){
+          const nearbyTurret = enemies.find(en=>en.friendly && en.type === 'turret' && dist(en.x,en.y,player.x,player.y) < 180);
+          if(!nearbyTurret) player.tryUseAbility(a.id);
+        } else if(a.id === 'homing_mine'){
+          const nearbyMine = enemies.find(en=>en.friendly && en.type === 'mine' && dist(en.x,en.y,player.x,player.y) < 120);
+          if(!nearbyMine) player.tryUseAbility(a.id);
         }
       }
     }
@@ -1262,7 +1330,8 @@
 
     // projectiles
     for(const p of projectiles) p.update(dt);
-    projectiles = projectiles.filter(p=>p.alive);
+  // filter projectiles and sanitize any stray ones without owner
+  projectiles = projectiles.filter(p=>p.alive && (p.owner === 'player' || p.owner === 'enemy'));
 
     for(const o of orbs) o.update(dt);
 
@@ -1675,7 +1744,7 @@
     btn.textContent = 'End Game';
     btn.title = 'Instantly end this run';
     btn.style.cssText = 'position:absolute;right:12px;bottom:12px;z-index:600; padding:6px 8px;border-radius:6px;background:rgba(0,0,0,0.6);color:#ffdca8;border:2px solid #ff6b35;cursor:pointer;';
-    btn.addEventListener('click', ()=>{ if(player) player.takeDamage(player.hp + 9999); });
+    btn.addEventListener('click', ()=>{ if(player) player.takeDamage(player.hp + 9999, { x: player.x, y: player.y, type: 'end' }); });
     if(playbound) playbound.appendChild(btn);
   })();
 
