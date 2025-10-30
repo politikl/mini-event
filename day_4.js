@@ -82,18 +82,20 @@ const __timeLockChecker = setInterval(() => {
     function initStocks(){
         STOCKS.length = 0;
         STOCK_DEFS.forEach(d => {
-            // larger variance for starting price
-            const volatility = 0.4 + Math.random() * 1.2; // broader spread
-            const seed = d.base * (0.5 + Math.random() * volatility);
+            // modest variance for starting price (keep things stable)
+            const volatility = 0.15 + Math.random() * 0.35;
+            const seed = d.base * (0.8 + Math.random() * volatility);
             const price = Math.max(0.5, parseFloat(seed.toFixed(2)));
-            const momentum = (Math.random() - 0.5) * 0.05;
-            const trend = (Math.random() < 0.3) ? pickNewTrend() : { dir: 0, dur: 0, magnitude: 0 };
+            const momentum = (Math.random() - 0.5) * 0.02;
+            // ensure every stock starts with a random trend/duration
+            const trend = pickNewTrend();
             STOCKS.push({ id: d.id, name: d.name, color: d.color, price, history: [], trend, momentum });
         });
     }
 
     // starting cash lowered to $100 per request
-    let state = { cash: 100, day: 1, portfolio: {}, history: {}, achievements: {}, highestCash: 100 };
+    // start at day 0 so initial market randomization/simulation can run
+    let state = { cash: 100, day: 0, portfolio: {}, history: {}, achievements: {}, highestCash: 100 };
     let settings = { autoAdvance: false, gameSpeed: 1 };
     let autoAdvanceInterval;
     let autosaveInterval;
@@ -149,16 +151,15 @@ const __timeLockChecker = setInterval(() => {
             const buy = e.target.closest('[data-buy]');
             const buyMax = e.target.closest('[data-buy-max]');
             const sell = e.target.closest('[data-sell]');
+            const sellAll = e.target.closest('[data-sell-all]');
 
             if(buy){ buyStocks(buy.dataset.stock, parseInt(buy.dataset.buy, 10)); }
             if(buyMax){ buyMaxStocks(buyMax.dataset.stock); }
-            if(sell){
-                const ds = sell.dataset;
-                if(typeof ds.sellAll !== 'undefined'){
-                    sellAllStocks(sell.dataset.stock);
-                } else {
-                    sellStocks(sell.dataset.stock, parseInt(sell.dataset.sell, 10));
-                }
+            if(sellAll){
+                // explicit sell-all button now handled separately
+                sellAllStocks(sellAll.dataset.stock);
+            } else if(sell){
+                sellStocks(sell.dataset.stock, parseInt(sell.dataset.sell, 10));
             }
         });
     }
@@ -294,7 +295,7 @@ const __timeLockChecker = setInterval(() => {
     function resetGame(){
         // Save score before resetting
         saveScore();
-        state = { cash: 100, day: 1, portfolio: {}, history: {}, achievements: {}, highestCash: 100 };
+        state = { cash: 100, day: 0, portfolio: {}, history: {}, achievements: {}, highestCash: 100 };
         createCharts();
         updateUI();
         if(autoAdvanceInterval) clearInterval(autoAdvanceInterval);
@@ -510,38 +511,37 @@ const __timeLockChecker = setInterval(() => {
     // ---------- stock trend engine ----------
     function pickNewTrend(s){
         const r = Math.random();
-        // make trends shorter and stronger more often to increase unpredictability
-        if(r < 0.10) return { dir: 1, dur: 2 + Math.floor(Math.random()*6), magnitude: 0.03 + Math.random()*0.18 };
-        if(r < 0.22) return { dir: -1, dur: 2 + Math.floor(Math.random()*6), magnitude: 0.03 + Math.random()*0.18 };
-        if(r < 0.50) return { dir: 0, dur: 1 + Math.floor(Math.random()*6), magnitude: 0.01 + Math.random()*0.06 };
-        // occasional long but volatile trend
-        return { dir: (Math.random()<0.6?1:-1), dur: 3 + Math.floor(Math.random()*30), magnitude: 0.02 + Math.random()*0.25 };
+        // produce mostly modest trends with varied durations
+        if(r < 0.12) return { dir: 1, dur: 2 + Math.floor(Math.random()*6), magnitude: 0.008 + Math.random()*0.03 };
+        if(r < 0.24) return { dir: -1, dur: 2 + Math.floor(Math.random()*6), magnitude: 0.008 + Math.random()*0.03 };
+        if(r < 0.70) return { dir: 0, dur: 1 + Math.floor(Math.random()*8), magnitude: 0.002 + Math.random()*0.012 };
+        // occasional longer trend but still moderate
+        return { dir: (Math.random()<0.6?1:-1), dur: 4 + Math.floor(Math.random()*20), magnitude: 0.01 + Math.random()*0.04 };
     }
 
     function advanceStocksForNextDay(){
-        const MAX_DAILY_PCT = 0.18; // cap daily percent moves to reduce extreme runs
+        // reduce the cap to make markets noticeably more stable
+        const MAX_DAILY_PCT = 0.06; // was 0.18
         STOCKS.forEach(s => {
             if(!s.trend || s.trend.dur <= 0) s.trend = pickNewTrend(s);
-            // modest shock frequency and magnitude; cap each day's change so the game
-            // doesn't explode to absurd values. This still keeps unpredictability,
-            // but prevents easy $10k+ runs.
+            // reduce shock frequency and magnitude
+            if(Math.random() < 0.03){
+                const shock = (Math.random() < 0.5 ? -1 : 1) * (0.02 + Math.random() * 0.04);
+                s.momentum = (s.momentum || 0) * 0.3 + shock * (0.25 + Math.random()*0.2);
+            }
+            // occasional trend flip, but keep it mild
             if(Math.random() < 0.06){
-                const shock = (Math.random() < 0.5 ? -1 : 1) * (0.06 + Math.random() * 0.18);
-                s.momentum = (s.momentum || 0) * 0.25 + shock * (0.3 + Math.random()*0.3);
-            }
-            // occasional trend flip, but less frequent
-            if(Math.random() < 0.10){
                 s.trend.dir = (s.trend.dir || 0) * -1 || (Math.random()<0.5?1:-1);
-                s.trend.magnitude = (s.trend.magnitude || 0.02) * (1 + Math.random()*0.6);
+                s.trend.magnitude = (s.trend.magnitude || 0.01) * (1 + Math.random()*0.4);
             }
-            const volatility = 0.012 + Math.random()*0.06;
+            const volatility = 0.006 + Math.random()*0.02;
             const trendEffect = (s.trend.dir || 0) * (s.trend.magnitude || 0);
             const randomEffect = (Math.random() - 0.5) * volatility * 2;
-            let changePct = trendEffect + randomEffect + (s.momentum || 0) * (0.45 + Math.random()*0.25);
+            let changePct = trendEffect + randomEffect + (s.momentum || 0) * (0.4 + Math.random()*0.2);
             // cap daily change
             changePct = Math.max(-MAX_DAILY_PCT, Math.min(MAX_DAILY_PCT, changePct));
             // update momentum (decay + influence)
-            s.momentum = (s.momentum || 0) * (0.55 + Math.random()*0.25) + changePct * (0.18 + Math.random()*0.25);
+            s.momentum = (s.momentum || 0) * (0.6 + Math.random()*0.2) + changePct * (0.12 + Math.random()*0.15);
             s.price = Math.max(0.2, +(s.price * (1 + changePct)).toFixed(2));
             s.history.push({ day: state.day, price: s.price });
             s.trend.dur = Math.max(0, (s.trend.dur || 0) - 1);
@@ -610,8 +610,8 @@ const __timeLockChecker = setInterval(() => {
         localStorage.removeItem('day4_state');
         localStorage.removeItem('candyTraderLeaderboard');
         localStorage.removeItem('candyTraderAnonId');
-        // reset client state and UI
-        state = { cash: 1000, day: 1, portfolio: {}, history: {}, achievements: {}, highestCash: 1000 };
+    // reset client state and UI (start at day 0)
+    state = { cash: 1000, day: 0, portfolio: {}, history: {}, achievements: {}, highestCash: 1000 };
         initStocks(); createCharts(); updateUI();
         showMessage('Saved state wiped and game restarted');
     }
