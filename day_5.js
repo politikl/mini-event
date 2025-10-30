@@ -161,11 +161,9 @@
     { id:'shockwave', title:'Shockwave', desc:'Cone shock forward.', type:'cone', basePower:12, cooldown:2500, range:220, upgradePow:(lv)=>12+lv*5 },
   // (removed poison_trail and frost_aura — deprecated)
     // shield visible
-    { id:'shield', title:'Shield', desc:'Temporary damage reduction.', type:'active', basePower:0.3, cooldown:8000, range:0, upgradePow:(lv)=>0.3+lv*0.06 },
-    // time slow visible aoe
-    { id:'time_slown', title:'Time Slow', desc:'Slow enemies in visible radius.', type:'aoe', basePower:0.45, cooldown:10000, range:260, upgradePow:(lv)=>0.45+lv*0.05 },
+  { id:'shield', title:'Shield', desc:'Temporary damage reduction.', type:'active', basePower:0.3, cooldown:8000, range:0, upgradePow:(lv)=>0.3+lv*0.06 },
 
-    // auto special (only hit on-screen)
+  // auto special (only hit on-screen)
     { id:'auto_laser', title:'Auto Laser', desc:'Auto-aim laser at nearest on-screen enemy).', type:'auto', basePower:18, cooldown:1400, range:700, upgradePow:(lv)=>18+lv*6 },
     { id:'anvil_drop', title:'Anvil Drop', desc:'Drop an anvil on a enemy.', type:'auto', basePower:36, cooldown:7000, range:700, upgradePow:(lv)=>36+lv*12 },
 
@@ -174,20 +172,18 @@
   // cannon: heavy click-targeted projectile with AoE
   { id:'cannon', title:'Cannon', desc:'Click to fire a heavy cannonball that explodes on impact.', type:'projectile', basePower:36, cooldown:4000, range:720, upgradePow:(lv)=>36+lv*12 },
   // stun grenade: short telegraph then stun on impact
-  { id:'stun_grenade', title:'Stun Grenade', desc:'Throws a grenade that stuns enemies in an area.', type:'projectile', basePower:0, cooldown:6000, range:420, upgradePow:(lv)=>0+lv*0 },
+  { id:'stun_grenade', title:'Stun Grenade', desc:'Throws a grenade that stuns enemies in an area.', type:'projectile', basePower:12, cooldown:6000, range:420, upgradePow:(lv)=>12+lv*2 },
   // ricochet shot: bounces between nearby enemies
   { id:'ricochet', title:'Ricochet Shot', desc:'Fires a projectile that ricochets to another nearby enemy.', type:'projectile', basePower:14, cooldown:2000, range:640, upgradePow:(lv)=>14+lv*5 },
   // defensive abilities
-  { id:'barrier', title:'Barrier', desc:'Create a short-lived barrier that greatly reduces incoming damage.', type:'active', basePower:0, cooldown:12000, range:0, upgradePow:(lv)=>0 },
-  { id:'heal_pulse', title:'Heal Pulse', desc:'Heal yourself and spawn small healing orbs.', type:'active', basePower:0, cooldown:9000, range:160, upgradePow:(lv)=>0 },
+  // barrier and heal_pulse removed per request
   { id:'reflect_shield', title:'Reflect Shield', desc:'Reflect incoming enemy projectiles for a short time.', type:'active', basePower:0, cooldown:12000, range:0, upgradePow:(lv)=>0 },
   { id:'guardian_spirit', title:'Guardian Spirit', desc:'Summon a friendly spirit that fires at enemies.', type:'deploy', basePower:18, cooldown:12000, range:0, upgradePow:(lv)=>18+lv*6 },
   { id:'phase_shift', title:'Phase Shift', desc:'Brief invulnerability (short cooldown).', type:'active', basePower:0, cooldown:15000, range:0, upgradePow:(lv)=>0 },
   // orbital removed (duplicate / deprecated)
     { id:'chain_lightning', title:'Chain Lightning', desc:'Strikes an enemy and chains to nearby enemies.', type:'projectile', basePower:16, cooldown:3200, range:540, upgradePow:(lv)=>16+lv*5 },
   { id:'meteor', title:'Meteor', desc:'Calls down a meteor that deals huge explosion (long cooldown).', type:'projectile', basePower:60, cooldown:14000, range:900, upgradePow:(lv)=>60+lv*24 },
-  // small extras: overshield and life leech
-    { id:'overshield', title:'Overshield', desc:'Grants a temporary strong shield that absorbs damage for a short time.', type:'active', basePower:0, cooldown:18000, range:0, upgradePow:(lv)=>0 },
+  // small extras: life leech
     { id:'life_leech', title:'Life Leech', desc:'Your attacks heal a portion of damage dealt.', type:'passive', basePower:0, cooldown:0, range:0, upgradePow:(lv)=>0 },
   ];
   ABILITIES.forEach(a=> abilityDefs[a.id]=a);
@@ -446,10 +442,22 @@
       }
     }
     takeDamage(dmg, src){
-      // optional source-aware damage: if no source provided, verify there is a nearby visible threat
+      // shield reduction
       if(this.shieldUntil > performance.now()) dmg *= 0.45;
+      // If a source is provided, verify it's reasonably close to the player. This avoids
+      // accepting damage from distant/noisy sources (phantom hits) while preserving
+      // legitimate attacks (which include src coords).
+      if(src && typeof src.x === 'number' && typeof src.y === 'number'){
+        const ds = dist(src.x, src.y, this.x, this.y);
+        if(ds > 600){
+          const now = performance.now();
+          this._lastPhantomLog = this._lastPhantomLog || 0;
+          if(now - this._lastPhantomLog > 2500){ this._lastPhantomLog = now; console.warn('Ignored distant damage source at', src, 'dist', Math.round(ds)); }
+          return;
+        }
+      }
+      // if no src provided, perform a nearby threat check (enemy or enemy projectile)
       if(!src){
-        // look for nearby enemy projectiles or enemies that could reasonably have caused damage
         let threat = false;
         try{
           for(const p of projectiles) if(p.alive && p.owner === 'enemy' && dist(p.x,p.y,this.x,this.y) <= (p.r + this.r + 8)){ threat = true; break; }
@@ -458,7 +466,6 @@
           }
         }catch(ex){ threat = true; }
         if(!threat){
-          // throttle console warnings to avoid spamming
           const now = performance.now();
           this._lastPhantomLog = this._lastPhantomLog || 0;
           if(now - this._lastPhantomLog > 2500){ this._lastPhantomLog = now; console.warn('Ignored phantom damage: no nearby visible source'); }
@@ -927,8 +934,10 @@
         try{ this.opt.onUpdate(this, dt); }catch(e){}
       }
       this.x += this.vx * dt/1000; this.y += this.vy * dt/1000;
-      this.trail.push({x:this.x, y:this.y, t:performance.now()});
-      while(this.trail.length>14) this.trail.shift();
+      // we intentionally avoid storing large world-space trails because they can produce
+      // phantom translated streaks when projectiles are spawned/mirrored. Keep a tiny
+      // history count (timestamps only) if needed; visual trail is rendered procedurally.
+      if(this.trail && this.trail.length > 6) this.trail.shift();
       this.life -= dt;
       if(this.life<=0){
         this.alive=false;
@@ -974,13 +983,20 @@
       if(!this.alive) return;
       const x=this.x-cam.x, y=this.y-cam.y;
       ctx.save(); ctx.translate(x,y);
-      // trail
-      for(let i=0;i<this.trail.length;i++){
-        const p=this.trail[i]; const alpha = (i+1)/this.trail.length * 0.55;
-        // draw trail points relative to camera
-        ctx.fillStyle = this.owner==='player' ? `rgba(255,216,77,${alpha})` : `rgba(240,128,128,${alpha})`;
-        ctx.beginPath(); ctx.arc(p.x-cam.x,p.y-cam.y, Math.max(1, this.r * i/this.trail.length),0,Math.PI*2); ctx.fill();
+      // short procedural trail (avoid replaying stored world points which can create
+      // phantom duplicates when projectiles are spawned with translated coordinates)
+      const col = this.owner==='player' ? 'rgba(255,216,77,0.9)' : (this.owner === 'enemy' ? 'rgba(240,128,128,0.9)' : 'rgba(187,187,187,0.6)');
+      ctx.fillStyle = col;
+      // draw a few faint blobs behind the projectile based on velocity
+      const speed = Math.hypot(this.vx||0,this.vy||0)||1;
+      for(let i=1;i<=3;i++){
+        const t = i * 0.02;
+        const bx = -this.vx * t, by = -this.vy * t;
+        const s = Math.max(1, this.r * (1 - i*0.22));
+        ctx.globalAlpha = 0.7 * (1 - i*0.22);
+        ctx.beginPath(); ctx.arc(bx, by, s, 0, Math.PI*2); ctx.fill();
       }
+      ctx.globalAlpha = 1;
       // visual by opt type
       if(this.opt.type === 'arrow'){
         ctx.fillStyle = '#c9f2ff'; ctx.beginPath(); ctx.ellipse(0,0,this.r*1.2,this.r*0.6, Math.atan2(this.vy,this.vx),0,Math.PI*2); ctx.fill();
@@ -1133,7 +1149,7 @@
       } else if(ev.button === 2){
         // right click: attempt to use a useful active ability first
         ev.preventDefault();
-        const prefer = ['heal_pulse','barrier','reflect_shield','phase_shift','shield'];
+  const prefer = ['reflect_shield','phase_shift','shield'];
         let used = false;
         for(const id of prefer){ if(player.hasAbility(id)) { used = player.tryUseAbility(id); if(used) break; } }
         if(!used){
@@ -1482,8 +1498,35 @@
     hpText.textContent = `XP: ${Math.round(player.xp)} / ${player.nextXp}`;
     xpFill.style.width = `${Math.min(100, Math.floor(player.xp / player.nextXp * 100))}%`;
     lvlText.textContent = player.level;
-    // hide pill list to reduce clutter (showing only on level-up overlay)
-    if(abilityPills) abilityPills.style.display = 'none';
+    // show ability pills with cooldown bars for click/active/deploy/projectile abilities
+    if(abilityPills){
+      abilityPills.innerHTML = '';
+      abilityPills.style.display = 'flex';
+      const arr = player.abilities || [];
+      for(const slot of arr){
+        const def = abilityDefs[slot.id];
+        if(!def) continue;
+        const pill = document.createElement('div'); pill.className = 'ability-pill';
+        pill.title = def.desc || '';
+        // title
+        const t = document.createElement('div'); t.style.fontSize = '0.82rem'; t.textContent = def.title; pill.appendChild(t);
+        // cooldown bar for abilities that have cooldown
+        if(def.cooldown && def.cooldown > 0){
+          const bar = document.createElement('div');
+          bar.style.width = '100%'; bar.style.height = '6px'; bar.style.background = 'rgba(0,0,0,0.25)'; bar.style.borderRadius = '4px'; bar.style.marginTop = '6px'; bar.style.overflow = 'hidden';
+          const fill = document.createElement('i');
+          const pct = Math.max(0, Math.min(1, (slot.cd || 0) / def.cooldown));
+          fill.style.display = 'block'; fill.style.height = '100%';
+          fill.style.width = `${Math.round(pct*100)}%`;
+          fill.style.background = pct > 0 ? 'linear-gradient(90deg,#ffd84d,#ff6bcb)' : 'linear-gradient(90deg,#6bf2a0,#9be3ff)';
+          bar.appendChild(fill);
+          pill.appendChild(bar);
+          // cooldown text
+          if(pct > 0){ const s = Math.ceil((slot.cd||0)/1000); const tsmall = document.createElement('div'); tsmall.style.fontSize='0.72rem'; tsmall.style.opacity='0.9'; tsmall.style.marginTop='4px'; tsmall.textContent = `${s}s`; pill.appendChild(tsmall); }
+        }
+        abilityPills.appendChild(pill);
+      }
+    }
     bigScoreEl.textContent = `Score: ${score}`;
   }
 
