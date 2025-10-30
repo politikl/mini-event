@@ -41,10 +41,14 @@ const UNLOCK_ISO = '2025-10-30T00:00:00-07:00';
 const unlockDate = new Date(UNLOCK_ISO);
 
 const rn = nowPT();
+if(inBlockedWindow(rn)){
+    showTimeLockOverlay('This game is temporarily blocked for scheduled hours. Please try again later.');
+    return;
+}
+
 if(rn < unlockDate){
     showTimeLockOverlay(`This game will unlock on ${unlockDate.toLocaleString('en-US', { timeZone: PT_TZ })} PT.`);
-} else if(inBlockedWindow(rn)){
-    showTimeLockOverlay('This game is temporarily blocked for scheduled hours. Please try again later.');
+    return;
 }
 
 const __timeLockChecker = setInterval(() => {
