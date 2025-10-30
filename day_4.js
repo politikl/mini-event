@@ -4,7 +4,6 @@
 const PT_TZ = 'America/Los_Angeles';
 const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_TZ }));
 
-// blocked weekday ranges in minutes (08:15–11:00, 12:50–15:20 PT)
 const BLOCKED_RANGES = [[8*60 + 15, 11*60], [12*60 + 50, 15*60 + 20]];
 function isWeekday(d){ const day = d.getDay(); return day >= 1 && day <= 5; }
 function inBlockedWindow(ptDate){
@@ -41,14 +40,10 @@ const UNLOCK_ISO = '2025-10-30T00:00:00-07:00';
 const unlockDate = new Date(UNLOCK_ISO);
 
 const rn = nowPT();
-if(inBlockedWindow(rn)){
-    showTimeLockOverlay('This game is temporarily blocked for scheduled hours. Please try again later.');
-    return;
-}
-
 if(rn < unlockDate){
     showTimeLockOverlay(`This game will unlock on ${unlockDate.toLocaleString('en-US', { timeZone: PT_TZ })} PT.`);
-    return;
+} else if(inBlockedWindow(rn)){
+    showTimeLockOverlay('This game is temporarily blocked for scheduled hours. Please try again later.');
 }
 
 const __timeLockChecker = setInterval(() => {
@@ -243,6 +238,13 @@ const __timeLockChecker = setInterval(() => {
 
             const el = document.querySelector('.owned-badge[data-stock="' + s.id + '"]');
             if(el) el.textContent = 'Owned: ' + owned;
+            if(s._chart){
+                s._chart.data.labels.push('');
+                s._chart.data.datasets[0].data.push(s.price);
+                if(s._chart.data.datasets[0].data.length > 50) s._chart.data.datasets[0].data.shift();
+                if(s._chart.data.labels.length > 50) s._chart.data.labels.shift();
+                s._chart.update();
+            }
         });
 
         const totalValue = state.cash + portfolioValue;
@@ -280,17 +282,6 @@ const __timeLockChecker = setInterval(() => {
         state.day++;
         updateUI();
         checkAchievements();
-
-        // Update charts only on day advance
-        STOCKS.forEach(s => {
-            if(s._chart){
-                s._chart.data.labels.push('');
-                s._chart.data.datasets[0].data.push(s.price);
-                if(s._chart.data.datasets[0].data.length > 50) s._chart.data.datasets[0].data.shift();
-                if(s._chart.data.labels.length > 50) s._chart.data.labels.shift();
-                s._chart.update();
-            }
-        });
 
         // End after 365 days and autosave highest cash
         if(state.day >= 365){
@@ -389,17 +380,17 @@ const __timeLockChecker = setInterval(() => {
     async function saveScore(){
         const totalValue = state.cash + Object.keys(state.portfolio).reduce((sum, id) => sum + (state.portfolio[id] || 0) * (STOCKS.find(s => s.id === id)?.price || 0), 0);
         const id = getPlayerDocId();
-        const fbUser = (window.firebaseAuth && window.firebaseAuth.currentUser) ? window.firebaseAuth.currentUser : null;
-        const playerName = fbUser ? (fbUser.displayName || fbUser.email || 'Player') : 'Player';
-        const entry = { player: playerName, score: totalValue, highestCash: state.highestCash || 0, date: new Date().toLocaleDateString(), ts: Date.now() };
-        // Only save to leaderboard if authenticated
-        if(fbUser && window.firebaseDb && window.firebaseSetDoc && window.firebaseDoc){
+        const entry = { player: 'Player', score: totalValue, highestCash: state.highestCash || 0, date: new Date().toLocaleDateString(), ts: Date.now() };
+        // Save under the player's id so updates replace previous entries instead of piling up
+        if(window.firebaseDb && window.firebaseSetDoc && window.firebaseDoc){
+            // ensure player is signed in before saving to Firestore
             try{
+                if(window.firebaseAuth && !window.firebaseAuth.currentUser){
+                    // prompt sign-in
+                    try{ await window.firebaseSignInWithPopup(window.firebaseAuth, window.googleProvider); }catch(e){ console.warn('signin cancelled', e); }
+                }
                 await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, 'day4_scores', id), entry);
             }catch(e){ console.warn('save score', e); }
-        } else if(!fbUser) {
-            // Not authenticated, don't save to leaderboard
-            return;
         } else {
             // local fallback: maintain a map by id
             try{
@@ -649,17 +640,17 @@ const __timeLockChecker = setInterval(() => {
         const restored = await loadState();
         // If there was no saved state, create a randomized starting market by stepping 31 days
         if(!restored){
-            // simulate 31 days to randomize the market, but show Day 1 to player.
+            // simulate 31 days to randomize the market, but show Day 0 to player.
             // We'll increment state.day during simulation so history reflects real days,
-            // then reset the visible counter to 1.
+            // then reset the visible counter to 0.
             const origDay = state.day || 0;
             state.day = 1;
             for(let i=0;i<31;i++){
                 advanceStocksForNextDay();
                 state.day++;
             }
-            // after simulation, set displayed day back to 1
-            state.day = 1;
+            // after simulation, set displayed day back to 0
+            state.day = 0;
             // persist the randomized start so reloads will restore it
             scheduleAutosave(true);
         }
