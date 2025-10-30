@@ -102,8 +102,29 @@ const __timeLockChecker = setInterval(() => {
 
             container.appendChild(card);
             const canvas = document.getElementById('chart-' + s.id);
+            // Constrain canvas CSS size to avoid creating extremely large internal bitmaps
+            canvas.style.maxWidth = '900px';
+            canvas.style.maxHeight = '400px';
+            canvas.style.width = '100%';
+            canvas.style.height = '90px';
+
             const ctx = canvas.getContext('2d');
-            s._chart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: s.color, backgroundColor: 'rgba(0,0,0,0)' }] }, options: { animation: false, responsive: true, maintainAspectRatio: false, scales: { x: { display: false } } } });
+            // Cap devicePixelRatio to a safe value to prevent chart.js from attempting
+            // to allocate a canvas buffer larger than the browser allows (which throws
+            // "Canvas exceeds max size"). Typical devicePixelRatio can be large on some
+            // high-density displays; 2 is a safe cap for visuals while avoiding the error.
+            const safeDPR = Math.min(window.devicePixelRatio || 1, 2);
+            s._chart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets: [{ data: [], borderColor: s.color, backgroundColor: 'rgba(0,0,0,0)' }] },
+                options: {
+                    devicePixelRatio: safeDPR,
+                    animation: false,
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { x: { display: false } }
+                }
+            });
         });
 
         container.addEventListener('click', e => {
