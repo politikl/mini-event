@@ -83,16 +83,13 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
     function initStocks(){
         STOCKS.length = 0;
         STOCK_DEFS.forEach(d => {
-            const price = d.base * (0.8 + Math.random() * 0.8); // vary starting values
-            STOCKS.push({
-                id: d.id,
-                name: d.name,
-                color: d.color,
-                price: parseFloat(price.toFixed(2)),
-                history: [],
-                trend: { dir: 0, dur: 0, magnitude: 0 },
-                momentum: 0
-            });
+            // larger variance for starting price
+            const volatility = 0.4 + Math.random() * 1.2; // broader spread
+            const seed = d.base * (0.5 + Math.random() * volatility);
+            const price = Math.max(0.5, parseFloat(seed.toFixed(2)));
+            const momentum = (Math.random() - 0.5) * 0.05;
+            const trend = (Math.random() < 0.3) ? pickNewTrend() : { dir: 0, dur: 0, magnitude: 0 };
+            STOCKS.push({ id: d.id, name: d.name, color: d.color, price, history: [], trend, momentum });
         });
     }
 
@@ -459,27 +456,34 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
     // ---------- stock trend engine ----------
     function pickNewTrend(s){
         const r = Math.random();
-        if(r < 0.12) return { dir: 1, dur: 3 + Math.floor(Math.random()*8), magnitude: 0.02 + Math.random()*0.06 };
-        if(r < 0.24) return { dir: -1, dur: 3 + Math.floor(Math.random()*8), magnitude: 0.02 + Math.random()*0.06 };
-        if(r < 0.55) return { dir: 0, dur: 2 + Math.floor(Math.random()*6), magnitude: 0.005 + Math.random()*0.02 };
-        return { dir: (Math.random()<0.5?1:-1), dur: 1 + Math.floor(Math.random()*12), magnitude: 0.01 + Math.random()*0.08 };
+        // more varied trend durations and magnitudes
+        if(r < 0.15) return { dir: 1, dur: 4 + Math.floor(Math.random()*12), magnitude: 0.015 + Math.random()*0.08 };
+        if(r < 0.30) return { dir: -1, dur: 4 + Math.floor(Math.random()*12), magnitude: 0.015 + Math.random()*0.08 };
+        if(r < 0.65) return { dir: 0, dur: 2 + Math.floor(Math.random()*8), magnitude: 0.005 + Math.random()*0.03 };
+        return { dir: (Math.random()<0.5?1:-1), dur: 2 + Math.floor(Math.random()*20), magnitude: 0.02 + Math.random()*0.12 };
     }
 
     function advanceStocksForNextDay(){
         STOCKS.forEach(s => {
             if(!s.trend || s.trend.dur <= 0) s.trend = pickNewTrend(s);
             // volatility around trend
-            const volatility = 0.01 + Math.random()*0.06;
+            // occasional news/shock events
+            if(Math.random() < 0.03){
+                // shock: +/- large move
+                const shock = (Math.random() < 0.5 ? -1 : 1) * (0.08 + Math.random() * 0.35);
+                s.momentum = s.momentum * 0.2 + shock * 0.5;
+            }
+            const volatility = 0.015 + Math.random()*0.08;
             const trendEffect = (s.trend.dir || 0) * (s.trend.magnitude || 0);
             const randomEffect = (Math.random() - 0.5) * volatility * 2;
-            const changePct = trendEffect + randomEffect + (s.momentum || 0) * 0.4;
+            const changePct = trendEffect + randomEffect + (s.momentum || 0) * 0.45;
             // update momentum (decay + influence)
-            s.momentum = (s.momentum || 0) * 0.6 + changePct * 0.25;
+            s.momentum = (s.momentum || 0) * 0.65 + changePct * 0.28;
             s.price = Math.max(0.5, +(s.price * (1 + changePct)).toFixed(2));
             s.history.push({ day: state.day, price: s.price });
             s.trend.dur = Math.max(0, (s.trend.dur || 0) - 1);
             // prune history length
-            if(s.history.length > 200) s.history.shift();
+            if(s.history.length > 400) s.history.shift();
         });
     }
 
@@ -491,9 +495,11 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
         const closeLeaderboard = document.getElementById('close-leaderboard');
         const autoAdvance = document.getElementById('auto-advance');
         const gameSpeed = document.getElementById('game-speed');
+        const wipe = document.getElementById('wipe-save-btn');
 
         if(next) next.addEventListener('click', nextDay);
         if(reset) reset.addEventListener('click', resetGame);
+        if(wipe) wipe.addEventListener('click', wipeSavedState);
         if(back) back.addEventListener('click', () => window.history.back());
         if(leaderboard) leaderboard.addEventListener('click', showLeaderboard);
         if(closeLeaderboard) closeLeaderboard.addEventListener('click', hideLeaderboard);
@@ -503,8 +509,10 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
 
     function handleAutoAdvanceToggle(){
         settings.autoAdvance = this.checked;
+        const baseMs = 2000; // base interval to divide by speed
         if(settings.autoAdvance){
-            autoAdvanceInterval = setInterval(nextDay, 5000 / settings.gameSpeed);
+            const iv = Math.max(100, Math.floor(baseMs / settings.gameSpeed));
+            autoAdvanceInterval = setInterval(nextDay, iv);
         } else {
             if(autoAdvanceInterval) clearInterval(autoAdvanceInterval);
             autoAdvanceInterval = null;
@@ -513,10 +521,34 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
 
     function handleGameSpeedChange(){
         settings.gameSpeed = parseFloat(this.value);
+        // update UI display if exists
+        const disp = document.getElementById('game-speed-display'); if(disp) disp.textContent = settings.gameSpeed.toFixed(1) + 'x';
         if(settings.autoAdvance && autoAdvanceInterval){
             clearInterval(autoAdvanceInterval);
-            autoAdvanceInterval = setInterval(nextDay, 5000 / settings.gameSpeed);
+            const baseMs = 2000;
+            const iv = Math.max(100, Math.floor(baseMs / settings.gameSpeed));
+            autoAdvanceInterval = setInterval(nextDay, iv);
         }
+    }
+
+    // Wipe saved state (Firestore doc + local storage)
+    async function wipeSavedState(){
+        const id = getPlayerDocId();
+        // delete remote doc if possible
+        if(window.firebaseDb && window.firebaseDoc && window.firebaseSetDoc){
+            try{
+                // overwrite with empty or delete if delete API not available: set an empty state
+                await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, 'day4_states', id), { wiped: true, ts: Date.now() });
+            }catch(e){ console.warn('wipe remote', e); }
+        }
+        // remove local keys
+        localStorage.removeItem('day4_state');
+        localStorage.removeItem('candyTraderLeaderboard');
+        localStorage.removeItem('candyTraderAnonId');
+        // reset client state and UI
+        state = { cash: 1000, day: 1, portfolio: {}, history: {}, achievements: {}, highestCash: 1000 };
+        initStocks(); createCharts(); updateUI();
+        showMessage('Saved state wiped and game restarted');
     }
     function updateTimers(){
         const el = document.getElementById('game-timer');
@@ -550,5 +582,10 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
         // autosave periodic
         if(autosaveInterval) clearInterval(autosaveInterval);
         autosaveInterval = setInterval(()=> scheduleAutosave(), 10_000);
+        // show current game speed
+        const disp = document.getElementById('game-speed-display'); if(disp) disp.textContent = (settings.gameSpeed||1).toFixed(1) + 'x';
+        // if auto-advance checkbox is already checked (from UI) start it
+        const autoCheckbox = document.getElementById('auto-advance');
+        if(autoCheckbox && autoCheckbox.checked){ settings.autoAdvance = true; handleAutoAdvanceToggle.call(autoCheckbox); }
     });
 })();
