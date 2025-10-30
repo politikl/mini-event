@@ -277,15 +277,20 @@
       if(!this.alive) return;
       const x = this.x - cam.x, y = this.y - cam.y;
       ctx.save(); ctx.translate(x,y);
-      // style by type
-      if(this.type==='skeleton'){ ctx.fillStyle = '#dfe8e9'; }
-      else if(this.type==='demon'){ ctx.fillStyle = '#b14a4a'; }
-      else if(this.type==='brute'){ ctx.fillStyle = '#7b3a3a'; }
-      else if(this.type==='wolf'){ ctx.fillStyle = '#88aacc'; }
-      else if(this.type==='mini'){ ctx.fillStyle = '#ffc968'; }
-      else if(this.type==='boss'){ ctx.fillStyle = '#ff6b6b'; }
-      else if(this.type==='necromancer'){ ctx.fillStyle = '#9a6bd1'; }
-      else ctx.fillStyle = '#6b8b6b';
+      // Friendly allies draw in a clearly different tint so players can tell them apart
+      if(this.friendly){
+        ctx.fillStyle = '#5fe0a3'; // friendly greenish
+      } else {
+        // style by type
+        if(this.type==='skeleton'){ ctx.fillStyle = '#dfe8e9'; }
+        else if(this.type==='demon'){ ctx.fillStyle = '#b14a4a'; }
+        else if(this.type==='brute'){ ctx.fillStyle = '#7b3a3a'; }
+        else if(this.type==='wolf'){ ctx.fillStyle = '#88aacc'; }
+        else if(this.type==='mini'){ ctx.fillStyle = '#ffc968'; }
+        else if(this.type==='boss'){ ctx.fillStyle = '#ff6b6b'; }
+        else if(this.type==='necromancer'){ ctx.fillStyle = '#9a6bd1'; }
+        else ctx.fillStyle = '#6b8b6b';
+      }
       ctx.beginPath(); ctx.arc(0,0,this.r,0,Math.PI*2); ctx.fill();
       // hp bar
       ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(-this.r, -this.r-8, this.r*2, 5);
@@ -347,7 +352,7 @@
         setTimeout(()=>{
           beams.push({ x1:tx, y1:ty, aoe:true, range:160, t:performance.now(), dur:420, power:80 + Math.floor(this.xpValue/2) });
           for(const e of enemies) if(e.alive && !e.friendly && dist(tx,ty,e.x,e.y) <= 160){ e.takeDamage(80 + Math.floor(this.xpValue/2)); }
-          if(dist(tx,ty,player.x,player.y) <= 160) player.takeDamage(60);
+          if(dist(tx,ty,player.x,player.y) <= 160) dealPlayerDamage(60, { x:tx, y:ty, kind:'meteor' });
           particles.push({ x:tx, y:ty, t:performance.now(), dur:1200, col:'#ff6b6b' });
         }, 3000);
       }
@@ -784,7 +789,7 @@
         // damage nearby on impact after short delay
         setTimeout(()=>{
           for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) < 120) e.takeDamage(90);
-          if(dist(this.x,this.y,player.x,player.y) < 120) player.takeDamage(80);
+          if(dist(this.x,this.y,player.x,player.y) < 120) dealPlayerDamage(80, { x:this.x, y:this.y, kind:'boss_dash' });
           particles.push({ x:this.x, y:this.y, t:performance.now(), dur:900, col:'#ff9b6b' });
         }, 300);
       }
@@ -820,7 +825,7 @@
         this.slamAcc = 3200 + Math.random()*1400;
         beams.push({ x1:this.x, y1:this.y, aoe:true, range:160, t:performance.now(), dur:420, power:80 });
         for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) < 160) e.takeDamage(80 + Math.floor(player.level*3));
-        if(dist(this.x,this.y,player.x,player.y) < 160) player.takeDamage(70);
+        if(dist(this.x,this.y,player.x,player.y) < 160) dealPlayerDamage(70, { x:this.x, y:this.y, kind:'slam' });
       }
     }
   }
@@ -877,9 +882,12 @@
 
   class Projectile {
     constructor(x,y,vx,vy,power,r,owner,range=600,opt={}){
-      this.x=x; this.y=y; this.vx=vx; this.vy=vy; this.power=power; this.r=r; this.owner=owner; this.range=range;
+      this.x=x; this.y=y; this.vx=vx; this.vy=vy; this.power=power; this.r=r; this.owner=owner || null; this.range=range;
+      // if a projectile is constructed without an explicit owner, drop it immediately to avoid
+      // mysterious streaks that do nothing (these were causing confusing visuals).
+      this.alive = !!this.owner;
       this.life = Math.max(200, range / Math.hypot(vx,vy) * 1000);
-      this.alive=true; this.trail=[]; this.opt = opt;
+      this.trail=[]; this.opt = opt;
     }
     update(dt){
       if(!this.alive) return;
@@ -897,7 +905,7 @@
           e.takeDamage(this.power);
           if(this.opt.onHit) this.opt.onHit(e);
           // siphon: heal player a small fraction on hit
-          try{ if(window && window.Day5Game && typeof window.Day5Game.playerRef === 'function'){ const pl = window.Day5Game.playerRef(); if(pl && pl.hasAbility && pl.hasAbility('siphon')) pl.heal(Math.max(1, Math.floor(this.power * 0.12))); } }catch(ex){}
+          try{ if(window && window.Day5Game && typeof window.Day5Game.playerRef === 'function'){ const pl = window.Day5Game.playerRef(); if(pl && pl.hasAbility && pl.hasAbility('siphon')) pl.heal(Math.max(1, Math.floor(this.power * 0.12))); }}catch(ex){}
           // knockback from projectile
           const nx = (e.x - this.x) || 1, ny = (e.y - this.y) || 1, m = Math.hypot(nx,ny)||1;
           e.vx = (e.vx||0) + (nx/m) * Math.min(140, this.power*4);
@@ -916,7 +924,8 @@
             // small visual cue
             beams.push({ x1:player.x, y1:player.y, aoe:false, t:now, dur:220, power:0 });
           } else {
-            player.takeDamage(this.power);
+            // visible hit feedback before applying damage
+            dealPlayerDamage(this.power, { x: this.x, y: this.y, kind: 'proj' });
             this.alive=false;
           }
         }
@@ -947,9 +956,32 @@
     }
   }
 
+  // unified, visible player-damage helper so all player damage produces an obvious effect
+  function dealPlayerDamage(amount, meta){
+    try{
+      // spawn a noticeable particle cluster and a short flash beam at player
+      particles.push({ x: player.x, y: player.y, t: performance.now(), dur: 700, col: '#ff6b6b' });
+      beams.push({ x1: player.x, y1: player.y, aoe: true, range: 18, t: performance.now(), dur: 260, power: 0 });
+    }catch(e){}
+    if(player && typeof player.takeDamage === 'function') player.takeDamage(amount);
+  }
+
   class Orb {
     constructor(x,y,amt,type='xp'){ this.x=x; this.y=y; this.amt=amt; this.type=type; this.r=8; this.alive=true; this.float=Math.random()*Math.PI*2; }
-    update(dt){ this.float += dt/300; }
+    update(dt){
+      this.float += dt/300;
+     // slowly attract visible XP orbs toward the player so they naturally come in when visible
+     if(this.type === 'xp' && player && onScreen(this.x,this.y)){
+       const dx = player.x - this.x, dy = player.y - this.y;
+       const d = Math.hypot(dx,dy)||1;
+       // only slightly pull them (so they can still be missed)
+       const pullSpeed = 60; // px/sec
+       if(d > 6){
+         this.x += (dx/d) * pullSpeed * dt/1000;
+         this.y += (dy/d) * pullSpeed * dt/1000;
+       }
+     }
+    }
     draw(ctx,cam){
       if(!this.alive) return;
       const x=this.x-cam.x, y=this.y-cam.y + Math.sin(this.float)*2;
@@ -1066,34 +1098,25 @@
       const dx = sx - player.x, dy = sy - player.y; const m = Math.hypot(dx,dy)||1;
       // left click
       if(ev.button === 0){
+        // left click: only fire a projectile-type ability. Do NOT fallback to dash on click.
         const proj = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && d.type==='projectile'; });
         if(proj) player.tryUseAbility(proj.id, dx/m, dy/m);
-        else if(player.hasAbility('dash_strike')) player.tryUseAbility('dash_strike', dx/m, dy/m);
-      } else if(ev.button === 2){
-        // right click: attempt to use a useful active ability first
-        ev.preventDefault();
-        const prefer = ['heal_pulse','barrier','reflect_shield','phase_shift','shield'];
-        let used = false;
-        for(const id of prefer){ if(player.hasAbility(id)) { used = player.tryUseAbility(id); if(used) break; } }
-        if(!used){
-          // fallback to projectile if nothing active
-          const proj = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && d.type==='projectile'; });
-          if(proj) player.tryUseAbility(proj.id, dx/m, dy/m);
+        } else if(ev.button === 2){
+          // right click: attempt to use a useful active ability first
+          ev.preventDefault();
+          const prefer = ['heal_pulse','barrier','reflect_shield','phase_shift','shield'];
+          let used = false;
+          for(const id of prefer){ if(player.hasAbility(id)) { used = player.tryUseAbility(id); if(used) break; } }
+          if(!used){
+            // fallback to projectile if nothing active
+            const proj = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && d.type==='projectile'; });
+            if(proj) player.tryUseAbility(proj.id, dx/m, dy/m);
+          }
         }
-      }
-    });
-    // prevent context menu on right-click inside canvas so right-click can be used for abilities
-    canvas.addEventListener('contextmenu', e => { e.preventDefault(); });
-  }
-
-  function getMoveDir(){
-    let x=0,y=0;
-    if(keys['w']||keys['arrowup']||keys['i']) y -= 1;
-    if(keys['s']||keys['arrowdown']||keys['k']) y += 1;
-    if(keys['a']||keys['arrowleft']||keys['j']) x -= 1;
-    if(keys['d']||keys['arrowright']||keys['l']) x += 1;
-    const m = Math.hypot(x,y); if(m>0) return {x:x/m,y:y/m}; return null;
-  }
+      });
+      // prevent context menu on right-click inside canvas so right-click can be used for abilities
+      canvas.addEventListener('contextmenu', e => { e.preventDefault(); });
+    }
 
   // --- level up UI & choices (no duplicates) ---
   function presentChoices(title, choices, onPick){
@@ -1244,10 +1267,10 @@
     // directional abilities use lastDir when stopped and will fire with cooldowns
     for(const a of player.abilities){
       const def = abilityDefs[a.id]; if(!def) continue;
-      if(['projectile','cone','dash','deploy','aoe','active','melee'].includes(def.type)){
+      if(['projectile','cone','deploy','aoe','active','melee'].includes(def.type)){
         const useDir = dir ? {x:dir.x,y:dir.y} : {x:player.lastDir.x, y:player.lastDir.y};
-        // projectiles and cone are allowed to auto-trigger when cd available (player desires auto)
-        if(def.type === 'projectile' || def.type === 'cone' || def.type === 'dash'){
+        // Only auto-trigger projectiles and cones. Dash is no longer auto-triggered and will only occur via Space.
+        if(def.type === 'projectile' || def.type === 'cone'){
           player.tryUseAbility(a.id, useDir.x, useDir.y);
         }
       }
