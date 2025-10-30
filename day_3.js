@@ -35,7 +35,7 @@ function hideTimeLockOverlay(){
   if(el) el.remove();
 }
 
-const UNLOCK_ISO = '2025-10-30T00:00:00-07:00';
+const UNLOCK_ISO = '2025-10-29T00:00:00-07:00';
 const unlockDate = new Date(UNLOCK_ISO);
 
 const rn = nowPT();
