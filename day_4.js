@@ -78,7 +78,9 @@ const __timeLockChecker = setInterval(() => {
         { id: 'jelly', name: 'Jelly', price: 43, color: '#b28cff' }
     ];
 
-    let state = { cash: 1000, day: 1, portfolio: {}, history: {} };
+    let state = { cash: 1000, day: 1, portfolio: {}, history: {}, achievements: {} };
+    let settings = { autoAdvance: false, gameSpeed: 1 };
+    let autoAdvanceInterval;
 
     function createCharts(){
         const container = document.getElementById('charts-container');
@@ -102,9 +104,7 @@ const __timeLockChecker = setInterval(() => {
 
             container.appendChild(card);
             const canvas = document.getElementById('chart-' + s.id);
-            // Constrain canvas CSS size to avoid creating extremely large internal bitmaps
-            canvas.style.maxWidth = '900px';
-            canvas.style.maxHeight = '400px';
+            // Set canvas size properly
             canvas.style.width = '100%';
             canvas.style.height = '90px';
 
@@ -116,13 +116,40 @@ const __timeLockChecker = setInterval(() => {
             const safeDPR = Math.min(window.devicePixelRatio || 1, 2);
             s._chart = new Chart(ctx, {
                 type: 'line',
-                data: { labels: [], datasets: [{ data: [], borderColor: s.color, backgroundColor: 'rgba(0,0,0,0)' }] },
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        borderColor: s.color,
+                        backgroundColor: 'rgba(0,0,0,0)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        tension: 0.1
+                    }]
+                },
                 options: {
                     devicePixelRatio: safeDPR,
                     animation: false,
                     responsive: true,
                     maintainAspectRatio: false,
-                    scales: { x: { display: false } }
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return '$' + context.parsed.y.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            display: false,
+                            beginAtZero: false
+                        }
+                    }
                 }
             });
         });
@@ -149,14 +176,54 @@ const __timeLockChecker = setInterval(() => {
     function updateUI(){
         const cashEl = document.getElementById('player-cash');
         const dayEl = document.getElementById('current-day');
+        const portfolioValueEl = document.getElementById('portfolio-value');
+        const statTotalValueEl = document.getElementById('stat-total-value');
+        const statDayEl = document.getElementById('stat-day');
+        const statHoldingsEl = document.getElementById('stat-holdings');
+        const statBestStockEl = document.getElementById('stat-best-stock');
+        const statAchievementsEl = document.getElementById('stat-achievements');
+        const statNetChangeEl = document.getElementById('stat-net-change');
+
         if(cashEl) cashEl.textContent = '$' + state.cash.toFixed(2);
         if(dayEl) dayEl.textContent = 'Day ' + state.day;
 
+        let portfolioValue = 0;
+        let totalHoldings = 0;
+        let bestStock = null;
+        let bestPerformance = -Infinity;
+
         STOCKS.forEach(s => {
+            const owned = state.portfolio[s.id] || 0;
+            portfolioValue += owned * s.price;
+            totalHoldings += owned;
+
+            // Find best performing stock (highest price)
+            if(s.price > bestPerformance){
+                bestPerformance = s.price;
+                bestStock = s.name;
+            }
+
             const el = document.querySelector('.owned-badge[data-stock="' + s.id + '"]');
-            if(el) el.textContent = 'Owned: ' + (state.portfolio[s.id] || 0);
-            if(s._chart){ s._chart.data.labels.push(''); s._chart.data.datasets[0].data.push(s.price); if(s._chart.data.datasets[0].data.length > 50) s._chart.data.datasets[0].data.shift(); if(s._chart.data.labels.length > 50) s._chart.data.labels.shift(); s._chart.update(); }
+            if(el) el.textContent = 'Owned: ' + owned;
+            if(s._chart){
+                s._chart.data.labels.push('');
+                s._chart.data.datasets[0].data.push(s.price);
+                if(s._chart.data.datasets[0].data.length > 50) s._chart.data.datasets[0].data.shift();
+                if(s._chart.data.labels.length > 50) s._chart.data.labels.shift();
+                s._chart.update();
+            }
         });
+
+        const totalValue = state.cash + portfolioValue;
+        const achievementCount = Object.keys(state.achievements || {}).length;
+
+        if(portfolioValueEl) portfolioValueEl.textContent = '$' + portfolioValue.toFixed(2);
+        if(statTotalValueEl) statTotalValueEl.textContent = '$' + totalValue.toFixed(2);
+        if(statDayEl) statDayEl.textContent = 'Day ' + state.day;
+        if(statHoldingsEl) statHoldingsEl.textContent = totalHoldings;
+        if(statBestStockEl) statBestStockEl.textContent = bestStock || '-';
+        if(statAchievementsEl) statAchievementsEl.textContent = achievementCount;
+        if(statNetChangeEl) statNetChangeEl.textContent = '$' + (totalValue - 1000).toFixed(2);
 
         updatePortfolioTable();
     }
@@ -168,9 +235,143 @@ const __timeLockChecker = setInterval(() => {
 
     function showMessage(msg){ const p = document.getElementById('message'); if(p){ p.textContent = msg; p.classList.remove('hidden'); setTimeout(()=>p.classList.add('hidden'),1500); } }
 
-    function nextDay(){ STOCKS.forEach(s => { const change = (Math.random() - 0.5) * s.price * 0.08; s.price = Math.max(1, s.price + change); }); state.day++; updateUI(); }
+    function nextDay(){
+        STOCKS.forEach(s => {
+            const change = (Math.random() - 0.5) * s.price * 0.08;
+            s.price = Math.max(1, s.price + change);
+        });
+        state.day++;
+        updateUI();
+        checkAchievements();
+    }
 
-    function resetGame(){ state = { cash: 1000, day: 1, portfolio: {}, history: {} }; createCharts(); updateUI(); }
+    function resetGame(){
+        // Save score before resetting
+        saveScore();
+        state = { cash: 1000, day: 1, portfolio: {}, history: {}, achievements: {} };
+        createCharts();
+        updateUI();
+        if(autoAdvanceInterval) clearInterval(autoAdvanceInterval);
+        autoAdvanceInterval = null;
+    }
 
-    window.addEventListener('load', () => { createCharts(); updateUI(); const next = document.getElementById('next-day'); const reset = document.getElementById('reset-game'); if(next) next.addEventListener('click', nextDay); if(reset) reset.addEventListener('click', resetGame); });
+    function checkAchievements(){
+        // Simple achievement checks
+        const totalValue = state.cash + Object.keys(state.portfolio).reduce((sum, id) => sum + (state.portfolio[id] || 0) * STOCKS.find(s => s.id === id).price, 0);
+        if(totalValue >= 2000 && !state.achievements?.rich){
+            state.achievements = state.achievements || {};
+            state.achievements.rich = true;
+            showAchievement('Wealthy Trader', 'Accumulated $2000+ in total value!');
+        }
+        if(state.day >= 10 && !state.achievements?.veteran){
+            state.achievements = state.achievements || {};
+            state.achievements.veteran = true;
+            showAchievement('Veteran Trader', 'Survived 10 trading days!');
+        }
+    }
+
+    function showAchievement(name, description){
+        const popup = document.getElementById('achievement-popup');
+        const nameEl = document.getElementById('achievement-name');
+        const descEl = document.getElementById('achievement-description');
+        const closeBtn = document.getElementById('achievement-close');
+        if(popup && nameEl && descEl){
+            nameEl.textContent = name;
+            descEl.textContent = description;
+            popup.classList.remove('hidden');
+            const hidePopup = () => popup.classList.add('hidden');
+            if(closeBtn) closeBtn.onclick = hidePopup;
+            setTimeout(hidePopup, 5000); // Extended to 5 seconds
+        }
+    }
+
+    // Leaderboard functionality
+    let leaderboardData = [];
+
+    function showLeaderboard(){
+        const modal = document.getElementById('leaderboard-modal');
+        if(modal) modal.classList.remove('hidden');
+        loadLeaderboard();
+    }
+
+    function hideLeaderboard(){
+        const modal = document.getElementById('leaderboard-modal');
+        if(modal) modal.classList.add('hidden');
+    }
+
+    // Add modal backdrop click to close
+    document.addEventListener('click', e => {
+        const modal = document.getElementById('leaderboard-modal');
+        if(e.target === modal) hideLeaderboard();
+    });
+
+    function loadLeaderboard(){
+        // For demo purposes, using localStorage. In production, use Firebase.
+        const stored = localStorage.getItem('candyTraderLeaderboard');
+        leaderboardData = stored ? JSON.parse(stored) : [];
+        renderLeaderboard();
+    }
+
+    function saveScore(){
+        const totalValue = state.cash + Object.keys(state.portfolio).reduce((sum, id) => sum + (state.portfolio[id] || 0) * STOCKS.find(s => s.id === id).price, 0);
+        const score = { player: 'Player', score: totalValue, date: new Date().toLocaleDateString() };
+        leaderboardData.push(score);
+        leaderboardData.sort((a, b) => b.score - a.score);
+        leaderboardData = leaderboardData.slice(0, 10); // Keep top 10
+        localStorage.setItem('candyTraderLeaderboard', JSON.stringify(leaderboardData));
+    }
+
+    function renderLeaderboard(){
+        const tbody = document.getElementById('leaderboard-body');
+        if(!tbody) return;
+        tbody.innerHTML = '';
+        leaderboardData.forEach((entry, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${index + 1}</td><td>${entry.player}</td><td>$${entry.score.toFixed(2)}</td><td>${entry.date}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Save score when game ends or on certain events
+    function endGame(){
+        saveScore();
+    }
+
+    function setupEventListeners(){
+        const next = document.getElementById('next-day-btn');
+        const reset = document.getElementById('reset-game-btn');
+        const back = document.getElementById('back-btn');
+        const leaderboard = document.getElementById('leaderboard-btn');
+        const closeLeaderboard = document.getElementById('close-leaderboard');
+        const autoAdvance = document.getElementById('auto-advance');
+        const gameSpeed = document.getElementById('game-speed');
+
+        if(next) next.addEventListener('click', nextDay);
+        if(reset) reset.addEventListener('click', resetGame);
+        if(back) back.addEventListener('click', () => window.history.back());
+        if(leaderboard) leaderboard.addEventListener('click', showLeaderboard);
+        if(closeLeaderboard) closeLeaderboard.addEventListener('click', hideLeaderboard);
+        if(autoAdvance) autoAdvance.addEventListener('change', handleAutoAdvanceToggle);
+        if(gameSpeed) gameSpeed.addEventListener('input', handleGameSpeedChange);
+    }
+
+    function handleAutoAdvanceToggle(){
+        settings.autoAdvance = this.checked;
+        if(settings.autoAdvance){
+            autoAdvanceInterval = setInterval(nextDay, 5000 / settings.gameSpeed);
+        } else {
+            if(autoAdvanceInterval) clearInterval(autoAdvanceInterval);
+            autoAdvanceInterval = null;
+        }
+    }
+
+    function handleGameSpeedChange(){
+        settings.gameSpeed = parseFloat(this.value);
+        if(settings.autoAdvance && autoAdvanceInterval){
+            clearInterval(autoAdvanceInterval);
+            autoAdvanceInterval = setInterval(nextDay, 5000 / settings.gameSpeed);
+        }
+    }
+
+    window.addEventListener('load', () => { createCharts(); updateUI(); setupEventListeners(); });
 })();

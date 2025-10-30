@@ -21,12 +21,12 @@
                                     <div class="stats-box">
                                         <div class="stats-title">Your Stats:</div>
                                         <div class="stats-grid">
-                                            <div class="stat-pill">##</div>
-                                            <div class="stat-pill">##</div>
-                                            <div class="stat-pill">##</div>
-                                            <div class="stat-pill">##</div>
-                                            <div class="stat-pill">##</div>
-                                            <div class="stat-pill">##</div>
+                                            <div class="stat-pill"><span class="stat-label">Total Value:</span> <span id="stat-total-value">$1000</span></div>
+                                            <div class="stat-pill"><span class="stat-label">Day:</span> <span id="stat-day">1</span></div>
+                                            <div class="stat-pill"><span class="stat-label">Holdings:</span> <span id="stat-holdings">0</span></div>
+                                            <div class="stat-pill"><span class="stat-label">Best Stock:</span> <span id="stat-best-stock">-</span></div>
+                                            <div class="stat-pill"><span class="stat-label">Achievements:</span> <span id="stat-achievements">0</span></div>
+                                            <div class="stat-pill"><span class="stat-label">Net Change:</span> <span id="stat-net-change">$0</span></div>
                                         </div>
                                     </div>
 
@@ -49,6 +49,21 @@
                                         <button id="next-day-btn" class="control large">Next Day</button>
                                     </div>
 
+                                    <div class="portfolio-box">
+                                        <table id="portfolio-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Stock</th>
+                                                    <th>Qty</th>
+                                                    <th>Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
+
+                                    <div id="message" class="hidden"></div>
+
                                     <div class="settings-box">
                                         <div class="settings-label">Settings</div>
                                         <div class="setting-row">
@@ -70,11 +85,10 @@
 
                     <!-- Achievement popup -->
                     <div id="achievement-popup" class="hidden">
-                        <div class="achievement-content">
-                            <h3>Achievement Unlocked!</h3>
-                            <p id="achievement-name"></p>
-                            <p id="achievement-description"></p>
-                        </div>
+                        <button id="achievement-close" class="achievement-close">×</button>
+                        <h3>Achievement Unlocked!</h3>
+                        <p id="achievement-name"></p>
+                        <p id="achievement-description"></p>
                     </div>
 
                     <!-- Leaderboard Modal -->
@@ -99,8 +113,6 @@
                     </div>
 
                     <!-- Required scripts -->
-                    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-                    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
                     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
                     <script src="day_4.js"></script>
                 </body>

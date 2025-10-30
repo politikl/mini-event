@@ -58,31 +58,28 @@ body {
 }
 
 .nav-buttons {
-    position: absolute;
-    top: 20px;
-    left: 20px;
     display: flex;
     gap: 10px;
+    margin-bottom: 20px;
 }
 
 .content-area {
-    margin-top: 60px;
+    margin-top: 0;
 }
 
 /* content area rules are set via .content-area and .main-frame */
-.content-area { 
-    display: block;
+.content-area {
+    display: flex;
+    gap: 20px;
     max-width: 860px;
     margin: 0 auto;
 }
 
-.content-area .left-col { 
-    width: 580px; 
-    float: left; 
+.content-area .left-col {
+    flex: 1;
 }
-.content-area .right-col { 
-    width: 260px; 
-    float: right; 
+.content-area .right-col {
+    width: 260px;
 }
 
 .stats-box { 
@@ -102,31 +99,39 @@ body {
     flex-wrap: nowrap;
     flex: 1;
 }
-.stat-pill { 
-    background: white; 
-    border: 2px solid var(--card-border); 
-    padding: 8px 10px; 
-    border-radius: 10px; 
-    min-width: 48px; 
+.stat-pill {
+    background: white;
+    border: 2px solid var(--card-border);
+    padding: 8px 10px;
+    border-radius: 10px;
+    min-width: 48px;
     text-align: center;
     font-weight: bold;
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.stat-label {
+    font-size: 0.8em;
+    color: #666;
+    font-weight: normal;
 }
 
 /* cards grid */
-.cards-grid { 
-    display: grid; 
-    grid-template-columns: repeat(2, 1fr); 
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 18px;
-    max-width: 580px;
 }
-.chart-card { 
-    background: white; 
-    border-radius: 16px; 
-    padding: 12px; 
-    border: 3px solid var(--card-border); 
+.chart-card {
+    background: white;
+    border-radius: 16px;
+    padding: 12px;
+    border: 3px solid var(--card-border);
     height: 180px;
-    width: 280px; 
     position: relative;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     display: flex;
@@ -160,39 +165,57 @@ body {
 .btn-sell { background: #ffbdbd; border: 2px solid #ff6b6b; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight: bold; color: #ff0000; }
 .owned-badge { margin-left:auto; background:#f0f0f0; border-radius:8px; padding:6px 10px; border:2px solid var(--card-border); }
 
-#portfolio-table th,
-#portfolio-table td {
-    padding: 12px;
-    text-align: right;
-}
-
-#portfolio-table th {
-    background-color: rgba(255, 107, 53, 0.2);
-    color: #ffaa00;
-    font-weight: normal;
-    text-align: right;
-}
-
-#portfolio-table tr:nth-child(even) {
-    background-color: rgba(255, 107, 53, 0.1);
-}
-
-#portfolio-table tr:hover {
-    background-color: rgba(255, 170, 0, 0.1);
-}
-
-.empty-portfolio {
-    text-align: center !important;
-    color: #ff6b35;
-    padding: 20px !important;
-}
+/* Remove conflicting portfolio table styles */
 
 /* right column */
-.right-col { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 15px; 
+.right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
     padding: 10px;
+}
+
+.portfolio-box {
+    background: var(--muted);
+    padding: 15px;
+    border-radius: 12px;
+    border: 3px solid var(--card-border);
+}
+
+.portfolio-box table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.portfolio-box th,
+.portfolio-box td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.portfolio-box th {
+    background: rgba(255, 107, 53, 0.2);
+    color: #ffaa00;
+    font-weight: bold;
+}
+
+.portfolio-box tr:nth-child(even) {
+    background: rgba(255, 107, 53, 0.1);
+}
+
+.portfolio-box tr:hover {
+    background: rgba(255, 170, 0, 0.1);
+}
+
+#message {
+    background: #ffe4c4;
+    border: 2px solid #ff6b35;
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+    color: #ff6b35;
 }
 .summary-box { 
     background: var(--muted); 
@@ -271,9 +294,100 @@ body {
 .hidden { display:none !important; }
 
 @media (max-width: 900px) {
-    .content-area .left-col, .content-area .right-col { float:none; width:100%; }
+    .app-shell { width: 95%; }
+    .content-area { flex-direction: column; }
+    .content-area .left-col, .content-area .right-col { width:100%; }
     .cards-grid { grid-template-columns: 1fr; }
+    .nav-buttons { flex-wrap: wrap; }
 }
 
 /* small reset for floats */
 .main-frame::after { content:''; display:block; clear:both; }
+
+/* Ensure charts don't overflow */
+.chart-card {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.card-canvas {
+    width: 100%;
+    max-width: 250px;
+}
+
+.card-canvas canvas {
+    width: 100% !important;
+    height: 90px !important;
+    max-width: 100%;
+}
+
+/* Modal styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    border: 3px solid var(--card-border);
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+}
+
+.modal-close {
+    background: var(--accent-red);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 15px;
+}
+
+#achievement-popup {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #98ff98;
+    border: 3px solid var(--accent);
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    z-index: 999;
+    max-width: 300px;
+    position: relative;
+}
+
+#achievement-popup h3 {
+    margin: 0 0 10px 0;
+    color: var(--accent);
+}
+
+.achievement-close {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--accent);
+    line-height: 1;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
