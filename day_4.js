@@ -119,13 +119,9 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
                     <button class="btn-buy" data-buy="1" data-stock="${s.id}">Buy 1</button>
                     <button class="btn-buy" data-buy="10" data-stock="${s.id}">Buy 10</button>
                     <button class="btn-buy" data-buy-max="true" data-stock="${s.id}">Buy Max</button>
-                    <input class="buy-input" data-stock="${s.id}" type="number" min="1" placeholder="Qty" style="width:64px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit">
-                    <button class="btn-buy-custom" data-stock="${s.id}">Buy</button>
                     <button class="btn-sell" data-sell="1" data-stock="${s.id}">Sell 1</button>
                     <button class="btn-sell" data-sell="10" data-stock="${s.id}">Sell 10</button>
                     <button class="btn-sell" data-sell-all="true" data-stock="${s.id}">Sell All</button>
-                    <input class="sell-input" data-stock="${s.id}" type="number" min="1" placeholder="Qty" style="width:64px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit">
-                    <button class="btn-sell-custom" data-stock="${s.id}">Sell</button>
                 </div>
             `;
 
@@ -150,31 +146,19 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
         });
 
         container.addEventListener('click', e => {
-            // buy buttons
             const buy = e.target.closest('[data-buy]');
             const buyMax = e.target.closest('[data-buy-max]');
             const sell = e.target.closest('[data-sell]');
-            const buyCustomBtn = e.target.closest('.btn-buy-custom');
-            const sellCustomBtn = e.target.closest('.btn-sell-custom');
 
             if(buy){ buyStocks(buy.dataset.stock, parseInt(buy.dataset.buy, 10)); }
             if(buyMax){ buyMaxStocks(buyMax.dataset.stock); }
             if(sell){
                 const ds = sell.dataset;
-                if(ds.sellAll) sellAllStocks(sell.dataset.stock);
-                else sellStocks(sell.dataset.stock, parseInt(sell.dataset.sell, 10));
-            }
-            if(buyCustomBtn){
-                const id = buyCustomBtn.dataset.stock;
-                const input = document.querySelector(`.buy-input[data-stock="${id}"]`);
-                const q = Math.max(1, parseInt(input.value||'0',10)||1);
-                buyStocks(id, q);
-            }
-            if(sellCustomBtn){
-                const id = sellCustomBtn.dataset.stock;
-                const input = document.querySelector(`.sell-input[data-stock="${id}"]`);
-                const q = Math.max(1, parseInt(input.value||'0',10)||1);
-                sellStocks(id, q);
+                if(typeof ds.sellAll !== 'undefined'){
+                    sellAllStocks(sell.dataset.stock);
+                } else {
+                    sellStocks(sell.dataset.stock, parseInt(sell.dataset.sell, 10));
+                }
             }
         });
     }
@@ -270,10 +254,12 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
 
         updatePortfolioTable();
 
-        // Track highest cash and autosave if increased
+        // Track highest cash and autosave if increased; also push to leaderboard
         if(state.cash > (state.highestCash || 0)){
             state.highestCash = state.cash;
             scheduleAutosave();
+            // autosave highest score to leaderboard (player-scoped doc)
+            try{ saveScore(true); }catch(e){ console.warn('saveScore autosave', e); }
         }
     }
 
@@ -386,17 +372,24 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
     }
 
     function saveScore(){
-        const totalValue = state.cash + Object.keys(state.portfolio).reduce((sum, id) => sum + (state.portfolio[id] || 0) * STOCKS.find(s => s.id === id).price, 0);
-        const entry = { player: 'Player', score: totalValue, date: new Date().toLocaleDateString(), ts: Date.now() };
-        // Try to save to Firestore
+        const totalValue = state.cash + Object.keys(state.portfolio).reduce((sum, id) => sum + (state.portfolio[id] || 0) * (STOCKS.find(s => s.id === id)?.price || 0), 0);
+        const id = getPlayerDocId();
+        const entry = { player: 'Player', score: totalValue, highestCash: state.highestCash || 0, date: new Date().toLocaleDateString(), ts: Date.now() };
+        // Save under the player's id so updates replace previous entries instead of piling up
         if(window.firebaseDb && window.firebaseSetDoc && window.firebaseDoc){
-            const id = `score_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
             try{ window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, 'day4_scores', id), entry); }catch(e){ console.warn('save score', e); }
         } else {
-            leaderboardData.push(entry);
-            leaderboardData.sort((a,b)=>b.score-a.score);
-            leaderboardData = leaderboardData.slice(0,10);
-            localStorage.setItem('candyTraderLeaderboard', JSON.stringify(leaderboardData));
+            // local fallback: maintain a map by id
+            try{
+                const stored = localStorage.getItem('candyTraderLeaderboard');
+                let list = stored ? JSON.parse(stored) : [];
+                list = list.filter(r => r.id !== id);
+                entry.id = id;
+                list.push(entry);
+                list.sort((a,b)=> (b.score || 0) - (a.score || 0));
+                list = list.slice(0, 50);
+                localStorage.setItem('candyTraderLeaderboard', JSON.stringify(list));
+            }catch(e){ console.warn('local leaderboard save', e); }
         }
     }
 
@@ -462,22 +455,23 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
     async function loadState(){
         const id = getPlayerDocId();
         let restored = false;
+        // try firebase first (must use stable player id from getPlayerDocId)
         if(window.firebaseDb && window.firebaseGetDoc && window.firebaseDoc){
             try{
                 const snap = await window.firebaseGetDoc(window.firebaseDoc(window.firebaseDb, 'day4_states', id));
-                if(snap && snap.exists && snap.exists()){
+                if(snap && typeof snap.exists === 'function' && snap.exists()){
                     const data = snap.data();
                     restoreStateFromPayload(data);
                     restored = true;
                 }
-            }catch(e){ console.warn('loadState', e); }
+            }catch(e){ console.warn('loadState (firebase)', e); }
         }
         // fallback localStorage if remote not available or not found
         if(!restored){
             try{
                 const stored = localStorage.getItem('day4_state');
                 if(stored){ const data = JSON.parse(stored); restoreStateFromPayload(data); restored = true; }
-            }catch(e){ console.warn('loadState local', e); }
+            }catch(e){ console.warn('loadState (local)', e); }
         }
         return restored;
     }
@@ -499,34 +493,39 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
     // ---------- stock trend engine ----------
     function pickNewTrend(s){
         const r = Math.random();
-        // more varied trend durations and magnitudes
-        if(r < 0.15) return { dir: 1, dur: 4 + Math.floor(Math.random()*12), magnitude: 0.015 + Math.random()*0.08 };
-        if(r < 0.30) return { dir: -1, dur: 4 + Math.floor(Math.random()*12), magnitude: 0.015 + Math.random()*0.08 };
-        if(r < 0.65) return { dir: 0, dur: 2 + Math.floor(Math.random()*8), magnitude: 0.005 + Math.random()*0.03 };
-        return { dir: (Math.random()<0.5?1:-1), dur: 2 + Math.floor(Math.random()*20), magnitude: 0.02 + Math.random()*0.12 };
+        // make trends shorter and stronger more often to increase unpredictability
+        if(r < 0.10) return { dir: 1, dur: 2 + Math.floor(Math.random()*6), magnitude: 0.03 + Math.random()*0.18 };
+        if(r < 0.22) return { dir: -1, dur: 2 + Math.floor(Math.random()*6), magnitude: 0.03 + Math.random()*0.18 };
+        if(r < 0.50) return { dir: 0, dur: 1 + Math.floor(Math.random()*6), magnitude: 0.01 + Math.random()*0.06 };
+        // occasional long but volatile trend
+        return { dir: (Math.random()<0.6?1:-1), dur: 3 + Math.floor(Math.random()*30), magnitude: 0.02 + Math.random()*0.25 };
     }
 
     function advanceStocksForNextDay(){
         STOCKS.forEach(s => {
             if(!s.trend || s.trend.dur <= 0) s.trend = pickNewTrend(s);
-            // volatility around trend
-            // occasional news/shock events
-            if(Math.random() < 0.03){
+            // increase shock frequency and magnitude to create chaos
+            if(Math.random() < 0.14){
                 // shock: +/- large move
-                const shock = (Math.random() < 0.5 ? -1 : 1) * (0.08 + Math.random() * 0.35);
-                s.momentum = s.momentum * 0.2 + shock * 0.5;
+                const shock = (Math.random() < 0.5 ? -1 : 1) * (0.08 + Math.random() * 0.6);
+                s.momentum = (s.momentum || 0) * 0.15 + shock * (0.4 + Math.random()*0.6);
             }
-            const volatility = 0.015 + Math.random()*0.08;
+            // occasional spontaneous trend flip on hot markets
+            if(Math.random() < 0.22){
+                s.trend.dir = (s.trend.dir || 0) * -1 || (Math.random()<0.5?1:-1);
+                s.trend.magnitude = (s.trend.magnitude || 0.02) * (1 + Math.random()*1.2);
+            }
+            const volatility = 0.02 + Math.random()*0.14;
             const trendEffect = (s.trend.dir || 0) * (s.trend.magnitude || 0);
             const randomEffect = (Math.random() - 0.5) * volatility * 2;
-            const changePct = trendEffect + randomEffect + (s.momentum || 0) * 0.45;
+            const changePct = trendEffect + randomEffect + (s.momentum || 0) * (0.55 + Math.random()*0.4);
             // update momentum (decay + influence)
-            s.momentum = (s.momentum || 0) * 0.65 + changePct * 0.28;
-            s.price = Math.max(0.5, +(s.price * (1 + changePct)).toFixed(2));
+            s.momentum = (s.momentum || 0) * (0.45 + Math.random()*0.35) + changePct * (0.22 + Math.random()*0.4);
+            s.price = Math.max(0.2, +(s.price * (1 + changePct)).toFixed(2));
             s.history.push({ day: state.day, price: s.price });
             s.trend.dur = Math.max(0, (s.trend.dur || 0) - 1);
             // prune history length
-            if(s.history.length > 400) s.history.shift();
+            if(s.history.length > 500) s.history.shift();
         });
     }
 
@@ -539,9 +538,11 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
         const autoAdvance = document.getElementById('auto-advance');
         const gameSpeed = document.getElementById('game-speed');
         const wipe = document.getElementById('wipe-save-btn');
+        const saveBtn = document.getElementById('save-game-btn');
 
         if(next) next.addEventListener('click', nextDay);
         if(reset) reset.addEventListener('click', resetGame);
+    if(saveBtn) saveBtn.addEventListener('click', ()=>{ scheduleAutosave(true); saveScore(); showMessage('Saved'); });
         if(wipe) wipe.addEventListener('click', wipeSavedState);
         if(back) back.addEventListener('click', () => window.history.back());
         if(leaderboard) leaderboard.addEventListener('click', showLeaderboard);
@@ -618,12 +619,17 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
         const restored = await loadState();
         // If there was no saved state, create a randomized starting market by stepping 31 days
         if(!restored){
-            // start at day 0 for a fresh randomized start
-            state.day = 0;
+            // simulate 31 days to randomize the market, but show Day 0 to player.
+            // We'll increment state.day during simulation so history reflects real days,
+            // then reset the visible counter to 0.
+            const origDay = state.day || 0;
+            state.day = 1;
             for(let i=0;i<31;i++){
-                // advance prices but do not increment the visible day counter
                 advanceStocksForNextDay();
+                state.day++;
             }
+            // after simulation, set displayed day back to 0
+            state.day = 0;
             // persist the randomized start so reloads will restore it
             scheduleAutosave(true);
         }
