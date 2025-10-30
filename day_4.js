@@ -36,6 +36,8 @@ function hideTimeLockOverlay(){
     if(el) el.remove();
 }
 
+/*
+// GAME TIME-LOCK: Commented out for testing
 // set per-day unlock ISO
 const UNLOCK_ISO = '2025-10-30T00:00:00-07:00';
 const unlockDate = new Date(UNLOCK_ISO);
@@ -65,6 +67,7 @@ const __timeLockChecker = setInterval(() => {
     hideTimeLockOverlay();
     clearInterval(__timeLockChecker);
 }, 10000);
+*/
 
 // Trading dashboard - card based UI
 (function(){
