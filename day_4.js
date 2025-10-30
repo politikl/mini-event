@@ -243,13 +243,6 @@ const __timeLockChecker = setInterval(() => {
 
             const el = document.querySelector('.owned-badge[data-stock="' + s.id + '"]');
             if(el) el.textContent = 'Owned: ' + owned;
-            if(s._chart){
-                s._chart.data.labels.push('');
-                s._chart.data.datasets[0].data.push(s.price);
-                if(s._chart.data.datasets[0].data.length > 50) s._chart.data.datasets[0].data.shift();
-                if(s._chart.data.labels.length > 50) s._chart.data.labels.shift();
-                s._chart.update();
-            }
         });
 
         const totalValue = state.cash + portfolioValue;
@@ -287,6 +280,17 @@ const __timeLockChecker = setInterval(() => {
         state.day++;
         updateUI();
         checkAchievements();
+
+        // Update charts only on day advance
+        STOCKS.forEach(s => {
+            if(s._chart){
+                s._chart.data.labels.push('');
+                s._chart.data.datasets[0].data.push(s.price);
+                if(s._chart.data.datasets[0].data.length > 50) s._chart.data.datasets[0].data.shift();
+                if(s._chart.data.labels.length > 50) s._chart.data.labels.shift();
+                s._chart.update();
+            }
+        });
 
         // End after 365 days and autosave highest cash
         if(state.day >= 365){
@@ -385,17 +389,17 @@ const __timeLockChecker = setInterval(() => {
     async function saveScore(){
         const totalValue = state.cash + Object.keys(state.portfolio).reduce((sum, id) => sum + (state.portfolio[id] || 0) * (STOCKS.find(s => s.id === id)?.price || 0), 0);
         const id = getPlayerDocId();
-        const entry = { player: 'Player', score: totalValue, highestCash: state.highestCash || 0, date: new Date().toLocaleDateString(), ts: Date.now() };
-        // Save under the player's id so updates replace previous entries instead of piling up
-        if(window.firebaseDb && window.firebaseSetDoc && window.firebaseDoc){
-            // ensure player is signed in before saving to Firestore
+        const fbUser = (window.firebaseAuth && window.firebaseAuth.currentUser) ? window.firebaseAuth.currentUser : null;
+        const playerName = fbUser ? (fbUser.displayName || fbUser.email || 'Player') : 'Player';
+        const entry = { player: playerName, score: totalValue, highestCash: state.highestCash || 0, date: new Date().toLocaleDateString(), ts: Date.now() };
+        // Only save to leaderboard if authenticated
+        if(fbUser && window.firebaseDb && window.firebaseSetDoc && window.firebaseDoc){
             try{
-                if(window.firebaseAuth && !window.firebaseAuth.currentUser){
-                    // prompt sign-in
-                    try{ await window.firebaseSignInWithPopup(window.firebaseAuth, window.googleProvider); }catch(e){ console.warn('signin cancelled', e); }
-                }
                 await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, 'day4_scores', id), entry);
             }catch(e){ console.warn('save score', e); }
+        } else if(!fbUser) {
+            // Not authenticated, don't save to leaderboard
+            return;
         } else {
             // local fallback: maintain a map by id
             try{
@@ -645,17 +649,17 @@ const __timeLockChecker = setInterval(() => {
         const restored = await loadState();
         // If there was no saved state, create a randomized starting market by stepping 31 days
         if(!restored){
-            // simulate 31 days to randomize the market, but show Day 0 to player.
+            // simulate 31 days to randomize the market, but show Day 1 to player.
             // We'll increment state.day during simulation so history reflects real days,
-            // then reset the visible counter to 0.
+            // then reset the visible counter to 1.
             const origDay = state.day || 0;
             state.day = 1;
             for(let i=0;i<31;i++){
                 advanceStocksForNextDay();
                 state.day++;
             }
-            // after simulation, set displayed day back to 0
-            state.day = 0;
+            // after simulation, set displayed day back to 1
+            state.day = 1;
             // persist the randomized start so reloads will restore it
             scheduleAutosave(true);
         }
