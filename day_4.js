@@ -118,9 +118,14 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
                 <div class="card-controls">
                     <button class="btn-buy" data-buy="1" data-stock="${s.id}">Buy 1</button>
                     <button class="btn-buy" data-buy="10" data-stock="${s.id}">Buy 10</button>
-                    <input class="buy-input" data-stock="${s.id}" type="number" min="1" placeholder="Qty" style="width:64px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:inherit">
+                    <button class="btn-buy" data-buy-max="true" data-stock="${s.id}">Buy Max</button>
+                    <input class="buy-input" data-stock="${s.id}" type="number" min="1" placeholder="Qty" style="width:64px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit">
                     <button class="btn-buy-custom" data-stock="${s.id}">Buy</button>
                     <button class="btn-sell" data-sell="1" data-stock="${s.id}">Sell 1</button>
+                    <button class="btn-sell" data-sell="10" data-stock="${s.id}">Sell 10</button>
+                    <button class="btn-sell" data-sell-all="true" data-stock="${s.id}">Sell All</button>
+                    <input class="sell-input" data-stock="${s.id}" type="number" min="1" placeholder="Qty" style="width:64px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit">
+                    <button class="btn-sell-custom" data-stock="${s.id}">Sell</button>
                 </div>
             `;
 
@@ -145,12 +150,32 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
         });
 
         container.addEventListener('click', e => {
+            // buy buttons
             const buy = e.target.closest('[data-buy]');
+            const buyMax = e.target.closest('[data-buy-max]');
             const sell = e.target.closest('[data-sell]');
             const buyCustomBtn = e.target.closest('.btn-buy-custom');
+            const sellCustomBtn = e.target.closest('.btn-sell-custom');
+
             if(buy){ buyStocks(buy.dataset.stock, parseInt(buy.dataset.buy, 10)); }
-            if(sell){ sellStocks(sell.dataset.stock, parseInt(sell.dataset.sell, 10)); }
-            if(buyCustomBtn){ const id = buyCustomBtn.dataset.stock; const input = document.querySelector(`.buy-input[data-stock="${id}"]`); const q = Math.max(1, parseInt(input.value||'0',10)||1); buyStocks(id, q); }
+            if(buyMax){ buyMaxStocks(buyMax.dataset.stock); }
+            if(sell){
+                const ds = sell.dataset;
+                if(ds.sellAll) sellAllStocks(sell.dataset.stock);
+                else sellStocks(sell.dataset.stock, parseInt(sell.dataset.sell, 10));
+            }
+            if(buyCustomBtn){
+                const id = buyCustomBtn.dataset.stock;
+                const input = document.querySelector(`.buy-input[data-stock="${id}"]`);
+                const q = Math.max(1, parseInt(input.value||'0',10)||1);
+                buyStocks(id, q);
+            }
+            if(sellCustomBtn){
+                const id = sellCustomBtn.dataset.stock;
+                const input = document.querySelector(`.sell-input[data-stock="${id}"]`);
+                const q = Math.max(1, parseInt(input.value||'0',10)||1);
+                sellStocks(id, q);
+            }
         });
     }
 
@@ -167,6 +192,14 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
         } else showMessage('Not enough cash');
     }
 
+    function buyMaxStocks(id){
+        const stock = STOCKS.find(s => s.id === id);
+        if(!stock) return;
+        const maxQty = Math.floor(state.cash / stock.price);
+        if(maxQty <= 0){ showMessage('Not enough cash'); return; }
+        buyStocks(id, maxQty);
+    }
+
     function sellStocks(id, qty){
         if((state.portfolio[id] || 0) >= qty){
             const stock = STOCKS.find(s => s.id === id);
@@ -175,6 +208,12 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
             updateUI();
             scheduleAutosave();
         } else showMessage('Not enough owned');
+    }
+
+    function sellAllStocks(id){
+        const owned = state.portfolio[id] || 0;
+        if(owned <= 0){ showMessage('No holdings to sell'); return; }
+        sellStocks(id, owned);
     }
 
     function updateUI(){
@@ -422,21 +461,25 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
 
     async function loadState(){
         const id = getPlayerDocId();
+        let restored = false;
         if(window.firebaseDb && window.firebaseGetDoc && window.firebaseDoc){
             try{
                 const snap = await window.firebaseGetDoc(window.firebaseDoc(window.firebaseDb, 'day4_states', id));
                 if(snap && snap.exists && snap.exists()){
                     const data = snap.data();
                     restoreStateFromPayload(data);
-                    return;
+                    restored = true;
                 }
             }catch(e){ console.warn('loadState', e); }
         }
-        // fallback localStorage
-        try{
-            const stored = localStorage.getItem('day4_state');
-            if(stored){ const data = JSON.parse(stored); restoreStateFromPayload(data); }
-        }catch(e){}
+        // fallback localStorage if remote not available or not found
+        if(!restored){
+            try{
+                const stored = localStorage.getItem('day4_state');
+                if(stored){ const data = JSON.parse(stored); restoreStateFromPayload(data); restored = true; }
+            }catch(e){ console.warn('loadState local', e); }
+        }
+        return restored;
     }
 
     function restoreStateFromPayload(data){
@@ -572,7 +615,18 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
     // Start up
     window.addEventListener('load', async () => {
         initStocks();
-        await loadState();
+        const restored = await loadState();
+        // If there was no saved state, create a randomized starting market by stepping 31 days
+        if(!restored){
+            // start at day 0 for a fresh randomized start
+            state.day = 0;
+            for(let i=0;i<31;i++){
+                // advance prices but do not increment the visible day counter
+                advanceStocksForNextDay();
+            }
+            // persist the randomized start so reloads will restore it
+            scheduleAutosave(true);
+        }
         createCharts();
         updateUI();
         setupEventListeners();
