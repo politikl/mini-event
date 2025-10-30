@@ -93,7 +93,8 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
         });
     }
 
-    let state = { cash: 1000, day: 1, portfolio: {}, history: {}, achievements: {}, highestCash: 1000 };
+    // starting cash lowered to $100 per request
+    let state = { cash: 100, day: 1, portfolio: {}, history: {}, achievements: {}, highestCash: 100 };
     let settings = { autoAdvance: false, gameSpeed: 1 };
     let autoAdvanceInterval;
     let autosaveInterval;
@@ -197,7 +198,13 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
     function sellAllStocks(id){
         const owned = state.portfolio[id] || 0;
         if(owned <= 0){ showMessage('No holdings to sell'); return; }
-        sellStocks(id, owned);
+        const stock = STOCKS.find(s => s.id === id);
+        if(!stock) { showMessage('Stock not found'); return; }
+        // directly liquidate to avoid handler/dataset issues
+        state.cash += owned * stock.price;
+        state.portfolio[id] = 0;
+        updateUI();
+        scheduleAutosave();
     }
 
     function updateUI(){
@@ -288,7 +295,7 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
     function resetGame(){
         // Save score before resetting
         saveScore();
-        state = { cash: 1000, day: 1, portfolio: {}, history: {}, achievements: {}, highestCash: 1000 };
+        state = { cash: 100, day: 1, portfolio: {}, history: {}, achievements: {}, highestCash: 100 };
         createCharts();
         updateUI();
         if(autoAdvanceInterval) clearInterval(autoAdvanceInterval);
@@ -371,13 +378,20 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
         }
     }
 
-    function saveScore(){
+    async function saveScore(){
         const totalValue = state.cash + Object.keys(state.portfolio).reduce((sum, id) => sum + (state.portfolio[id] || 0) * (STOCKS.find(s => s.id === id)?.price || 0), 0);
         const id = getPlayerDocId();
         const entry = { player: 'Player', score: totalValue, highestCash: state.highestCash || 0, date: new Date().toLocaleDateString(), ts: Date.now() };
         // Save under the player's id so updates replace previous entries instead of piling up
         if(window.firebaseDb && window.firebaseSetDoc && window.firebaseDoc){
-            try{ window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, 'day4_scores', id), entry); }catch(e){ console.warn('save score', e); }
+            // ensure player is signed in before saving to Firestore
+            try{
+                if(window.firebaseAuth && !window.firebaseAuth.currentUser){
+                    // prompt sign-in
+                    try{ await window.firebaseSignInWithPopup(window.firebaseAuth, window.googleProvider); }catch(e){ console.warn('signin cancelled', e); }
+                }
+                await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, 'day4_scores', id), entry);
+            }catch(e){ console.warn('save score', e); }
         } else {
             // local fallback: maintain a map by id
             try{
@@ -435,6 +449,10 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
         const payload = { cash: state.cash, day: state.day, portfolio: state.portfolio, stocks: STOCKS.map(s=>({id:s.id,price:s.price,momentum:s.momentum,trend:s.trend})), highestCash: state.highestCash, ts: Date.now() };
         if(window.firebaseDb && window.firebaseSetDoc && window.firebaseDoc){
             try{
+                // ensure user signed in before saving to Firestore
+                if(window.firebaseAuth && !window.firebaseAuth.currentUser){
+                    try{ await window.firebaseSignInWithPopup(window.firebaseAuth, window.googleProvider); }catch(e){ console.warn('signin cancelled', e); }
+                }
                 await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, 'day4_states', id), payload);
                 showMessage('Game saved');
                 return { ok:true };
@@ -502,25 +520,29 @@ const nowPT = () => new Date(new Date().toLocaleString('en-US', { timeZone: PT_T
     }
 
     function advanceStocksForNextDay(){
+        const MAX_DAILY_PCT = 0.18; // cap daily percent moves to reduce extreme runs
         STOCKS.forEach(s => {
             if(!s.trend || s.trend.dur <= 0) s.trend = pickNewTrend(s);
-            // increase shock frequency and magnitude to create chaos
-            if(Math.random() < 0.14){
-                // shock: +/- large move
-                const shock = (Math.random() < 0.5 ? -1 : 1) * (0.08 + Math.random() * 0.6);
-                s.momentum = (s.momentum || 0) * 0.15 + shock * (0.4 + Math.random()*0.6);
+            // modest shock frequency and magnitude; cap each day's change so the game
+            // doesn't explode to absurd values. This still keeps unpredictability,
+            // but prevents easy $10k+ runs.
+            if(Math.random() < 0.06){
+                const shock = (Math.random() < 0.5 ? -1 : 1) * (0.06 + Math.random() * 0.18);
+                s.momentum = (s.momentum || 0) * 0.25 + shock * (0.3 + Math.random()*0.3);
             }
-            // occasional spontaneous trend flip on hot markets
-            if(Math.random() < 0.22){
+            // occasional trend flip, but less frequent
+            if(Math.random() < 0.10){
                 s.trend.dir = (s.trend.dir || 0) * -1 || (Math.random()<0.5?1:-1);
-                s.trend.magnitude = (s.trend.magnitude || 0.02) * (1 + Math.random()*1.2);
+                s.trend.magnitude = (s.trend.magnitude || 0.02) * (1 + Math.random()*0.6);
             }
-            const volatility = 0.02 + Math.random()*0.14;
+            const volatility = 0.012 + Math.random()*0.06;
             const trendEffect = (s.trend.dir || 0) * (s.trend.magnitude || 0);
             const randomEffect = (Math.random() - 0.5) * volatility * 2;
-            const changePct = trendEffect + randomEffect + (s.momentum || 0) * (0.55 + Math.random()*0.4);
+            let changePct = trendEffect + randomEffect + (s.momentum || 0) * (0.45 + Math.random()*0.25);
+            // cap daily change
+            changePct = Math.max(-MAX_DAILY_PCT, Math.min(MAX_DAILY_PCT, changePct));
             // update momentum (decay + influence)
-            s.momentum = (s.momentum || 0) * (0.45 + Math.random()*0.35) + changePct * (0.22 + Math.random()*0.4);
+            s.momentum = (s.momentum || 0) * (0.55 + Math.random()*0.25) + changePct * (0.18 + Math.random()*0.25);
             s.price = Math.max(0.2, +(s.price * (1 + changePct)).toFixed(2));
             s.history.push({ day: state.day, price: s.price });
             s.trend.dur = Math.max(0, (s.trend.dur || 0) - 1);
