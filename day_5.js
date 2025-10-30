@@ -131,6 +131,8 @@
   let spawnTimer = 0;
   let spawnInterval = 3800;
   let score = 0;
+  let slowMotionUntil = 0;
+  let deathSlowActive = false;
   let abilityDefs = {};
 
   // visual effect arrays
@@ -145,20 +147,20 @@
   const ABILITIES = [
     // melee reduced, visible blades
     { id:'blade_spin', title:'Blade Spin', desc:'Rotating blades around you (auto).', type:'auto', basePower:10, cooldown:900, range:72, upgradePow:(lv)=>10 + lv*3 },
-    // dash: small damage and visible streak, knockback
-    { id:'dash_strike', title:'Dash Strike', desc:'Dash and damage enemies in path.', type:'dash', basePower:18, cooldown:2600, range:160, upgradePow:(lv)=>18+lv*6 },
-    // projectile: fireball with explosion visual
-    { id:'fireball', title:'Fireball', desc:'Fire a projectile that explodes on impact.', type:'projectile', basePower:20, cooldown:900, range:480, upgradePow:(lv)=>20+lv*6 },
-    // multi_arrow spread
-    { id:'multi_arrow', title:'Multi Arrow', desc:'Spread arrows in movement direction.', type:'projectile', basePower:12, cooldown:1100, range:520, upgradePow:(lv)=>12+lv*4 },
+  // dash: small damage and visible streak, knockback (space-bound)
+  { id:'dash_strike', title:'Dash Strike', desc:'Dash and damage enemies in path.', type:'dash', basePower:18, cooldown:2600, range:160, upgradePow:(lv)=>18+lv*6, bind:'space' },
+  // projectile: fireball with explosion visual — auto-fires in last movement direction
+  { id:'fireball', title:'Fireball', desc:'Fire a projectile that explodes on impact.', type:'projectile', basePower:20, cooldown:900, range:480, upgradePow:(lv)=>20+lv*6, auto:true },
+  // multi_arrow spread (auto in movement direction)
+  { id:'multi_arrow', title:'Multi Arrow', desc:'Spread arrows in movement direction.', type:'projectile', basePower:12, cooldown:1100, range:520, upgradePow:(lv)=>12+lv*4, auto:true },
     // siphon passive: deals damage on hit and heals small — visible as particle
     { id:'siphon', title:'Siphon', desc:'On-hit heal.', type:'passive', basePower:5, cooldown:0, range:40, upgradePow:(lv)=>5+lv*2 },
-    // turret (friendly) — visual bullets
-  { id:'turret', title:'Turret', desc:'Place a turret that shoots at on-screen enemies.', type:'deploy', basePower:10, cooldown:5000, range:0, upgradePow:(lv)=>10+lv*4 },
-    // homing mine — visible seeker
-    { id:'homing_mine', title:'Homing Mine', desc:'Spawn a homing mine that seeks enemies.', type:'deploy', basePower:14, cooldown:4000, range:0, upgradePow:(lv)=>14+lv*6 },
-    // cone: visible cone shock but nerfed damage
-    { id:'shockwave', title:'Shockwave', desc:'Cone shock forward.', type:'cone', basePower:12, cooldown:2500, range:220, upgradePow:(lv)=>12+lv*5 },
+    // turret (friendly) — visual bullets (click to deploy)
+  { id:'turret', title:'Turret', desc:'Place a turret that shoots at on-screen enemies.', type:'deploy', basePower:10, cooldown:5000, range:0, upgradePow:(lv)=>10+lv*4, bind:'click' },
+    // homing mine — visible seeker (click to deploy)
+    { id:'homing_mine', title:'Homing Mine', desc:'Spawn a homing mine that seeks enemies.', type:'deploy', basePower:14, cooldown:4000, range:0, upgradePow:(lv)=>14+lv*6, bind:'click' },
+  // cone: visible cone shock that auto-fires in movement direction
+  { id:'shockwave', title:'Shockwave', desc:'Cone shock forward.', type:'cone', basePower:18, cooldown:2500, range:220, upgradePow:(lv)=>18+lv*5, auto:true },
   // (removed poison_trail and frost_aura — deprecated)
     // shield visible
   { id:'shield', title:'Shield', desc:'Temporary damage reduction.', type:'active', basePower:0.3, cooldown:8000, range:0, upgradePow:(lv)=>0.3+lv*0.06 },
@@ -168,23 +170,23 @@
     { id:'anvil_drop', title:'Anvil Drop', desc:'Drop an anvil on a enemy.', type:'auto', basePower:36, cooldown:7000, range:700, upgradePow:(lv)=>36+lv*12 },
 
   // extra projectile/area abilities (visible)
-  { id:'poison_bomb', title:'Poison Bomb', desc:'Throws a bomb that spawns a poison patch.', type:'projectile', basePower:10, cooldown:2600, range:420, upgradePow:(lv)=>10+lv*3 },
+  // poison_bomb removed per request
   // cannon: heavy click-targeted projectile with AoE
-  { id:'cannon', title:'Cannon', desc:'Click to fire a heavy cannonball that explodes on impact.', type:'projectile', basePower:36, cooldown:4000, range:720, upgradePow:(lv)=>36+lv*12 },
+  { id:'cannon', title:'Cannon', desc:'Click to fire a heavy cannonball that explodes on impact.', type:'projectile', basePower:36, cooldown:4000, range:720, upgradePow:(lv)=>36+lv*12, bind:'click' },
+  // new click abilities: ice shard (slows) and flare (area reveal/visual)
+  { id:'ice_shard', title:'Ice Shard', desc:'Throw an icy shard that slows enemies on hit (click).', type:'projectile', basePower:14, cooldown:2200, range:520, upgradePow:(lv)=>14+lv*4, bind:'click' },
+  { id:'flare', title:'Flare', desc:'Fire a flare that bursts on expire revealing the area (click).', type:'projectile', basePower:0, cooldown:3000, range:520, upgradePow:(lv)=>0, bind:'click' },
   // stun grenade: short telegraph then stun on impact
-  { id:'stun_grenade', title:'Stun Grenade', desc:'Throws a grenade that stuns enemies in an area.', type:'projectile', basePower:12, cooldown:6000, range:420, upgradePow:(lv)=>12+lv*2 },
-  // ricochet shot: bounces between nearby enemies
-  { id:'ricochet', title:'Ricochet Shot', desc:'Fires a projectile that ricochets to another nearby enemy.', type:'projectile', basePower:14, cooldown:2000, range:640, upgradePow:(lv)=>14+lv*5 },
+  // stun_grenade removed per request
+  // ricochet shot: bounces between nearby enemies (click)
+  { id:'ricochet', title:'Ricochet Shot', desc:'Fires a projectile that ricochets to another nearby enemy.', type:'projectile', basePower:14, cooldown:2000, range:640, upgradePow:(lv)=>14+lv*5, bind:'click' },
   // defensive abilities
-  // barrier and heal_pulse removed per request
-  { id:'reflect_shield', title:'Reflect Shield', desc:'Reflect incoming enemy projectiles for a short time.', type:'active', basePower:0, cooldown:12000, range:0, upgradePow:(lv)=>0 },
-  { id:'guardian_spirit', title:'Guardian Spirit', desc:'Summon a friendly spirit that fires at enemies.', type:'deploy', basePower:18, cooldown:12000, range:0, upgradePow:(lv)=>18+lv*6 },
-  { id:'phase_shift', title:'Phase Shift', desc:'Brief invulnerability (short cooldown).', type:'active', basePower:0, cooldown:15000, range:0, upgradePow:(lv)=>0 },
+  // reflect_shield / guardian_spirit removed per request
+  { id:'phase_shift', title:'Phase Shift', desc:'Brief invulnerability (short cooldown).', type:'active', basePower:0, cooldown:15000, range:0, upgradePow:(lv)=>0, bind:'space' },
   // orbital removed (duplicate / deprecated)
-    { id:'chain_lightning', title:'Chain Lightning', desc:'Strikes an enemy and chains to nearby enemies.', type:'projectile', basePower:16, cooldown:3200, range:540, upgradePow:(lv)=>16+lv*5 },
-  { id:'meteor', title:'Meteor', desc:'Calls down a meteor that deals huge explosion (long cooldown).', type:'projectile', basePower:60, cooldown:14000, range:900, upgradePow:(lv)=>60+lv*24 },
-  // small extras: life leech
-    { id:'life_leech', title:'Life Leech', desc:'Your attacks heal a portion of damage dealt.', type:'passive', basePower:0, cooldown:0, range:0, upgradePow:(lv)=>0 },
+    { id:'chain_lightning', title:'Chain Lightning', desc:'Strikes an enemy and chains to nearby enemies.', type:'projectile', basePower:16, cooldown:3200, range:540, upgradePow:(lv)=>16+lv*5, bind:'click' },
+    { id:'meteor', title:'Meteor', desc:'Calls down a meteor that deals huge explosion (long cooldown).', type:'projectile', basePower:60, cooldown:14000, range:900, upgradePow:(lv)=>60+lv*24, bind:'click' },
+  // small extras
   ];
   ABILITIES.forEach(a=> abilityDefs[a.id]=a);
 
@@ -558,15 +560,6 @@
             const nx = Math.cos(ang), ny = Math.sin(ang);
             projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*420, ny*420, power, 6, 'player', def.range, { type:'arrow' }));
           }
-        } else if(id === 'poison_bomb'){
-          const nx = dirx/mag, ny = diry/mag;
-          projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*300, ny*300, power, 8, 'player', def.range, {
-            onExpire: (px,py)=> {
-              beams.push({ x1:px, y1:py, aoe:true, range:80, t:performance.now(), dur:260, power: power*0.6, poison:true });
-              poisonTrails.push({ x:px, y:py, r:80, t:performance.now(), dur:4500, power:power*0.5 });
-            },
-            visual:'poison'
-          }));
         } else if(id === 'cannon'){
           // heavy cannonball: explodes on impact or expire with AoE damage
           const nx = dirx/mag, ny = diry/mag;
@@ -585,27 +578,25 @@
             },
             visual:'heavy'
           }));
-        } else if(id === 'stun_grenade'){
-          // grenade that stuns on explode
+        // stun_grenade removed
+        } else if(id === 'ice_shard'){
           const nx = dirx/mag, ny = diry/mag;
-          projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*260, ny*260, power, 9, 'player', def.range, {
-            onExpire: (px,py)=>{
-              const rad = 64 + lvl*8;
-              const stunMs = 1100 + lvl*350;
-              beams.push({ x1:px, y1:py, aoe:true, range:rad, t:performance.now(), dur:360, power:0, stun:true });
-              for(const e of enemies) if(e.alive && !e.friendly && dist(px,py,e.x,e.y) <= rad){ e.stunUntil = performance.now() + stunMs; }
-              particles.push({ x:px, y:py, t:performance.now(), dur:700, col:'#d6f2ff' });
-            },
+          projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*380, ny*380, power, 6, 'player', def.range, {
             onHit: (enemy)=>{
-              // explode at enemy and stun nearby
-              const px = enemy.x, py = enemy.y;
-              const rad = 64 + lvl*8;
-              const stunMs = 1100 + lvl*350;
-              beams.push({ x1:px, y1:py, aoe:true, range:rad, t:performance.now(), dur:360, power:0, stun:true });
-              for(const e of enemies) if(e.alive && !e.friendly && dist(px,py,e.x,e.y) <= rad){ e.stunUntil = performance.now() + stunMs; }
-              particles.push({ x:px, y:py, t:performance.now(), dur:700, col:'#d6f2ff' });
+              enemy.applySlow(0.5, 1400 + lvl*300);
+              beams.push({ x1:enemy.x, y1:enemy.y, aoe:false, t:performance.now(), dur:260, power:power*0.6 });
+              particles.push({ x:enemy.x, y:enemy.y, t:performance.now(), dur:700, col:'#d6f2ff' });
             },
-            visual:'stun'
+            visual:'spark'
+          }));
+        } else if(id === 'flare'){
+          const nx = dirx/mag, ny = diry/mag;
+          projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*260, ny*260, power, 8, 'player', def.range, {
+            onExpire: (px,py)=>{
+              beams.push({ x1:px, y1:py, aoe:true, range:96, t:performance.now(), dur:520, power:0 });
+              particles.push({ x:px, y:py, t:performance.now(), dur:900, col:'#ffd86b' });
+            },
+            visual:'spark'
           }));
         } else if(id === 'ricochet'){
           // ricochet: spawns a projectile that can spawn follow-up projectiles hitting nearby enemies
@@ -682,10 +673,6 @@
           const t = new Turret(this.x + 20, this.y, power, 7000 + lvl*1500); t.friendly = true; enemies.push(t);
         } else if(id === 'homing_mine'){
           enemies.push(new HomingMine(this.x + randRange(-18,18), this.y + randRange(-18,18), power, 7000 + lvl*1000));
-        } else if(id === 'guardian_spirit'){
-          // guardian is a friendly turret-like helper
-          const g = new Turret(this.x + randRange(-20,20), this.y + randRange(-20,20), power + Math.floor(lvl*2), 9000 + lvl*2000);
-          g.type = 'guardian'; g.friendly = true; enemies.push(g);
         }
         return true;
       }
@@ -702,23 +689,13 @@
         return true;
       }
       if(def.type==='active'){
-        // per-ability active behavior
-        if(id === 'barrier'){
-          // strong short barrier
-          this.shieldUntil = performance.now() + 1400 + lvl*600;
-        } else if(id === 'reflect_shield'){
-          // reflect incoming projectiles for a short time
-          this.reflectUntil = performance.now() + 800 + lvl*450;
-        } else if(id === 'heal_pulse'){
-          // immediate heal + spawn a few small heal orbs
-          const healAmt = 12 + lvl*6;
-          this.heal(healAmt);
-          for(let i=0;i<4;i++) orbs.push(new Orb(this.x + randRange(-18,18), this.y + randRange(-18,18), Math.max(4, Math.floor(6 + lvl*3)), 'heal'));
-        } else if(id === 'phase_shift'){
+        // per-ability active behavior — only keep phase_shift and fallback shield
+        if(id === 'phase_shift'){
           // short invulnerability (reuse shield flag)
           this.shieldUntil = performance.now() + 600 + lvl*400;
         } else {
-          this.shieldUntil = performance.now() + 2000 + lvl*600;
+          // generic short shield for unspecified active abilities
+          this.shieldUntil = performance.now() + 1200 + lvl*400;
         }
         return true;
       }
@@ -1122,12 +1099,12 @@
   window.addEventListener('keydown', (e)=>{
     if(e.code === 'Space'){ e.preventDefault();
       if(!player) return;
-      // Space is now an explicit dash/primary action key: prefer dash_strike if owned, otherwise use the first 'active' or 'melee' ability
-      if(player.hasAbility('dash_strike')) player.tryUseAbility('dash_strike');
-      else {
-        const pref = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && (['melee','active'].includes(d.type)); });
-        if(pref) player.tryUseAbility(pref.id);
-      }
+      // Space triggers ALL abilities bound to 'space'
+      const spaceables = player.abilities.filter(a=>{ const d=abilityDefs[a.id]; return d && d.bind === 'space'; });
+      let usedAny = false;
+      for(const slot of spaceables){ if(player.tryUseAbility(slot.id)) usedAny = true; }
+      // fallback: if none bound to space, try dash if available
+      if(!usedAny && player.hasAbility('dash_strike')) player.tryUseAbility('dash_strike');
     }
   });
 
@@ -1140,22 +1117,23 @@
       const sx = (ev.clientX - rect.left) * (VIEW_W / rect.width) + camera.x;
       const sy = (ev.clientY - rect.top) * (VIEW_H / rect.height) + camera.y;
       const dx = sx - player.x, dy = sy - player.y; const m = Math.hypot(dx,dy)||1;
-      // left click
+      // left click: trigger ALL abilities bound to 'click'
       if(ev.button === 0){
-          // Left-click should trigger a click-bound projectile ability if present, otherwise fire default 'fireball' if available
-          const clickProj = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && d.type==='projectile'; });
-          if(clickProj) player.tryUseAbility(clickProj.id, dx/m, dy/m);
-          else if(player.hasAbility('fireball')) player.tryUseAbility('fireball', dx/m, dy/m);
+        const clickables = player.abilities.filter(a=>{ const d=abilityDefs[a.id]; return d && d.bind === 'click'; });
+        let usedAny = false;
+        for(const slot of clickables){ const d = abilityDefs[slot.id]; const ok = player.tryUseAbility(slot.id, dx/m, dy/m); if(ok) usedAny = true; }
+        // fallback: if none bound to click, allow firing a default projectile if player has auto:false projectile (legacy)
+        if(!usedAny){ if(player.hasAbility('fireball')) player.tryUseAbility('fireball', dx/m, dy/m); }
       } else if(ev.button === 2){
-        // right click: attempt to use a useful active ability first
+        // right click: try active / space-bound abilities first (treat as quick-use)
         ev.preventDefault();
-  const prefer = ['reflect_shield','phase_shift','shield'];
+        const prefer = ['phase_shift','shield'];
         let used = false;
         for(const id of prefer){ if(player.hasAbility(id)) { used = player.tryUseAbility(id); if(used) break; } }
         if(!used){
-          // fallback to projectile if nothing active
-          const proj = player.abilities.find(a=>{ const d=abilityDefs[a.id]; return d && d.type==='projectile'; });
-          if(proj) player.tryUseAbility(proj.id, dx/m, dy/m);
+          // also trigger click-bound projectiles as fallback
+          const clickables = player.abilities.filter(a=>{ const d=abilityDefs[a.id]; return d && d.bind === 'click'; });
+          for(const slot of clickables) player.tryUseAbility(slot.id, dx/m, dy/m);
         }
       }
     });
@@ -1324,9 +1302,15 @@
       if(def.type === 'auto'){
         // auto abilities are triggered in player.tick already (triggerAuto)
       }
-      // deploy abilities still auto-place (turret/mine/guardian)
-      if(def.type === 'deploy' && a.cd <= 0){
-        // avoid placing duplicate turret/mine nearby
+      // auto-fire abilities that are marked auto (e.g., fireball, multi_arrow, shockwave)
+      if(def.auto && a.cd <= 0){
+        // need a direction: prefer lastDir (movement) otherwise fallback to right
+        const dir = player.lastDir || { x: 1, y: 0 };
+        player.tryUseAbility(a.id, dir.x, dir.y);
+      }
+      // deploy abilities: leave them bound to click (if bind==='click') or auto if desired
+      if(def.type === 'deploy' && def.bind !== 'click' && a.cd <= 0){
+        // default behavior previously auto-placed turrets/mines — keep only non-click deploy as auto
         if(a.id === 'turret'){
           const nearbyTurret = enemies.find(en=>en.friendly && en.type === 'turret' && dist(en.x,en.y,player.x,player.y) < 180);
           if(!nearbyTurret) player.tryUseAbility(a.id);
@@ -1485,7 +1469,20 @@
   function loop(ts){
     const dt = Math.min(40, ts - lastTime);
     lastTime = ts;
-    if(running) update(dt);
+    const now = performance.now();
+    if(deathSlowActive){
+      if(now < slowMotionUntil){
+        // run the world at half speed for a short replay window
+        update(dt * 0.5);
+      } else {
+        // replay finished — show game over and stop
+        deathSlowActive = false;
+        running = false;
+        gameOverModal.classList.remove('hidden');
+      }
+    } else {
+      if(running) update(dt);
+    }
     draw();
     requestAnimationFrame(loop);
   }
@@ -1502,15 +1499,17 @@
     if(abilityPills){
       abilityPills.innerHTML = '';
       abilityPills.style.display = 'flex';
+      // do not let HUD block clicks to the canvas
+      hud.style.pointerEvents = 'none'; abilityPills.style.pointerEvents = 'none';
       const arr = player.abilities || [];
-      for(const slot of arr){
+      // only show abilities that are explicitly bound to click or space
+      const visible = arr.filter(slot => { const d = abilityDefs[slot.id]; return d && (d.bind === 'click' || d.bind === 'space'); });
+      for(const slot of visible){
         const def = abilityDefs[slot.id];
         if(!def) continue;
         const pill = document.createElement('div'); pill.className = 'ability-pill';
         pill.title = def.desc || '';
-        // title
         const t = document.createElement('div'); t.style.fontSize = '0.82rem'; t.textContent = def.title; pill.appendChild(t);
-        // cooldown bar for abilities that have cooldown
         if(def.cooldown && def.cooldown > 0){
           const bar = document.createElement('div');
           bar.style.width = '100%'; bar.style.height = '6px'; bar.style.background = 'rgba(0,0,0,0.25)'; bar.style.borderRadius = '4px'; bar.style.marginTop = '6px'; bar.style.overflow = 'hidden';
@@ -1521,7 +1520,6 @@
           fill.style.background = pct > 0 ? 'linear-gradient(90deg,#ffd84d,#ff6bcb)' : 'linear-gradient(90deg,#6bf2a0,#9be3ff)';
           bar.appendChild(fill);
           pill.appendChild(bar);
-          // cooldown text
           if(pct > 0){ const s = Math.ceil((slot.cd||0)/1000); const tsmall = document.createElement('div'); tsmall.style.fontSize='0.72rem'; tsmall.style.opacity='0.9'; tsmall.style.marginTop='4px'; tsmall.textContent = `${s}s`; pill.appendChild(tsmall); }
         }
         abilityPills.appendChild(pill);
@@ -1532,9 +1530,11 @@
 
   // --- death / reset ---
   function onPlayerDeath(){
-    running = false;
+    // trigger a short slow-motion replay so the player can see what happened
+    slowMotionUntil = performance.now() + 900;
+    deathSlowActive = true;
+    // ensure score is prepared for display when slow-motion ends
     finalScoreEl.textContent = score;
-    gameOverModal.classList.remove('hidden');
   }
   retryBtn.addEventListener('click', ()=>{ gameOverModal.classList.add('hidden'); resetGame(); startGame(); });
 
