@@ -363,8 +363,8 @@ const __timeLockChecker = setInterval(() => {
         if(window.firebaseDb && window.firebaseGetDocs && window.firebaseCollection && window.firebaseQuery && window.firebaseOrderBy){
             (async ()=>{
                 try{
-                    // order by highestScore (per-user) descending
-                    const q = window.firebaseQuery(window.firebaseCollection(window.firebaseDb,'day4_scores'), window.firebaseOrderBy('highestScore','desc'));
+                    // order by users.score (per-user highest) descending
+                    const q = window.firebaseQuery(window.firebaseCollection(window.firebaseDb,'users'), window.firebaseOrderBy('score','desc'));
                     const snap = await window.firebaseGetDocs(q);
                     const rows = [];
                     snap.forEach(d => rows.push(d.data()));
@@ -382,29 +382,45 @@ const __timeLockChecker = setInterval(() => {
 
     async function saveScore(){
         const totalValue = state.cash + Object.keys(state.portfolio).reduce((sum, id) => sum + (state.portfolio[id] || 0) * (STOCKS.find(s => s.id === id)?.price || 0), 0);
-        // Only save leaderboard entries for signed-in users
+        // Only save leaderboard entries for signed-in users and write highest score
+        // into the central `users` collection (capped at 50000, rounded to nearest int)
+        // Require firebase and a signed-in user
         if(!(window.firebaseDb && window.firebaseSetDoc && window.firebaseDoc && window.firebaseAuth && window.firebaseAuth.currentUser && window.firebaseGetDoc)){
-            // Not signed in or no Firebase available — do not save leaderboard
             return;
         }
+        // Only save if within event window (before EVENT_END_TS)
+        if(Date.now() >= EVENT_END_TS) return;
+
         try{
             const user = window.firebaseAuth.currentUser;
             const uid = user.uid;
             const username = user.displayName || (user.email ? user.email.split('@')[0] : 'Player');
-            const docRef = window.firebaseDoc(window.firebaseDb, 'day4_scores', uid);
-            let existing = null;
+
+            // Read existing user doc to get current scores object
+            const userDocRef = window.firebaseDoc(window.firebaseDb, 'users', uid);
+            let existingScores = {};
             try{
-                const snap = await window.firebaseGetDoc(docRef);
-                if(snap && typeof snap.exists === 'function' && snap.exists()) existing = snap.data();
+                const snap = await window.firebaseGetDoc(userDocRef);
+                if(snap && typeof snap.exists === 'function' && snap.exists()){
+                    const data = snap.data();
+                    existingScores = (data && data.scores) ? data.scores : {};
+                }
             }catch(e){ /* ignore missing doc */ }
 
-            const prevHighest = existing?.highestScore || 0;
-            const prevTotal = existing?.totalScore || 0;
-            const newHighest = Math.max(prevHighest, totalValue);
-            const newTotal = prevTotal + totalValue;
+            // compute today's day4 value (rounded, capped at 50000)
+            const day4Val = Math.min(50000, Math.round(totalValue || 0));
 
-            const entry = { username, highestScore: newHighest, totalScore: newTotal, lastUpdated: Date.now(), ts: Date.now() };
-            await window.firebaseSetDoc(docRef, entry);
+            // compute new total as sum of day1..day5 where day4 is replaced by day4Val
+            const days = ['day1','day2','day3','day4','day5'];
+            let newTotal = 0;
+            days.forEach(d => {
+                if(d === 'day4') newTotal += day4Val;
+                else newTotal += Math.round(existingScores[d] || 0);
+            });
+
+            const payload = { scores: { day4: day4Val, total: newTotal }, lastUpdated: Date.now() };
+            // Merge so we don't touch createdAt, email, username, or other fields
+            await window.firebaseSetDoc(userDocRef, payload, { merge: true });
         }catch(e){ console.warn('save score', e); }
     }
 
