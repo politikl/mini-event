@@ -156,6 +156,10 @@
   { id:'multi_arrow', title:'Multi Arrow', desc:'Spread arrows in movement direction.', type:'projectile', basePower:12, cooldown:1100, range:520, upgradePow:(lv)=>12+lv*4, auto:true },
     // siphon passive: deals damage on hit and heals small — visible as particle
     { id:'siphon', title:'Siphon', desc:'On-hit heal.', type:'passive', basePower:5, cooldown:0, range:40, upgradePow:(lv)=>5+lv*2 },
+  // passive aura: slightly slows nearby enemies while active
+  { id:'frost_aura', title:'Frost Aura', desc:'Passive aura that chills nearby enemies, slowing movement.', type:'passive', basePower:0, cooldown:0, range:120, upgradePow:(lv)=>0 },
+  // small click AoE that briefly stuns/slows enemies
+  { id:'shock_burst', title:'Shock Burst', desc:'Click to emit a short-range shock that slows and damages enemies.', type:'aoe', basePower:16, cooldown:3800, range:120, upgradePow:(lv)=>16+lv*6, bind:'click' },
     // turret (friendly) — visual bullets (click to deploy)
   { id:'turret', title:'Turret', desc:'Place a turret that shoots at on-screen enemies.', type:'deploy', basePower:10, cooldown:5000, range:0, upgradePow:(lv)=>10+lv*4, bind:'click' },
     // homing mine — visible seeker (click to deploy)
@@ -381,6 +385,7 @@
       this.abilities = [];
       this.moveSpeed = 180;
       this.shieldUntil = 0;
+      this.invulUntil = 0; // true invulnerability for phase_shift
       this.alive = true;
       this.lastAuto = {};
       this.lastDir = { x:1, y:0 };
@@ -486,10 +491,26 @@
         if(console && console.debug) console.debug('[Day5] takeDamage called', entry);
       }catch(e){}
 
+      // if player is currently invulnerable (phase_shift), ignore damage
+      if(this.invulUntil && this.invulUntil > performance.now()){
+        if(console && console.debug) console.debug('[Day5] damage blocked by invulnerability', src);
+        return;
+      }
+
       // ignore damage if player already dead
       if(!this.alive) return;
 
       // simple dedupe for rapid repeated hits from identical sources to prevent phantom persistent damage
+      // normalize src coords: if provided but missing numeric x/y, attempt to infer nearest enemy/player
+      if(src && (typeof src.x !== 'number' || typeof src.y !== 'number')){
+        try{
+          // try to find a nearby enemy as the likely culprit
+          let nearest = null, nd = Infinity;
+          for(const e of enemies) if(e.alive && !e.friendly){ const d = dist(e.x,e.y,this.x,this.y); if(d < nd){ nd = d; nearest = e; } }
+          if(nearest && nd < 160){ src.x = nearest.x; src.y = nearest.y; }
+          else { src.x = this.x; src.y = this.y; }
+        }catch(e){}
+      }
       this._recentDamage = this._recentDamage || [];
       try{
         const nowt = performance.now();
@@ -649,11 +670,11 @@
           projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*380, ny*380, power, 6, 'player', def.range, {
             onHit: (enemy)=>{
               // stronger, more noticeable slow effect on movement
-              enemy.applySlow(0.4, 2600 + lvl*600);
-              // slow down enemy attack cadence as well
-              if(typeof enemy.applyAttackSlow === 'function') enemy.applyAttackSlow(0.5, 3600 + lvl*800);
-              // also apply a small immediate velocity damp so they visibly jolt
-              enemy.vx *= 0.45; enemy.vy *= 0.45;
+              enemy.applySlow(0.3, 4200 + lvl*1200);
+              // slow down enemy attack cadence as well (longer)
+              if(typeof enemy.applyAttackSlow === 'function') enemy.applyAttackSlow(0.4, 6000 + lvl*1500);
+              // stronger immediate velocity damp so they visibly jolt
+              enemy.vx *= 0.35; enemy.vy *= 0.35;
               beams.push({ x1:enemy.x, y1:enemy.y, aoe:false, t:performance.now(), dur:420, power:Math.round(power*0.6) });
               particles.push({ x:enemy.x, y:enemy.y, t:performance.now(), dur:1000, col:'#d6f2ff' });
             },
@@ -735,11 +756,16 @@
       if(def.type==='active'){
         // per-ability active behavior — only keep phase_shift and fallback shield
         if(id === 'phase_shift'){
-          // short invulnerability (reuse shield flag)
-          this.shieldUntil = performance.now() + 600 + lvl*400;
-        } else {
-          // generic short shield for unspecified active abilities
+          // short true invulnerability (no damage taken while active)
+          this.invulUntil = performance.now() + 600 + lvl*400;
+          // small visual cue
+          beams.push({ x1:this.x, y1:this.y, aoe:true, range: this.r+32, t:performance.now(), dur:380, power:0 });
+        } else if(id === 'shield'){
+          // shield reduces incoming damage
           this.shieldUntil = performance.now() + 1200 + lvl*400;
+        } else {
+          // generic short shield fallback
+          this.shieldUntil = performance.now() + 800 + lvl*300;
         }
         return true;
       }
@@ -782,7 +808,7 @@
     }
     update(dt){
       Enemy.prototype.update.call(this, dt);
-  this.chargeAcc -= dt * (this.attackSlowFactor || 1);
+      this.chargeAcc -= dt * (this.attackSlowFactor || 1);
       if(this.chargeAcc <= 0){
         this.chargeAcc = 1400 + Math.random()*1000;
         const dx = player.x - this.x, dy = player.y - this.y, m = Math.hypot(dx,dy)||1;
@@ -829,6 +855,56 @@
       // occasionally slam area
       if(Math.random() < 0.002){
         for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) < 80) e.takeDamage(18 + Math.floor(player.level*2));
+      }
+    }
+  }
+
+  // new enemy: SlowCaster - periodically fires a chilling beam that slows the player
+  class SlowCaster extends Enemy {
+    constructor(x,y,lvl){
+      super(x,y, 46 + lvl*8, 12 + Math.floor(lvl*0.5), 12, 'slowcaster', false, 26 + lvl*4);
+      this.castAcc = 2200 - Math.min(1400, lvl*60);
+    }
+    update(dt){
+      Enemy.prototype.update.call(this, dt);
+      this.castAcc -= dt * (this.attackSlowFactor || 1);
+      if(this.castAcc <= 0){
+        this.castAcc = 2000 + Math.random()*1200;
+        if(onScreen(this.x,this.y)){
+          // telegraph and apply slow to player if in range
+          beams.push({ x1:player.x, y1:player.y, aoe:false, range:10, t:performance.now(), dur:420, power:0 });
+          // small delay then apply slow
+          setTimeout(()=>{
+            const distToPlayer = dist(this.x,this.y,player.x,player.y);
+            const rng = 260;
+            if(distToPlayer <= rng){
+              player.applySlow(0.6, 1600 + Math.floor(this.xpValue/2)*200);
+              particles.push({ x:player.x, y:player.y, t:performance.now(), dur:900, col:'#d6f2ff' });
+            }
+          }, 240);
+        }
+      }
+    }
+  }
+
+  // new enemy: Commander - periodically buffs nearby hostile enemies
+  class Commander extends Enemy {
+    constructor(x,y,lvl){
+      super(x,y, 120 + lvl*26, 10 + Math.floor(lvl*0.6), 16, 'commander', false, 80 + lvl*10);
+      this.auraAcc = 3000 - Math.min(2000, lvl*80);
+    }
+    update(dt){
+      Enemy.prototype.update.call(this, dt);
+      this.auraAcc -= dt * (this.attackSlowFactor || 1);
+      if(this.auraAcc <= 0){
+        this.auraAcc = 3200 + Math.random()*1800;
+        // buff nearby hostiles
+        const rad = 140;
+        for(const e of enemies) if(e.alive && !e.friendly && e !== this && dist(this.x,this.y,e.x,e.y) <= rad){
+          e.applyBuff(1.35, 3200 + Math.floor(this.xpValue/3)*400);
+        }
+        beams.push({ x1:this.x, y1:this.y, aoe:true, range:rad, t:performance.now(), dur:420, power:0 });
+        particles.push({ x:this.x, y:this.y, t:performance.now(), dur:900, col:'#ffb86b' });
       }
     }
   }
@@ -928,7 +1004,14 @@
         this.x += (dx/m) * 80 * dt/1000;
         this.y += (dy/m) * 80 * dt/1000;
         if(dist(this.x,this.y,target.x,target.y) < target.r + this.r + 4){
-          target.takeDamage(this.power); this.alive=false;
+          // explode with AoE damage and visuals
+          const ex = this.x, ey = this.y;
+          const radius = 64 + Math.floor(this.power * 2);
+          beams.push({ x1:ex, y1:ey, aoe:true, range:radius, t:performance.now(), dur:420, power: Math.round(this.power * 1.4) });
+          for(const e of enemies) if(e.alive && !e.friendly && dist(ex,ey,e.x,e.y) <= radius){ e.takeDamage(Math.round(this.power * 1.4)); e.vx = (e.x-ex)/Math.max(1,dist(ex,ey,e.x,e.y))*80; e.vy = (e.y-ey)/Math.max(1,dist(ex,ey,e.x,e.y))*80; }
+          if(dist(ex,ey,player.x,player.y) <= radius) player.takeDamage(Math.round(this.power * 1.2), { x: ex, y: ey, type: 'mine_explode' });
+          particles.push({ x:ex, y:ey, t:performance.now(), dur:900, col:'#ffb86b' });
+          this.alive=false;
         }
       }
       Enemy.prototype.applyVelocity.call(this, dt);
@@ -1113,6 +1196,9 @@
       const r = Math.random();
   if(lvl >= 10 && Math.random() < 0.02){ enemies.push(new Boss(pt.sx,pt.sy,lvl)); continue; }
   if(lvl >= 12 && Math.random() < 0.01){ enemies.push(new Warlord(pt.sx,pt.sy,lvl)); continue; }
+      // new mob spawns
+      if(lvl >= 10 && Math.random() < 0.02){ enemies.push(new Commander(pt.sx, pt.sy, lvl)); continue; }
+      if(lvl >= 8 && Math.random() < 0.035){ enemies.push(new SlowCaster(pt.sx, pt.sy, lvl)); continue; }
       if(lvl >= 6 && Math.random() < 0.04){ enemies.push(new Necromancer(pt.sx,pt.sy,lvl)); continue; }
       if(lvl >=5 && Math.random() < 0.03){ enemies.push(new Enemy(pt.sx,pt.sy, 120 + lvl*30, 22, 26, 'mini', true, 100 + lvl*10)); continue; }
 
@@ -1299,6 +1385,20 @@
       }
     }
     blades = blades.filter(b=> now - b.t <= b.dur);
+
+    // passive frost aura: if player has the passive, apply a light continuous slow to nearby enemies
+    try{
+      if(player && player.hasAbility && player.hasAbility('frost_aura')){
+        const lvl = player.abilityLevel('frost_aura');
+        const auraRange = 100 + lvl*16;
+        for(const e of enemies) if(e.alive && !e.friendly && dist(player.x,player.y,e.x,e.y) <= auraRange){
+          // reapply a short slow so the aura feels continuous
+          e.applySlow(0.85, 900);
+          // small icy particles occasionally
+          if(Math.random() < 0.06) particles.push({ x:e.x + randRange(-6,6), y:e.y + randRange(-6,6), t:performance.now(), dur:700, col:'#d6f2ff' });
+        }
+      }
+    }catch(e){}
 
     beams = beams.filter(b => now - b.t <= (b.dur||220));
 
@@ -1544,6 +1644,7 @@
     if(abilityPills){
       abilityPills.innerHTML = '';
       abilityPills.style.display = 'flex';
+  abilityPills.style.fontSize = '0.78rem';
       // do not let HUD block clicks to the canvas
       hud.style.pointerEvents = 'none'; abilityPills.style.pointerEvents = 'none';
       const arr = player.abilities || [];
@@ -1554,10 +1655,10 @@
         if(!def) continue;
         const pill = document.createElement('div'); pill.className = 'ability-pill';
         pill.title = def.desc || '';
-        const t = document.createElement('div'); t.style.fontSize = '0.82rem'; t.textContent = def.title; pill.appendChild(t);
+        const t = document.createElement('div'); t.style.fontSize = '0.7rem'; t.textContent = def.title; pill.appendChild(t);
         if(def.cooldown && def.cooldown > 0){
           const bar = document.createElement('div');
-          bar.style.width = '100%'; bar.style.height = '6px'; bar.style.background = 'rgba(0,0,0,0.25)'; bar.style.borderRadius = '4px'; bar.style.marginTop = '6px'; bar.style.overflow = 'hidden';
+          bar.style.width = '100%'; bar.style.height = '5px'; bar.style.background = 'rgba(0,0,0,0.25)'; bar.style.borderRadius = '4px'; bar.style.marginTop = '6px'; bar.style.overflow = 'hidden';
           const fill = document.createElement('i');
           const pct = Math.max(0, Math.min(1, (slot.cd || 0) / def.cooldown));
           fill.style.display = 'block'; fill.style.height = '100%';
