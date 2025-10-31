@@ -174,9 +174,8 @@
   // poison_bomb removed per request
   // cannon: heavy click-targeted projectile with AoE
   { id:'cannon', title:'Cannon', desc:'Click to fire a heavy cannonball that explodes on impact.', type:'projectile', basePower:36, cooldown:4000, range:720, upgradePow:(lv)=>36+lv*12, bind:'click' },
-  // new click abilities: ice shard (slows) and flare (area reveal/visual)
-  { id:'ice_shard', title:'Ice Shard', desc:'Throw an icy shard that slows enemies on hit (click).', type:'projectile', basePower:14, cooldown:2200, range:520, upgradePow:(lv)=>14+lv*4, bind:'click' },
-  { id:'flare', title:'Flare', desc:'Fire a flare that bursts on expire revealing the area (click).', type:'projectile', basePower:0, cooldown:3000, range:520, upgradePow:(lv)=>0, bind:'click' },
+  // new click abilities: ice shard (slows)
+  { id:'ice_shard', title:'Ice Shard', desc:'Throw an icy shard that strongly slows enemies on hit (click).', type:'projectile', basePower:14, cooldown:2200, range:520, upgradePow:(lv)=>14+lv*4, bind:'click' },
   // stun grenade: short telegraph then stun on impact
   // stun_grenade removed per request
   // ricochet shot: bounces between nearby enemies (click)
@@ -185,7 +184,7 @@
   // reflect_shield / guardian_spirit removed per request
   { id:'phase_shift', title:'Phase Shift', desc:'Brief invulnerability (short cooldown).', type:'active', basePower:0, cooldown:15000, range:0, upgradePow:(lv)=>0, bind:'space' },
   // orbital removed (duplicate / deprecated)
-    { id:'chain_lightning', title:'Chain Lightning', desc:'Strikes an enemy and chains to nearby enemies.', type:'projectile', basePower:16, cooldown:3200, range:540, upgradePow:(lv)=>16+lv*5, bind:'click' },
+  { id:'chain_lightning', title:'Chain Lightning', desc:'Strikes an enemy and chains to nearby enemies (auto).', type:'auto', auto:true, basePower:16, cooldown:3200, range:540, upgradePow:(lv)=>16+lv*5 },
     { id:'meteor', title:'Meteor', desc:'Calls down a meteor that deals huge explosion (long cooldown).', type:'projectile', basePower:60, cooldown:14000, range:900, upgradePow:(lv)=>60+lv*24, bind:'click' },
   // small extras
   ];
@@ -442,9 +441,46 @@
           const target = choose(pool);
           anvils.push({ tx: target.x, ty: target.y, x: target.x, y: -80, vy: 0, t: performance.now(), power, hit:false });
         }
+      } else if(id === 'chain_lightning'){
+        // auto-triggered chain lightning: hit nearest on-screen enemy then arc to nearby targets
+        const pool = enemies.filter(e=>e.alive && !e.friendly && onScreen(e.x,e.y));
+        if(pool.length){
+          const first = pool.sort((a,b)=>dist(this.x,this.y,a.x,a.y)-dist(this.x,this.y,b.x,b.y))[0];
+          if(first){
+            const lvl = this.abilityLevel('chain_lightning');
+            const base = power;
+            beams.push({ x1:this.x, y1:this.y, x2:first.x, y2:first.y, t:performance.now(), dur:200, power: base });
+            first.takeDamage(base);
+            let last = first;
+            const chains = 1 + Math.floor((lvl-1)/2) + 1;
+            const targets = enemies.filter(e=>e.alive && !e.friendly && e !== first).sort((a,b)=>dist(first.x,first.y,a.x,a.y)-dist(first.x,first.y,b.x,b.y)).slice(0, chains);
+            for(const tg of targets){
+              beams.push({ x1:last.x, y1:last.y, x2:tg.x, y2:tg.y, t:performance.now(), dur:220, power: base*0.7 });
+              tg.takeDamage(Math.round(base*0.7));
+              last = tg;
+            }
+          }
+        }
       }
     }
     takeDamage(dmg, src){
+      // ignore damage if player already dead
+      if(!this.alive) return;
+      // simple dedupe for rapid repeated hits from identical sources to prevent phantom persistent damage
+      this._recentDamage = this._recentDamage || [];
+      try{
+        const nowt = performance.now();
+        if(src && typeof src.x === 'number' && typeof src.y === 'number' && src.type){
+          // remove old entries
+          this._recentDamage = this._recentDamage.filter(it => nowt - it.t < 600);
+          const similar = this._recentDamage.find(it => it.type === src.type && Math.hypot(it.x - src.x, it.y - src.y) < 8);
+          if(similar){
+            // already took very recent damage from same source, ignore to avoid repeats
+            return;
+          }
+          this._recentDamage.push({ x: src.x, y: src.y, type: src.type, t: nowt });
+        }
+      }catch(e){}
       // shield reduction
       if(this.shieldUntil > performance.now()) dmg *= 0.45;
       // If a source is provided, verify it's reasonably close to the player. This avoids
@@ -584,18 +620,12 @@
           const nx = dirx/mag, ny = diry/mag;
           projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*380, ny*380, power, 6, 'player', def.range, {
             onHit: (enemy)=>{
-              enemy.applySlow(0.5, 1400 + lvl*300);
-              beams.push({ x1:enemy.x, y1:enemy.y, aoe:false, t:performance.now(), dur:260, power:power*0.6 });
-              particles.push({ x:enemy.x, y:enemy.y, t:performance.now(), dur:700, col:'#d6f2ff' });
-            },
-            visual:'spark'
-          }));
-        } else if(id === 'flare'){
-          const nx = dirx/mag, ny = diry/mag;
-          projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*260, ny*260, power, 8, 'player', def.range, {
-            onExpire: (px,py)=>{
-              beams.push({ x1:px, y1:py, aoe:true, range:96, t:performance.now(), dur:520, power:0 });
-              particles.push({ x:px, y:py, t:performance.now(), dur:900, col:'#ffd86b' });
+              // stronger, more noticeable slow effect
+              enemy.applySlow(0.45, 1800 + lvl*400);
+              // also apply a small immediate velocity damp so they visibly jolt
+              enemy.vx *= 0.55; enemy.vy *= 0.55;
+              beams.push({ x1:enemy.x, y1:enemy.y, aoe:false, t:performance.now(), dur:320, power:Math.round(power*0.6) });
+              particles.push({ x:enemy.x, y:enemy.y, t:performance.now(), dur:900, col:'#d6f2ff' });
             },
             visual:'spark'
           }));
@@ -625,23 +655,6 @@
           // initial target: pick an on-screen enemy towards click direction or nearest
           const firstTarget = enemies.filter(e=>e.alive && !e.friendly).sort((a,b)=>dist(this.x,this.y,a.x,a.y)-dist(this.x,this.y,b.x,b.y))[0];
           if(firstTarget){ makeRicochet(this.x + nx*(this.r+8), this.y + ny*(this.r+8), firstTarget.x, firstTarget.y, bounces); }
-        } else if(id === 'chain_lightning'){
-        } else if(id === 'chain_lightning'){
-          const nx = dirx/mag, ny = diry/mag;
-          const chains = 1 + Math.floor((lvl-1)/2) + 1; // more chains with levels
-          projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*420, ny*420, power, 6, 'player', def.range, {
-            onHit: (enemy)=>{
-              // chain arcs: create beams from hit to nearest other enemies
-              const targets = enemies.filter(e=>e.alive && !e.friendly && e !== enemy).sort((a,b)=>dist(enemy.x,enemy.y,a.x,a.y)-dist(enemy.x,enemy.y,b.x,b.y)).slice(0, Math.max(1, chains));
-              let last = enemy;
-              targets.forEach(tg=>{
-                beams.push({ x1:last.x, y1:last.y, x2:tg.x, y2:tg.y, t:performance.now(), dur:220, power: power*0.7 });
-                tg.takeDamage(power*0.7);
-                last = tg;
-              });
-            },
-            visual:'spark'
-          }));
         } else if(id === 'meteor'){
           const nx = dirx/mag, ny = diry/mag;
           // meteor: spawn falling marker then impact after short delay
