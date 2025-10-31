@@ -117,8 +117,8 @@
   canvas.width = VIEW_W; canvas.height = VIEW_H;
 
   // map size large multiple of view
-  const MAP_W = VIEW_W * 6;
-  const MAP_H = VIEW_H * 4;
+  const MAP_W = VIEW_W * 10; // expanded map per request
+  const MAP_H = VIEW_H * 8;
 
   // state
   let running = false;
@@ -198,7 +198,13 @@
       this.alive=true; this.slowUntil=0; this.slowFactor=1; this.tickAcc=0; this.friendly=false; this.xpValue = xpValue;
       this.vx = 0; this.vy = 0; // for knockback
       this.stunUntil = 0; // timestamp while stunned (skip AI)
+      // attack-slow: reduces how fast attack countdowns decrement (<=1 slows attacks)
+      this.attackSlowUntil = 0; this.attackSlowFactor = 1;
+      // temporary buff multiplier (for commanders)
+      this.buffUntil = 0; this.buffMultiplier = 1;
     }
+    applyAttackSlow(factor, ms){ this.attackSlowFactor = factor; this.attackSlowUntil = performance.now() + ms; }
+    applyBuff(mult, ms){ this.buffMultiplier = mult; this.buffUntil = performance.now() + ms; }
     takeDamage(d){
       this.hp -= d;
       particles.push({ x:this.x, y:this.y, t:performance.now(), dur:520, col:'#ff6b6b' });
@@ -228,9 +234,11 @@
         return;
       }
       if(performance.now() > this.slowUntil) this.slowFactor = 1;
+      if(performance.now() > this.attackSlowUntil) this.attackSlowFactor = 1;
+      if(performance.now() > this.buffUntil) this.buffMultiplier = 1;
       const sx = player.x - this.x, sy = player.y - this.y; const d = Math.hypot(sx,sy);
       if(d > 1){
-        const spd = this.speed * (this.slowFactor || 1);
+        const spd = this.speed * (this.slowFactor || 1) * (this.buffMultiplier || 1);
         this.x += (sx/d) * spd * dt/1000;
         this.y += (sy/d) * spd * dt/1000;
       }
@@ -333,7 +341,7 @@
     }
     update(dt){
       Enemy.prototype.update.call(this, dt);
-      this.strikeAcc -= dt;
+      this.strikeAcc -= dt * (this.attackSlowFactor || 1);
       if(this.strikeAcc <= 0){
         this.strikeAcc = 3200 + Math.random()*2000;
         // telegraph a meteor at a random on-screen position near player
@@ -377,7 +385,9 @@
       this.lastAuto = {};
       this.lastDir = { x:1, y:0 };
       this.trailPoints = [];
+      this.slowUntil = 0; this.slowFactor = 1;
     }
+    applySlow(factor, ms){ this.slowFactor = factor; this.slowUntil = performance.now() + ms; }
     addAbility(id){
       const existing = this.abilities.find(a=>a.id===id);
       if(existing){ existing.lvl++; return existing; }
@@ -391,6 +401,7 @@
     abilityLevel(id){ const a=this.abilities.find(x=>x.id===id); return a? a.lvl:0; }
     tick(dt){
       this.abilities.forEach(a=>{ if(a.cd>0) a.cd = Math.max(0, a.cd - dt); });
+      if(performance.now() > this.slowUntil) this.slowFactor = 1;
       for(const a of this.abilities){
         const def = abilityDefs[a.id];
         if(!def) continue;
@@ -464,8 +475,20 @@
       }
     }
     takeDamage(dmg, src){
+      // instrumentation: record every damage attempt so we can trace phantom sources
+      try{
+        if(window && !window._day5_damage_log) window._day5_damage_log = [];
+        const entry = { t: performance.now(), dmg: dmg, src: src ? { ...src } : null, hp: this.hp };
+        if(window && window._day5_damage_log){ window._day5_damage_log.push(entry); if(window._day5_damage_log.length > 600) window._day5_damage_log.shift(); }
+        // also include a short stack to help trace caller
+        try{ entry.stack = (new Error()).stack.split('\n').slice(2,8).map(s=>s.trim()); }catch(e){}
+        // lightweight console debug to make repros visible in browser console
+        if(console && console.debug) console.debug('[Day5] takeDamage called', entry);
+      }catch(e){}
+
       // ignore damage if player already dead
       if(!this.alive) return;
+
       // simple dedupe for rapid repeated hits from identical sources to prevent phantom persistent damage
       this._recentDamage = this._recentDamage || [];
       try{
@@ -476,13 +499,16 @@
           const similar = this._recentDamage.find(it => it.type === src.type && Math.hypot(it.x - src.x, it.y - src.y) < 8);
           if(similar){
             // already took very recent damage from same source, ignore to avoid repeats
+            if(console && console.debug) console.debug('[Day5] Ignored repeated damage from same source', src);
             return;
           }
           this._recentDamage.push({ x: src.x, y: src.y, type: src.type, t: nowt });
         }
       }catch(e){}
+
       // shield reduction
       if(this.shieldUntil > performance.now()) dmg *= 0.45;
+
       // If a source is provided, verify it's reasonably close to the player. This avoids
       // accepting damage from distant/noisy sources (phantom hits) while preserving
       // legitimate attacks (which include src coords).
@@ -495,6 +521,7 @@
           return;
         }
       }
+
       // if no src provided, perform a nearby threat check (enemy or enemy projectile)
       if(!src){
         let threat = false;
@@ -511,6 +538,7 @@
           return;
         }
       }
+
       this.hp -= dmg;
       if(this.hp <= 0){ this.hp = 0; this.die(); }
     }
@@ -620,12 +648,14 @@
           const nx = dirx/mag, ny = diry/mag;
           projectiles.push(new Projectile(this.x + nx*(this.r+8), this.y + ny*(this.r+8), nx*380, ny*380, power, 6, 'player', def.range, {
             onHit: (enemy)=>{
-              // stronger, more noticeable slow effect
-              enemy.applySlow(0.45, 1800 + lvl*400);
+              // stronger, more noticeable slow effect on movement
+              enemy.applySlow(0.4, 2600 + lvl*600);
+              // slow down enemy attack cadence as well
+              if(typeof enemy.applyAttackSlow === 'function') enemy.applyAttackSlow(0.5, 3600 + lvl*800);
               // also apply a small immediate velocity damp so they visibly jolt
-              enemy.vx *= 0.55; enemy.vy *= 0.55;
-              beams.push({ x1:enemy.x, y1:enemy.y, aoe:false, t:performance.now(), dur:320, power:Math.round(power*0.6) });
-              particles.push({ x:enemy.x, y:enemy.y, t:performance.now(), dur:900, col:'#d6f2ff' });
+              enemy.vx *= 0.45; enemy.vy *= 0.45;
+              beams.push({ x1:enemy.x, y1:enemy.y, aoe:false, t:performance.now(), dur:420, power:Math.round(power*0.6) });
+              particles.push({ x:enemy.x, y:enemy.y, t:performance.now(), dur:1000, col:'#d6f2ff' });
             },
             visual:'spark'
           }));
@@ -729,7 +759,7 @@
     }
     update(dt){
       Enemy.prototype.update.call(this,dt);
-      this.summonAcc -= dt;
+  this.summonAcc -= dt * (this.attackSlowFactor || 1);
       if(this.summonAcc <= 0){
         this.summonAcc = 2200 + Math.random()*700;
         // summon a skeleton nearby (only if on-screen so not unfair)
@@ -752,7 +782,7 @@
     }
     update(dt){
       Enemy.prototype.update.call(this, dt);
-      this.chargeAcc -= dt;
+  this.chargeAcc -= dt * (this.attackSlowFactor || 1);
       if(this.chargeAcc <= 0){
         this.chargeAcc = 1400 + Math.random()*1000;
         const dx = player.x - this.x, dy = player.y - this.y, m = Math.hypot(dx,dy)||1;
@@ -772,7 +802,7 @@
     }
     update(dt){
       Enemy.prototype.update.call(this, dt);
-      this.snipeAcc -= dt;
+  this.snipeAcc -= dt * (this.attackSlowFactor || 1);
       if(this.snipeAcc <= 0){
         this.snipeAcc = 1800 + Math.random()*1000;
         if(onScreen(this.x,this.y)){
@@ -825,7 +855,7 @@
           particles.push({ x:this.x, y:this.y, t:performance.now(), dur:900, col:'#ff9b6b' });
         }, 300);
       }
-      this.dashAcc -= dt;
+  this.dashAcc -= dt * (this.attackSlowFactor || 1);
       Enemy.prototype.applyVelocity.call(this, dt);
       // small passive regen so boss persists
       if(this.hp < this.maxHp && Math.random() < 0.002) this.hp += 6;
@@ -843,7 +873,7 @@
     }
     update(dt){
       Enemy.prototype.update.call(this, dt);
-      this.summonAcc -= dt; this.slamAcc -= dt;
+  this.summonAcc -= dt * (this.attackSlowFactor || 1); this.slamAcc -= dt * (this.attackSlowFactor || 1);
       if(this.summonAcc <= 0){
         this.summonAcc = 4200 + Math.random()*1800;
         // summon 1-2 brutes near the player to harass
@@ -1220,7 +1250,7 @@
   // --- ranged enemy behaviour: skeleton shoots, only on-screen and weaker --- 
   function enemyRangedBehavior(e, dt){
     if(e.type!=='skeleton' || !e.alive) return;
-    e.tickAcc = (e.tickAcc||0) - dt;
+  e.tickAcc = (e.tickAcc||0) - dt * (e.attackSlowFactor || 1);
     if(e.tickAcc <= 0){
       e.tickAcc = 1800 + player.level*90;
       const dx = player.x - e.x, dy = player.y - e.y; const m = Math.hypot(dx,dy)||1;
@@ -1298,8 +1328,9 @@
     if(!player || !player.alive) return;
     const dir = getMoveDir();
     if(dir){
-      player.x += dir.x * player.moveSpeed * dt/1000;
-      player.y += dir.y * player.moveSpeed * dt/1000;
+      const spdFactor = player.slowFactor || 1;
+      player.x += dir.x * player.moveSpeed * spdFactor * dt/1000;
+      player.y += dir.y * player.moveSpeed * spdFactor * dt/1000;
       player.x = clamp(player.x, 0, MAP_W);
       player.y = clamp(player.y, 0, MAP_H);
       player.lastDir = dir;
