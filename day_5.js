@@ -168,7 +168,7 @@
   { id:'shockwave', title:'Shockwave', desc:'Cone shock forward.', type:'cone', basePower:18, cooldown:2500, range:220, upgradePow:(lv)=>18+lv*5, auto:true },
   // (removed poison_trail and frost_aura — deprecated)
     // shield visible
-  { id:'shield', title:'Shield', desc:'Temporary damage reduction.', type:'active', basePower:0.3, cooldown:8000, range:0, upgradePow:(lv)=>0.3+lv*0.06 },
+  { id:'shield', title:'Shield', desc:'Temporary damage reduction.', type:'active', basePower:0.3, cooldown:7000, range:0, upgradePow:(lv)=>0.3+lv*0.06, bind:'space' },
 
   // auto special (only hit on-screen)
     { id:'auto_laser', title:'Auto Laser', desc:'Auto-aim laser at nearest on-screen enemy).', type:'auto', basePower:18, cooldown:1400, range:700, upgradePow:(lv)=>18+lv*6 },
@@ -569,12 +569,12 @@
         }
       }catch(e){}
 
-      // shield reduction
-      if(this.shieldUntil > performance.now()) dmg *= 0.45;
+      // shield reduction (less strong than phase_shift)
+      if(this.shieldUntil > performance.now()) dmg *= 0.65;
       // additional temporary ring reduction windows (spawned by shield ability)
       try{
         const nowt = performance.now();
-        if(this._shieldRingWindowUntil && this._shieldRingWindowUntil > nowt){ dmg *= 0.6; }
+        if(this._shieldRingWindowUntil && this._shieldRingWindowUntil > nowt){ dmg *= 0.78; }
       }catch(e){}
 
       // If a source is provided, verify it's reasonably close to the player. This avoids
@@ -808,12 +808,14 @@
           // small visual cue
           beams.push({ x1:this.x, y1:this.y, aoe:true, range: this.r+32, t:performance.now(), dur:380, power:0 });
         } else if(id === 'shield'){
-          // shield reduces incoming damage and emits periodic protective rings
+          // shield reduces incoming damage and emits periodic protective rings + revolving shields
           const now = performance.now();
           this.shieldUntil = now + 1200 + lvl*400;
           // spawn a sequence of rings for a short window (rings every ~1.1s)
           this._shieldRingActiveUntil = now + 3200 + Math.max(0, lvl*400);
           this._shieldRingAcc = now + 60;
+          // revolving shield visual lasts slightly shorter than ring sequence
+          this._revolvingShieldUntil = now + 1200 + Math.max(0, lvl*300);
         } else {
           // generic short shield fallback
           this.shieldUntil = performance.now() + 800 + lvl*300;
@@ -821,12 +823,14 @@
         return true;
       }
       if(def.type==='aoe'){
-        for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) <= def.range){ e.applySlow(0.45, 2000 + lvl*200); e.takeDamage(power*0.6); e.vx=(e.x-this.x)/Math.max(1,dist(this.x,this.y,e.x,e.y))*40; e.vy=(e.y-this.y)/Math.max(1,dist(this.x,this.y,e.x,e.y))*40; }
+        const dmgMul = (id === 'shock_burst') ? 0.95 : 0.6;
+        const kb = (id === 'shock_burst') ? 120 : 40;
+        for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) <= def.range){ e.applySlow(0.45, 2000 + lvl*200); e.takeDamage(Math.round(power * dmgMul)); e.vx=(e.x-this.x)/Math.max(1,dist(this.x,this.y,e.x,e.y))*kb; e.vy=(e.y-this.y)/Math.max(1,dist(this.x,this.y,e.x,e.y))*kb; }
         // special visual for shock_burst
         if(id === 'shock_burst'){
           beams.push({ x1:this.x, y1:this.y, aoe:true, range:def.range, t:performance.now(), dur:420, power, shock:true });
           // concentric pulse
-          beams.push({ x1:this.x, y1:this.y, aoe:true, range:Math.round(def.range*0.6), t:performance.now()+40, dur:300, power:power*0.5, shock:true });
+          beams.push({ x1:this.x, y1:this.y, aoe:true, range:Math.round(def.range*0.6), t:performance.now()+40, dur:300, power:Math.round(power*0.5), shock:true });
           particles.push({ x:this.x, y:this.y, t:performance.now(), dur:900, col:'#fff2b2' });
         } else {
           beams.push({ x1:this.x, y1:this.y, aoe:true, range:def.range, t:performance.now(), dur:320, power });
@@ -1655,8 +1659,23 @@
       ctx.save(); ctx.translate(px,py);
       ctx.fillStyle = '#7fbfff'; ctx.beginPath(); ctx.arc(0,0,player.r,0,Math.PI*2); ctx.fill();
       if(player.shieldUntil > performance.now()){
+        const now = performance.now();
         ctx.strokeStyle = 'rgba(130,200,255,0.6)'; ctx.lineWidth = 4;
         ctx.beginPath(); ctx.arc(0,0,player.r+8,0,Math.PI*2); ctx.stroke();
+        // revolving mini-shields while active
+        if(player._revolvingShieldUntil && player._revolvingShieldUntil > now){
+          const count = 5;
+          for(let i=0;i<count;i++){
+            const ang = (now/320) + i * (Math.PI*2 / count);
+            const rad = player.r + 18;
+            const sx = Math.cos(ang) * rad, sy = Math.sin(ang) * rad;
+            ctx.save(); ctx.translate(sx, sy); ctx.rotate(ang);
+            ctx.globalAlpha = 0.95;
+            ctx.fillStyle = 'rgba(170,220,255,0.95)';
+            ctx.fillRect(-6, -4, 12, 8);
+            ctx.restore();
+          }
+        }
       }
       const barW = 72; const barH = 8;
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(-barW/2, -player.r - 22, barW, barH);
