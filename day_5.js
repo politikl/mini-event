@@ -407,6 +407,21 @@
     tick(dt){
       this.abilities.forEach(a=>{ if(a.cd>0) a.cd = Math.max(0, a.cd - dt); });
       if(performance.now() > this.slowUntil) this.slowFactor = 1;
+      // shield ring periodic spawner: when shield ability recently used, spawn visible rings that briefly reduce damage
+      try{
+        const now = performance.now();
+        if(this._shieldRingActiveUntil && now < this._shieldRingActiveUntil){
+          this._shieldRingAcc = this._shieldRingAcc || 0;
+          if(now >= this._shieldRingAcc){
+            // schedule next ring in ~1.1s
+            this._shieldRingAcc = now + 1100;
+            // visible pulse
+            beams.push({ x1:this.x, y1:this.y, aoe:true, range: Math.round(this.r + 96), t: now, dur: 520, power:0, shieldRing:true });
+            // brief extra damage reduction window
+            this._shieldRingWindowUntil = now + 520;
+          }
+        }
+      }catch(e){}
       for(const a of this.abilities){
         const def = abilityDefs[a.id];
         if(!def) continue;
@@ -556,6 +571,11 @@
 
       // shield reduction
       if(this.shieldUntil > performance.now()) dmg *= 0.45;
+      // additional temporary ring reduction windows (spawned by shield ability)
+      try{
+        const nowt = performance.now();
+        if(this._shieldRingWindowUntil && this._shieldRingWindowUntil > nowt){ dmg *= 0.6; }
+      }catch(e){}
 
       // If a source is provided, verify it's reasonably close to the player. This avoids
       // accepting damage from distant/noisy sources (phantom hits) while preserving
@@ -776,7 +796,7 @@
           const dx2 = e.x - this.x, dy2 = e.y - this.y, d = Math.hypot(dx2,dy2);
           if(d > def.range) continue;
           const a = Math.atan2(dy2,dx2); let diff = Math.abs(((a-angleCenter+Math.PI)%(Math.PI*2))-Math.PI);
-          if(diff < coneSize/2){ e.takeDamage(power); e.vx=(e.x-this.x)/Math.max(1,d)*30; e.vy=(e.y-this.y)/Math.max(1,d)*30; }
+          if(diff < coneSize/2){ e.takeDamage(power); e.vx=(e.x-this.x)/Math.max(1,d)*60; e.vy=(e.y-this.y)/Math.max(1,d)*60; }
         }
         return true;
       }
@@ -788,8 +808,12 @@
           // small visual cue
           beams.push({ x1:this.x, y1:this.y, aoe:true, range: this.r+32, t:performance.now(), dur:380, power:0 });
         } else if(id === 'shield'){
-          // shield reduces incoming damage
-          this.shieldUntil = performance.now() + 1200 + lvl*400;
+          // shield reduces incoming damage and emits periodic protective rings
+          const now = performance.now();
+          this.shieldUntil = now + 1200 + lvl*400;
+          // spawn a sequence of rings for a short window (rings every ~1.1s)
+          this._shieldRingActiveUntil = now + 3200 + Math.max(0, lvl*400);
+          this._shieldRingAcc = now + 60;
         } else {
           // generic short shield fallback
           this.shieldUntil = performance.now() + 800 + lvl*300;
@@ -797,8 +821,16 @@
         return true;
       }
       if(def.type==='aoe'){
-        for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) <= def.range){ e.applySlow(0.45, 2000 + lvl*200); e.takeDamage(power*0.6); e.vx=(e.x-this.x)/Math.max(1,dist(this.x,this.y,e.x,e.y))*18; e.vy=(e.y-this.y)/Math.max(1,dist(this.x,this.y,e.x,e.y))*18; }
-        beams.push({ x1:this.x, y1:this.y, aoe:true, range:def.range, t:performance.now(), dur:320, power });
+        for(const e of enemies) if(e.alive && !e.friendly && dist(this.x,this.y,e.x,e.y) <= def.range){ e.applySlow(0.45, 2000 + lvl*200); e.takeDamage(power*0.6); e.vx=(e.x-this.x)/Math.max(1,dist(this.x,this.y,e.x,e.y))*40; e.vy=(e.y-this.y)/Math.max(1,dist(this.x,this.y,e.x,e.y))*40; }
+        // special visual for shock_burst
+        if(id === 'shock_burst'){
+          beams.push({ x1:this.x, y1:this.y, aoe:true, range:def.range, t:performance.now(), dur:420, power, shock:true });
+          // concentric pulse
+          beams.push({ x1:this.x, y1:this.y, aoe:true, range:Math.round(def.range*0.6), t:performance.now()+40, dur:300, power:power*0.5, shock:true });
+          particles.push({ x:this.x, y:this.y, t:performance.now(), dur:900, col:'#fff2b2' });
+        } else {
+          beams.push({ x1:this.x, y1:this.y, aoe:true, range:def.range, t:performance.now(), dur:320, power });
+        }
         return true;
       }
       return false;
@@ -825,24 +857,31 @@
     }
   }
 
-  // new enemy: Charger (fast dash attacker)
-  class Charger extends Enemy {
+  // replacement enemy: Skirmisher (less buggy dash attacker)
+  class Skirmisher extends Enemy {
     constructor(x,y,lvl){
-      // nerfed: lower base HP/speed and explicit melee power; spawns later
-      super(x,y, 34 + lvl*6, 86 + Math.floor(lvl*4), 10, 'charger', true, 16 + lvl*2);
-      this.meleePower = 6; // lower contact damage
-      this.chargeAcc = 1600 - Math.max(0, lvl*20);
+      // simpler: store level and use smaller impulse with telegraph
+      super(x,y, 48 + lvl*6, 72 + Math.floor(lvl*3), 10, 'skirmisher', true, 18 + lvl*2);
+      this.meleePower = 6;
+      this.lvl = lvl;
+      this.chargeAcc = 1600 - Math.max(0, this.lvl*12);
+      this.telegraph = false;
     }
     update(dt){
       Enemy.prototype.update.call(this, dt);
       this.chargeAcc -= dt * (this.attackSlowFactor || 1);
       if(this.chargeAcc <= 0){
-        this.chargeAcc = 1400 + Math.random()*1000;
-        const dx = player.x - this.x, dy = player.y - this.y, m = Math.hypot(dx,dy)||1;
-        // smaller charge impulse so it is less punishing
-        const impulse = 380 + Math.floor(lvl*8);
-        this.vx += (dx/m) * impulse;
-        this.vy += (dy/m) * impulse;
+        this.chargeAcc = 1400 + Math.random()*1200;
+        // telegraph briefly then dash
+        this.telegraph = true;
+        const sx = this.x, sy = this.y;
+        beams.push({ x1: this.x, y1: this.y, aoe:false, range: 8, t:performance.now(), dur:260, power:0 });
+        setTimeout(()=>{
+          const dx = player.x - this.x, dy = player.y - this.y, m = Math.hypot(dx,dy)||1;
+          const impulse = 260 + Math.floor(this.lvl*6);
+          this.vx += (dx/m) * impulse; this.vy += (dy/m) * impulse;
+          this.telegraph = false;
+        }, 180);
       }
     }
   }
@@ -1230,7 +1269,7 @@
       if(lvl >=5 && Math.random() < 0.03){ enemies.push(new Enemy(pt.sx,pt.sy, 120 + lvl*30, 22, 26, 'mini', true, 100 + lvl*10)); continue; }
 
   // expanded enemy types with level scaling
-  if(lvl >= 6 && r < 0.12){ enemies.push(new Charger(pt.sx,pt.sy,lvl)); }
+  if(lvl >= 6 && r < 0.12){ enemies.push(new Skirmisher(pt.sx,pt.sy,lvl)); }
   else if(r < 0.25){ enemies.push(new Sniper(pt.sx,pt.sy,lvl)); }
   else if(r < 0.42){ enemies.push(new Enemy(pt.sx,pt.sy, 30 + lvl*6, 30 + lvl*1.2, 14, 'zombie', true, 12 + lvl*2)); }
   else if(r < 0.58){ enemies.push(new Enemy(pt.sx,pt.sy, 28 + lvl*6, 36, 12, 'skeleton', false, 18 + lvl*3)); }
@@ -1419,10 +1458,11 @@
         const lvl = player.abilityLevel('frost_aura');
         const auraRange = 100 + lvl*16;
         for(const e of enemies) if(e.alive && !e.friendly && dist(player.x,player.y,e.x,e.y) <= auraRange){
-          // reapply a short slow so the aura feels continuous
-          e.applySlow(0.85, 900);
-          // small icy particles occasionally
-          if(Math.random() < 0.06) particles.push({ x:e.x + randRange(-6,6), y:e.y + randRange(-6,6), t:performance.now(), dur:700, col:'#d6f2ff' });
+          // stronger aura: longer slow + slight attack slow
+          e.applySlow(0.7, 1400 + lvl*200);
+          if(typeof e.applyAttackSlow === 'function') e.applyAttackSlow(0.9, 900 + lvl*120);
+          // small icy particles frequently
+          if(Math.random() < 0.12) particles.push({ x:e.x + randRange(-6,6), y:e.y + randRange(-6,6), t:performance.now(), dur:900, col:'#cfeeff' });
         }
       }
     }catch(e){}
@@ -1553,6 +1593,20 @@
       if(a <= 0) continue;
       ctx.save();
       ctx.globalAlpha = a*0.95;
+      // special shock rendering
+      if(b.shock){
+        ctx.fillStyle = 'rgba(255,240,200,0.10)'; ctx.beginPath(); ctx.arc(b.x1 - camera.x, b.y1 - camera.y, b.range || 80, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,220,160,0.95)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(b.x1 - camera.x, b.y1 - camera.y, (b.range||80)*0.9, 0, Math.PI*2); ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+      if(b.shieldRing){
+        // soft bluish protective pulse
+        ctx.fillStyle = 'rgba(120,200,255,0.12)'; ctx.beginPath(); ctx.arc(b.x1 - camera.x, b.y1 - camera.y, b.range || 110, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = 'rgba(160,220,255,0.85)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(b.x1 - camera.x, b.y1 - camera.y, (b.range||110)*0.95, 0, Math.PI*2); ctx.stroke();
+        ctx.restore();
+        continue;
+      }
       if(b.meteor){
         ctx.fillStyle = 'rgba(255,120,60,0.12)'; ctx.beginPath(); ctx.arc(b.x1 - camera.x, b.y1 - camera.y, b.range || 80, 0, Math.PI*2); ctx.fill();
       } else if(b.aoe){
