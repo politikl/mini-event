@@ -480,14 +480,41 @@
       }
     }
     takeDamage(dmg, src){
-      // instrumentation: record every damage attempt so we can trace phantom sources
+      // preliminary normalization of src: if provided but missing numeric x/y, attempt to infer nearest enemy/player
+      if(src && (typeof src.x !== 'number' || typeof src.y !== 'number')){
+        try{
+          let nearest = null, nd = Infinity;
+          for(const e of enemies) if(e.alive && !e.friendly){ const d = dist(e.x,e.y,this.x,this.y); if(d < nd){ nd = d; nearest = e; } }
+          if(nearest && nd < 160){ src.x = nearest.x; src.y = nearest.y; src._guessed = { type: nearest.type }; }
+          else { src.x = this.x; src.y = this.y; src._guessed = { type: 'self' }; }
+        }catch(e){}
+      }
+
+      // now perform a nearby-source sanity check for melee sources: if there's no nearby enemy, treat as phantom and ignore
+      try{
+        if(src && src.type === 'melee'){
+          // find nearest hostile enemy to player
+          let nearest = null, nd = Infinity;
+          for(const e of enemies) if(e.alive && !e.friendly){ const d = dist(e.x,e.y,this.x,this.y); if(d < nd){ nd = d; nearest = e; } }
+          // augment log with guess info (below) and reject if nothing is reasonably close
+          if(!nearest || nd > 180){
+            console.warn('[Day5] Ignored phantom melee damage (no nearby enemy found)', { src, nearestGuess: nearest ? { type:nearest.type, d: Math.round(nd) } : null });
+            // record this ignored event for diagnostics
+            if(window && !window._day5_ignored_phantom) window._day5_ignored_phantom = [];
+            window._day5_ignored_phantom.push({ t: performance.now(), src, nearest: nearest ? { type: nearest.type, x: nearest.x, y: nearest.y, d: nd } : null, hp: this.hp });
+            // keep the ignored log length bounded
+            if(window && window._day5_ignored_phantom && window._day5_ignored_phantom.length > 300) window._day5_ignored_phantom.shift();
+            return;
+          }
+        }
+      }catch(e){}
+
+      // instrumentation: record every damage attempt so we can trace phantom sources (after normalization)
       try{
         if(window && !window._day5_damage_log) window._day5_damage_log = [];
         const entry = { t: performance.now(), dmg: dmg, src: src ? { ...src } : null, hp: this.hp };
-        if(window && window._day5_damage_log){ window._day5_damage_log.push(entry); if(window._day5_damage_log.length > 600) window._day5_damage_log.shift(); }
-        // also include a short stack to help trace caller
         try{ entry.stack = (new Error()).stack.split('\n').slice(2,8).map(s=>s.trim()); }catch(e){}
-        // lightweight console debug to make repros visible in browser console
+        if(window && window._day5_damage_log){ window._day5_damage_log.push(entry); if(window._day5_damage_log.length > 600) window._day5_damage_log.shift(); }
         if(console && console.debug) console.debug('[Day5] takeDamage called', entry);
       }catch(e){}
 
