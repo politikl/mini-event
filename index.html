@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Winter Celebrations 2025 - Celebrate the Season</title>
+    <link rel="stylesheet" href="index.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>❄️</text></svg>">
+    <style>
+        /* Prevent layout shift during load */
+        html { scroll-behavior: smooth; }
+    </style>
+</head>
+<body>
+    <!-- Background canvas for snow and effects -->
+    <div id="background-container">
+        <canvas id="snow-canvas"></canvas>
+        <div id="stars-container"></div>
+        <div id="floating-elements"></div>
+    </div>
+
+    <!-- Day/Night cycle overlay -->
+    <div id="sky-overlay"></div>
+    
+    <!-- Sun/Moon display -->
+    <div id="celestial-body"></div>
+
+    <!-- Corner countdown displays -->
+    <div id="countdowns-corners">
+        <div class="corner-countdown" id="christmas-corner">
+            <div class="corner-icon">🎄</div>
+            <div class="corner-title">Christmas</div>
+            <div class="corner-display" id="christmas-countdown">--:--:--</div>
+        </div>
+        <div class="corner-countdown" id="hanukkah-corner">
+            <div class="corner-icon">🕯️</div>
+            <div class="corner-title">Hanukkah</div>
+            <div class="corner-display" id="hanukkah-countdown">--:--:--</div>
+        </div>
+        <div class="corner-countdown" id="kwanzaa-corner">
+            <div class="corner-icon">🐑</div>
+            <div class="corner-title">Kwanzaa</div>
+            <div class="corner-display" id="kwanzaa-countdown">--:--:--</div>
+        </div>
+        <div class="corner-countdown" id="newyear-corner">
+            <div class="corner-icon">🎆</div>
+            <div class="corner-title">New Year</div>
+            <div class="corner-display" id="newyear-countdown">--:--:--</div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <div id="content-wrapper">
+        <!-- Header with title -->
+        <header id="main-header">
+            <h1 id="main-title">Winter Celebrations 2025</h1>
+            <p id="subtitle">Celebrate the Season • Find Joy in the Holidays</p>
+        </header>
+
+        <!-- Main action button - Decomytree as primary focus -->
+        <section id="action-section">
+            <button id="decomytree-btn" class="btn btn-primary btn-huge decomytree-xl">
+                <span class="btn-emoji">🎄</span>
+                <span class="btn-text">Design Your Tree</span>
+            </button>
+        </section>
+        <!-- Corner minigame trigger -->
+        <div id="minigame-trigger" class="minigame-trigger"></div>
+        
+        <!-- Mini snowball game -->
+        <div id="mini-snowball-game" class="hidden">
+            <div class="game-overlay">
+                <h2>❄️ Snowball Catch ❄️</h2>
+                <div class="game-info">
+                    <span id="snowball-score">Score: 0</span>
+                    <span id="snowball-lives">Lives: ❤️❤️❤️</span>
+                    <span id="snowball-level">Level: 1</span>
+                </div>
+                <div id="snowball-game-area">
+                    <div id="player-bucket"></div>
+                </div>
+                <p id="game-status"></p>
+                <button id="close-minigame" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ambient particle system overlay -->
+    <div id="ambient-particles"></div>
+
+    <script src="index.js"></script>
+</body>
+</html>
