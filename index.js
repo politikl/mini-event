@@ -36,26 +36,21 @@ class Snowflake {
         this.speedX = Math.random() * 2 - 1;
         this.opacity = Math.random() * 0.5 + 0.5;
         
-        // Determine snowflake type
-        if (isClue) {
-            this.type = SNOWFLAKE_TYPES.SPECIAL_CLUE;
-            this.color = '#FFD700'; // Gold color for clues
-            this.size = Math.random() * 3 + 5; // Slightly larger
+        // Determine snowflake type (no yellow/gold clues)
+        const rand = Math.random();
+        if (rand < 0.7) {
+            this.type = SNOWFLAKE_TYPES.SNOW;
+            this.color = '#FFFFFF';
+        } else if (rand < 0.85) {
+            this.type = SNOWFLAKE_TYPES.HAIL;
+            this.color = '#E8F4F8';
+            this.size = Math.random() * 2 + 1; // Smaller
         } else {
-            const rand = Math.random();
-            if (rand < 0.7) {
-                this.type = SNOWFLAKE_TYPES.SNOW;
-                this.color = '#FFFFFF';
-            } else if (rand < 0.85) {
-                this.type = SNOWFLAKE_TYPES.HAIL;
-                this.color = '#E8F4F8';
-                this.size = Math.random() * 2 + 1; // Smaller
-            } else {
-                this.type = SNOWFLAKE_TYPES.SLEET;
-                this.color = '#D0E8F2';
-                this.size = Math.random() * 3 + 1.5;
-            }
+            this.type = SNOWFLAKE_TYPES.SLEET;
+            this.color = '#D0E8F2';
+            this.size = Math.random() * 3 + 1.5;
         }
+        // No special clue snowflakes — user wants only white snow
     }
 
     update() {
@@ -147,21 +142,19 @@ function initSnowflakes() {
 }
 
 function addClueSnowflake() {
-    if (Math.random() < 0.02) { // 2% chance each frame
-        snowflakes.push(new Snowflake(true));
-    }
+    // Clue snowflakes disabled per user request — no yellow snow
 }
 
 
 function animateSnow() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Update wind direction periodically
+    // Update wind direction periodically (much less wind)
     windChangeTimer++;
-    if (windChangeTimer > 300) { // Change every 5 seconds at 60fps
+    if (windChangeTimer > 900) { // Change every ~15 seconds
         windChangeTimer = 0;
-        windDirection = Math.random() * 2 - 1; // Random direction between -1 and 1
-        windStrength = Math.random() * 1.5 + 0.5; // Between 0.5 and 2
+        windDirection = (Math.random() * 2 - 1) * 0.3; // Small direction
+        windStrength = Math.random() * 0.4 + 0.1; // Between 0.1 and 0.5
     }
 
     snowflakes.forEach(flake => {
@@ -290,21 +283,21 @@ function setupButtonHandlers() {
         document.getElementById('mini-snowball-game').classList.add('hidden');
     });
 
-    // small game buttons show modal
+    // Handle locked game buttons
     const releaseModal = document.getElementById('release-modal');
     const closeRelease = document.getElementById('close-release');
     const collatzBtn = document.getElementById('collatz-btn');
     const hexBtn = document.getElementById('hex-btn');
 
-    function openRelease(name) {
-        document.getElementById('release-title').textContent = name;
-        document.getElementById('release-message').textContent = 'Will be released on Christmas.';
+    function openRelease() {
         releaseModal.classList.remove('hidden');
     }
 
-    collatzBtn.addEventListener('click', (e) => { e.preventDefault(); openRelease('Collatz Racing'); });
-    hexBtn.addEventListener('click', (e) => { e.preventDefault(); openRelease('Hexagonal Chess'); });
-    closeRelease.addEventListener('click', () => releaseModal.classList.add('hidden'));
+    if (collatzBtn) collatzBtn.addEventListener('click', (e) => { e.preventDefault(); openRelease(); });
+    if (hexBtn) hexBtn.addEventListener('click', (e) => { e.preventDefault(); openRelease(); });
+    if (closeRelease) closeRelease.addEventListener('click', () => releaseModal.classList.add('hidden'));
+
+    // small game buttons show modal - already handled above
 }
 
 // ==================== Mini Snowball Game with Powerups ==================== 
@@ -318,12 +311,14 @@ let powerups = [];
 const GAME_CONSTANTS = {
     maxLives: 3,
     levelUpScore: 50,
-    initialSpawnRate: 500
+    initialSpawnRate: 1200  // Slower spawn rate
 };
 
 class FallingSnowball {
     constructor(gameArea) {
-        this.x = Math.random() * (gameArea.clientWidth - 20);
+        // Keep snowballs away from unreachable edges
+        const edgePadding = Math.min(100, Math.floor(gameArea.clientWidth * 0.12));
+        this.x = Math.random() * (gameArea.clientWidth - edgePadding * 2) + edgePadding;
         this.y = -20;
         this.size = Math.random() * 15 + 10;
         this.speedY = Math.random() * 3 + 2 + (snowballLevel * 0.5);
@@ -668,7 +663,7 @@ window.addEventListener('load', () => {
     setupMiniGame();
 
     setTimeout(() => {
-        showNotification('❄️ Welcome to Winter Celebrations! (Triple-click top-right for minigame)');
+        showNotification('❄️ Welcome to Winter Celebrations!');
     }, 500);
 });
 

@@ -60,13 +60,34 @@
 
         <!-- Main action button - Decomytree as primary focus -->
         <section id="action-section">
-            <button id="decomytree-btn" class="btn btn-primary btn-huge decomytree-xl">
+            <button id="decomytree-btn" class="btn btn-primary btn-huge decomytree-detail">
                 <span class="btn-emoji">🎄</span>
                 <span class="btn-text">Design Your Tree</span>
+                <span class="btn-detail">✨</span>
             </button>
+            <!-- Small game buttons (locked) -->
+            <div id="small-games-area">
+                <button id="collatz-btn" class="btn btn-secondary btn-locked">
+                    <span class="lock-icon">🔒</span>
+                    <span class="btn-text">Collatz Racing</span>
+                </button>
+                <button id="hex-btn" class="btn btn-secondary btn-locked">
+                    <span class="lock-icon">🔒</span>
+                    <span class="btn-text">Hexagonal Chess</span>
+                </button>
+            </div>
         </section>
+
         <!-- Corner minigame trigger -->
         <div id="minigame-trigger" class="minigame-trigger"></div>
+        
+        <!-- Release modal -->
+        <div id="release-modal" class="hidden">
+            <div class="release-overlay">
+                <p class="release-text">🔒 Available on Christmas 🔒</p>
+                <button id="close-release" class="btn btn-primary">OK</button>
+            </div>
+        </div>
         
         <!-- Mini snowball game -->
         <div id="mini-snowball-game" class="hidden">
