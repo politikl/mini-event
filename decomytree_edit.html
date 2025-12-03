@@ -3,8 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>DecomyTree</title>
+    <title>Edit Tree - DecomyTree</title>
     <link rel="stylesheet" href="decomytree.css">
+    <link rel="stylesheet" href="decomytree_view.css">
 </head>
 <body>
     <div class="background-trees"></div>
@@ -14,42 +15,25 @@
             <span id="username-display"></span>
             <button id="sign-out-btn">Sign Out</button>
         </div>
-        <button id="sign-in-btn" class="hidden">Sign In with Google</button>
     </div>
 
     <main class="container">
-        <h1>DecomyTree</h1>
-        <div id="main-area">
-            <div id="no-tree" class="panel hidden">
-                <p>You don't have a tree yet.</p>
-                <button id="create-tree-btn" class="primary">Create Your Tree</button>
-            </div>
-
-            <div id="has-tree" class="panel hidden">
-                <p>Welcome back! ✨</p>
-                <button id="view-tree-btn" class="primary">View Your Tree</button>
-                <button id="edit-tree-btn" style="margin-left:8px">Edit Tree</button>
-                <button id="add-ornament-btn" style="margin-left:8px">Add Ornament to Other Trees</button>
-            </div>
+        <div class="view-header">
+            <button id="back-btn" class="back-btn">← Back</button>
+            <h1>Edit Your Tree</h1>
         </div>
-    </main>
 
-    <!-- Create Tree Modal -->
-    <div id="create-tree-modal" class="modal hidden">
-        <div class="modal-content">
-            <h2>Customize Your Tree</h2>
-            <p style="font-size:0.95em;margin-bottom:16px">Choose your tree design and color</p>
-            
+        <div class="edit-panel panel">
             <label>Tree Style:</label>
             <div class="designs">
-                <label><input type="radio" name="design" value="classic" checked> <span>🎄 Classic</span></label>
+                <label><input type="radio" name="design" value="classic"> <span>🎄 Classic</span></label>
                 <label><input type="radio" name="design" value="modern"> <span>✨ Modern</span></label>
                 <label><input type="radio" name="design" value="snowy"> <span>❄️ Snowy</span></label>
             </div>
 
             <label>Tree Color:</label>
             <div class="designs">
-                <label><input type="radio" name="color" value="green" checked> <span>🟢 Green</span></label>
+                <label><input type="radio" name="color" value="green"> <span>🟢 Green</span></label>
                 <label><input type="radio" name="color" value="blue"> <span>🔵 Blue</span></label>
                 <label><input type="radio" name="color" value="frost"> <span>❄️ Frost</span></label>
                 <label><input type="radio" name="color" value="emerald"> <span>💚 Emerald</span></label>
@@ -58,30 +42,44 @@
 
             <label style="margin-top:12px">Scene Theme:</label>
             <div class="designs">
-                <label><input type="radio" name="theme" value="scene-default" checked> <span>Classic</span></label>
+                <label><input type="radio" name="theme" value="scene-default"> <span>Classic</span></label>
                 <label><input type="radio" name="theme" value="scene-colorful"> <span>Colorful</span></label>
                 <label><input type="radio" name="theme" value="scene-snowy"> <span>Snowy</span></label>
             </div>
 
-            <label style="margin-top:16px"><input type="checkbox" id="tree-public" checked> Make this tree <strong>public</strong> (searchable by all)</label>
+            <label style="margin-top:16px"><input type="checkbox" id="tree-public"> Make this tree <strong>public</strong></label>
+
+            <div class="modal-buttons" style="margin-top:20px">
+                <button id="save-tree-btn" class="primary">Save Changes</button>
+                <button id="share-tree-btn" class="primary" style="margin-left:8px">🔗 Share Tree</button>
+                <button id="back-to-view" class="cancel">Cancel</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Share Tree Modal -->
+    <div id="share-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Share Your Tree</h2>
+            <p>Add friends to your private tree by their username (e.g. <em>First L</em>) or by email. Use usernames to invite without exposing emails.</p>
             
-            <div class="modal-buttons">
-                <button id="publish-tree-btn" class="primary">Create My Tree</button>
-                <button id="cancel-create-tree" class="cancel">Cancel</button>
+            <label>Friend's Username or Email:
+                <input type="text" id="share-email" placeholder="First L or friend@lakesideschool.org" style="width:100%;padding:8px;margin:8px 0;border-radius:6px;border:1px solid rgba(212,175,55,0.3);background:rgba(255,255,255,0.05);color:var(--cream)">
+            </label>
+
+            <div id="invited-users" style="margin-top:16px">
+                <h3 style="color:var(--gold);margin-bottom:8px">Invited Users:</h3>
+                <div id="invited-list" style="max-height:200px;overflow-y:auto"></div>
+            </div>
+
+            <div class="modal-buttons" style="margin-top:20px">
+                <button id="add-user-btn" class="primary">Add User</button>
+                <button id="close-share-btn" class="cancel">Close</button>
             </div>
         </div>
     </div>
 
-    <!-- Force Sign-In Modal (must sign in) -->
-    <div id="force-signin-modal" class="modal hidden">
-        <div class="modal-content">
-            <h2>Sign in required</h2>
-            <p>You must sign in with your `@lakesideschool.org` account to use DecomyTree.</p>
-            <button id="force-signin-btn" class="primary">Sign In with Google</button>
-        </div>
-    </div>
-
-    <!-- Firebase SDK and initialization (reuse project config) -->
+    <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
@@ -97,13 +95,14 @@
             doc, 
             setDoc, 
             getDoc, 
-            collection, 
-            getDocs, 
-            query, 
-            where, 
-            orderBy, 
-            limit, 
-            serverTimestamp
+            updateDoc,
+            serverTimestamp,
+            arrayUnion,
+            arrayRemove,
+            collection,
+            query,
+            where,
+            getDocs
         } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -112,7 +111,7 @@
             projectId: "nerd-mini-events",
             storageBucket: "nerd-mini-events.firebasestorage.app",
             messagingSenderId: "974357416633",
-            appId: "1:974357416633:web:e190de605d03e968",
+            appId: "1:974357416633:web:e190de60553d03e968",
             measurementId: "G-V9NGCSEY8J"
         };
 
@@ -120,31 +119,26 @@
         const analytics = getAnalytics(app);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const provider = new GoogleAuthProvider();
 
-        // expose to page script
-        window.firebaseApp = app;
         window.firebaseAuth = auth;
         window.firebaseDb = db;
-        window.googleProvider = provider;
-        window.firebaseSignInWithPopup = signInWithPopup;
         window.firebaseSignOut = signOut;
         window.firebaseOnAuthStateChanged = onAuthStateChanged;
         window.firebaseDoc = doc;
-        window.firebaseSetDoc = setDoc;
         window.firebaseGetDoc = getDoc;
+        window.firebaseUpdateDoc = updateDoc;
+        window.firebaseServerTimestamp = serverTimestamp;
+        window.firebaseArrayUnion = arrayUnion;
+        window.firebaseArrayRemove = arrayRemove;
         window.firebaseCollection = collection;
-        window.firebaseGetDocs = getDocs;
         window.firebaseQuery = query;
         window.firebaseWhere = where;
-        window.firebaseOrderBy = orderBy;
-        window.firebaseLimit = limit;
-        window.firebaseServerTimestamp = serverTimestamp;
+        window.firebaseGetDocs = getDocs;
 
         window.firebaseReady = true;
-        if (window.initDecomyTree) window.initDecomyTree();
+        if (window.initEditTree) window.initEditTree();
     </script>
 
-    <script src="decomytree.js"></script>
+    <script src="decomytree_edit.js"></script>
 </body>
 </html>

@@ -1,0 +1,626 @@
+/* Global notification system */
+.notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 400px;
+}
+
+.notification {
+    background: rgba(13, 94, 63, 0.9);
+    border: 2px solid rgba(212, 175, 55, 0.6);
+    color: var(--cream);
+    padding: 16px 20px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    font-weight: 500;
+    animation: slideIn 0.3s ease-out;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    transform: translateX(400px);
+    opacity: 0;
+    transition: all 0.3s ease-out;
+}
+
+.notification.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.notification-success {
+    border-color: rgba(144, 238, 144, 0.6);
+    background: rgba(34, 139, 34, 0.6);
+    color: #90ee90;
+}
+
+.notification-error {
+    border-color: rgba(220, 20, 60, 0.6);
+    background: rgba(139, 0, 0, 0.6);
+    color: #ff6b6b;
+}
+
+.notification-warning {
+    border-color: rgba(255, 165, 0, 0.6);
+    background: rgba(139, 69, 0, 0.6);
+    color: #ffa500;
+}
+
+.notification-info {
+    border-color: rgba(212, 175, 55, 0.6);
+    background: rgba(13, 94, 63, 0.6);
+    color: var(--gold);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+:root {
+    --primary-green: #0d5e3f;
+    --dark-green: #051f1a;
+    --red: #c41e3a;
+    --gold: #d4af37;
+    --cream: #f5f0e8;
+    --white: #ffffff;
+    --soft-shadow: rgba(0, 0, 0, 0.15);
+    --glow: rgba(212, 175, 55, 0.3);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    height: 100%;
+    overflow-x: hidden;
+}
+
+body {
+    font-family: 'Segoe UI', 'Trebuchet MS', Arial, sans-serif;
+    background: linear-gradient(180deg, #0a2d1a 0%, #1a3a2d 40%, #2d5a3d 100%);
+    color: var(--cream);
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* Fixed background layers */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 20% 10%, rgba(255, 200, 100, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(135, 206, 235, 0.08) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Falling snowflakes */
+body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        radial-gradient(circle, white 1px, transparent 1px),
+        radial-gradient(circle, rgba(255, 255, 255, 0.6) 1.5px, transparent 1.5px),
+        radial-gradient(circle, rgba(255, 255, 255, 0.4) 1px, transparent 1px);
+    background-size: 
+        50px 50px,
+        80px 80px,
+        120px 120px;
+    background-position: 
+        0 0,
+        25px 25px,
+        60px 60px;
+    animation: snowfallAnim 20s linear infinite;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.3;
+}
+
+@keyframes snowfallAnim {
+    0% { background-position: 0 0, 25px 25px, 60px 60px; }
+    100% { background-position: 0 100vh, 25px calc(100vh + 25px), 60px calc(100vh + 60px); }
+}
+
+/* Animated background trees (decorative) */
+.background-trees {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 120px;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.15;
+    font-size: 80px;
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-end;
+    overflow: hidden;
+    animation: treesSway 8s ease-in-out infinite;
+}
+
+.background-trees::before,
+.background-trees::after {
+    content: '🎄';
+    animation: sway 4s ease-in-out infinite;
+}
+
+.background-trees::before {
+    animation-delay: 0s;
+}
+
+.background-trees::after {
+    animation-delay: 2s;
+}
+
+@keyframes sway {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(10px); }
+}
+
+/* Sun/Moon cycle */
+.celestial-body {
+    position: fixed;
+    width: 80px;
+    height: 80px;
+    top: 60px;
+    right: 60px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 2;
+    box-shadow: 0 0 40px rgba(255, 200, 100, 0.4);
+}
+
+.celestial-body.sun {
+    background: radial-gradient(circle at 30% 30%, #ffd700, #ffa500);
+    animation: sunGlow 3s ease-in-out infinite alternate;
+}
+
+.celestial-body.moon {
+    background: radial-gradient(circle at 30% 30%, #f0f0f0, #dcdcdc);
+    box-shadow: 0 0 30px rgba(200, 200, 255, 0.3);
+}
+
+@keyframes sunGlow {
+    0% { box-shadow: 0 0 40px rgba(255, 200, 100, 0.4); }
+    100% { box-shadow: 0 0 60px rgba(255, 200, 100, 0.6); }
+}
+
+/* Night mode background */
+body.night-mode {
+    background: linear-gradient(180deg, #0a0f1a 0%, #1a1a2e 40%, #16213e 100%);
+}
+
+body.night-mode .celestial-body.sun {
+    display: none;
+}
+
+body.night-mode::before {
+    background: 
+        radial-gradient(circle at 20% 10%, rgba(100, 150, 255, 0.08) 0%, transparent 50%);
+}
+
+main {
+    position: relative;
+    z-index: 2;
+}
+
+.container {
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 24px;
+}
+
+h1 {
+    text-align: center;
+    font-size: 3.5em;
+    margin-bottom: 12px;
+    color: var(--gold);
+    text-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.4), 
+        0 0 20px var(--glow),
+        2px 2px 4px rgba(196, 30, 58, 0.2);
+    font-weight: 700;
+    letter-spacing: 3px;
+}
+
+h1::before {
+    content: '🎄 ';
+}
+
+h1::after {
+    content: ' 🎄';
+}
+
+.panel {
+    background: linear-gradient(135deg, rgba(13, 94, 63, 0.4) 0%, rgba(5, 31, 26, 0.4) 100%);
+    border: 2px solid rgba(212, 175, 55, 0.3);
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 
+        0 8px 32px var(--soft-shadow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 0 20px rgba(196, 30, 58, 0.1);
+    backdrop-filter: blur(10px);
+    text-align: center;
+}
+
+.panel p {
+    font-size: 1.15em;
+    margin-bottom: 20px;
+    color: rgba(245, 240, 232, 0.95);
+    font-weight: 500;
+}
+
+.hidden {
+    display: none !important;
+}
+
+button {
+    cursor: pointer;
+    font-weight: 700;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    border: none;
+    border-radius: 10px;
+    padding: 12px 24px;
+    font-size: 1em;
+    position: relative;
+    overflow: hidden;
+}
+
+button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    transition: left 0.3s;
+}
+
+button:hover::before {
+    left: 100%;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+.primary {
+    background: linear-gradient(135deg, var(--red) 0%, #a01728 100%);
+    color: var(--white);
+    box-shadow: 0 4px 15px rgba(196, 30, 58, 0.4);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.primary:hover {
+    background: linear-gradient(135deg, #d42a47 0%, #b02233 100%);
+    box-shadow: 0 6px 25px rgba(196, 30, 58, 0.6);
+}
+
+.primary::after {
+    content: ' ✨';
+}
+
+button:not(.primary) {
+    background: rgba(212, 175, 55, 0.15);
+    color: var(--gold);
+    border: 2px solid var(--gold);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+button:not(.primary):hover {
+    background: rgba(212, 175, 55, 0.25);
+    box-shadow: 0 0 16px rgba(212, 175, 55, 0.5);
+}
+
+button.cancel {
+    background: rgba(100, 100, 100, 0.15) !important;
+    color: rgba(245, 240, 232, 0.8) !important;
+    border: 2px solid rgba(100, 100, 100, 0.3) !important;
+}
+
+button.cancel:hover {
+    background: rgba(100, 100, 100, 0.25) !important;
+}
+
+/* Modal styling */
+.modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    z-index: 3000;
+}
+
+.modal .modal-content {
+    background: linear-gradient(135deg, rgba(13, 94, 63, 0.6) 0%, rgba(5, 31, 26, 0.6) 100%);
+    border: 2px solid rgba(212, 175, 55, 0.4);
+    padding: 32px;
+    border-radius: 16px;
+    min-width: 340px;
+    color: var(--cream);
+    box-shadow: 
+        0 20px 60px rgba(0, 0, 0, 0.4),
+        0 0 30px rgba(212, 175, 55, 0.2);
+    backdrop-filter: blur(10px);
+    animation: slideUp 0.4s ease-out;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-content h2 {
+    color: var(--gold);
+    margin-bottom: 12px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    font-size: 1.4em;
+}
+
+.modal-content h2::before {
+    content: '✨ ';
+}
+
+.modal-content p {
+    color: rgba(245, 240, 232, 0.9);
+    margin-bottom: 16px;
+    line-height: 1.6;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.modal-buttons button {
+    flex: 1;
+    min-width: 120px;
+}
+
+.designs {
+    display: flex;
+    gap: 16px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.designs label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: rgba(212, 175, 55, 0.1);
+    border: 2px solid rgba(212, 175, 55, 0.3);
+    transition: all 0.2s;
+}
+
+.designs label:hover {
+    background: rgba(212, 175, 55, 0.2);
+    border-color: rgba(212, 175, 55, 0.6);
+    transform: scale(1.05);
+}
+
+.designs label input[type="radio"]:checked + span {
+    color: var(--gold);
+    font-weight: 700;
+}
+
+.designs input[type="radio"] {
+    accent-color: var(--gold);
+}
+
+label {
+    display: block;
+    margin-bottom: 12px;
+    color: rgba(245, 240, 232, 0.95);
+    font-weight: 600;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="search"] {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 2px solid rgba(212, 175, 55, 0.4);
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--cream);
+    font-size: 1em;
+    transition: all 0.2s;
+    margin-bottom: 10px;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="search"]:focus {
+    outline: none;
+    border-color: var(--gold);
+    background: rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0 12px rgba(212, 175, 55, 0.3);
+}
+
+input[type="checkbox"] {
+    accent-color: var(--gold);
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+}
+
+/* Auth Container */
+#auth-container {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 2500;
+    background: linear-gradient(135deg, rgba(13, 94, 63, 0.3), rgba(5, 31, 26, 0.3));
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 2px solid rgba(212, 175, 55, 0.3);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+#user-info {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    color: var(--cream);
+    font-weight: 600;
+}
+
+#username-display {
+    color: var(--gold);
+    font-weight: 700;
+}
+
+#username-display::before {
+    content: '🎅 ';
+}
+
+#sign-out-btn {
+    padding: 8px 12px;
+    font-size: 0.9em;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+    .container {
+        margin: 20px auto;
+        padding: 16px;
+    }
+
+    h1 {
+        font-size: 2.2em;
+        letter-spacing: 2px;
+    }
+
+    .panel {
+        padding: 20px;
+    }
+
+    .modal .modal-content {
+        min-width: calc(100% - 32px);
+        max-width: 90vw;
+        padding: 24px;
+    }
+
+    .designs {
+        flex-direction: column;
+    }
+
+    .designs label {
+        width: 100%;
+    }
+
+    button {
+        padding: 10px 16px;
+        font-size: 0.95em;
+    }
+
+    #auth-container {
+        top: 10px;
+        right: 10px;
+        padding: 10px 12px;
+    }
+
+    #user-info {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .celestial-body {
+        width: 60px;
+        height: 60px;
+        top: 40px;
+        right: 40px;
+    }
+}
+
+/* Print-friendly */
+@media print {
+    body::before,
+    body::after,
+    .celestial-body,
+    .background-trees {
+        display: none;
+    }
+
+    .modal,
+    #auth-container,
+    button {
+        display: none;
+    }
+}
+
+/* Scene themes: colorful landscape and snowy landscape */
+.scene-colorful::before {
+    background: radial-gradient(circle at 10% 10%, rgba(255,220,150,0.12), transparent 25%), radial-gradient(circle at 90% 20%, rgba(180,220,255,0.08), transparent 35%);
+}
+.scene-colorful .background-trees { opacity: 0.25; }
+
+.scene-snowy::before { background: radial-gradient(circle at 50% 10%, rgba(230,240,255,0.08), transparent 35%); }
+.scene-snowy body::after { opacity: 0.5; }
+
+/* Decorative hills and trees at page bottom */
+.landscape-hills {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 240px;
+    pointer-events: none;
+    z-index: 1;
+    background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(12,35,18,0.2) 40%);
+}
+.landscape-hills .hill { position: absolute; bottom: 0; width: 120%; height: 120px; border-radius: 50%; background: linear-gradient(180deg, #1a4b2f, #0b2b1a); transform-origin: center; }
+.landscape-hills .hill.h1 { left: -10%; height: 140px; }
+.landscape-hills .hill.h2 { left: 10%; height: 120px; background: linear-gradient(180deg, #234f35, #0d3320); }
+.landscape-hills .tree-emoji { position: absolute; bottom: 30px; font-size: 48px; opacity: 0.18; }
+.landscape-hills .santa { position: absolute; bottom: 40px; right: 12%; font-size: 56px; opacity: 0.9; transform: translateY(0); animation: santa-float 6s ease-in-out infinite; }
+
+@keyframes santa-float { 0% { transform: translateY(0); } 50% { transform: translateY(-6px); } 100% { transform: translateY(0); } }

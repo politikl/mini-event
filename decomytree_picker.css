@@ -1,0 +1,113 @@
+/* Tree Picker Specific Styles */
+
+.picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+}
+
+.picker-header h1 {
+    margin: 0;
+    flex: 1;
+    min-width: 200px;
+}
+
+.search-box {
+    flex: 1;
+    min-width: 200px;
+}
+
+#search-input {
+    width: 100%;
+}
+
+.trees-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+}
+
+.tree-card {
+    background: linear-gradient(135deg, rgba(13, 94, 63, 0.3) 0%, rgba(5, 31, 26, 0.3) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.25);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.tree-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(212, 175, 55, 0.5);
+    box-shadow: 0 12px 32px rgba(212, 175, 55, 0.25);
+}
+
+.tree-icon {
+    font-size: 64px;
+    margin-bottom: 12px;
+    display: block;
+    filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.2));
+}
+
+.tree-card h3 {
+    color: var(--gold);
+    margin: 12px 0;
+    font-size: 1.2em;
+}
+
+.tree-owner {
+    color: rgba(245, 240, 232, 0.7);
+    font-size: 0.9em;
+    margin-bottom: 8px;
+}
+
+.tree-ornaments {
+    color: rgba(245, 240, 232, 0.6);
+    font-size: 0.85em;
+    padding: 8px;
+    background: rgba(212, 175, 55, 0.08);
+    border-radius: 6px;
+    margin-top: 10px;
+}
+
+.tree-card.invited {
+    box-shadow: 0 8px 24px rgba(20, 120, 80, 0.08);
+    border-color: rgba(144, 238, 144, 0.25);
+}
+
+.tree-ornaments.already {
+    background: linear-gradient(90deg, rgba(144,238,144,0.12), rgba(212,175,55,0.08));
+    color: #dfffe4;
+}
+
+.tree-card.no-results {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px;
+    color: rgba(245, 240, 232, 0.6);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .picker-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .picker-header h1 {
+        width: 100%;
+    }
+
+    .search-box {
+        width: 100%;
+    }
+
+    .trees-grid {
+        grid-template-columns: 1fr;
+    }
+}

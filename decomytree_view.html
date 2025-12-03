@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Tree View - DecomyTree</title>
+    <link rel="stylesheet" href="decomytree.css">
+    <link rel="stylesheet" href="decomytree_view.css">
+</head>
+<body>
+    <div class="background-trees"></div>
+    <div class="celestial-body sun"></div>
+    <div class="landscape-hills">
+        <div class="hill h1"></div>
+        <div class="hill h2"></div>
+        <div class="tree-emoji" style="left:8%">🎄</div>
+        <div class="tree-emoji" style="left:24%">🌲</div>
+        <div class="tree-emoji" style="left:44%">🎄</div>
+        <div class="santa">🎅</div>
+    </div>
+    
+    <!-- Countdown Timer -->
+    <div id="countdown-timer" class="countdown-timer">
+        <div class="countdown-content">
+            🎄 <span id="countdown-text">Loading...</span>
+        </div>
+    </div>
+
+    <!-- Custom Notification System -->
+    <div id="notification-container" class="notification-container"></div>
+    <div id="auth-container">
+        <div id="user-info" class="hidden">
+            <span id="username-display"></span>
+            <button id="sign-out-btn">Sign Out</button>
+        </div>
+    </div>
+
+    <main class="container">
+        <div class="view-header">
+            <button id="back-btn" class="back-btn">← Back</button>
+            <h1 id="tree-title">Tree</h1>
+        </div>
+
+        <div class="tree-container loading">
+            <svg id="tree-svg" class="tree-svg" viewBox="0 0 400 500" width="400" height="500">
+                <!-- Trunk -->
+                <rect id="tree-trunk" x="175" y="350" width="50" height="100" fill="#8B4513" rx="5"/>
+                <!-- Tree layers (triangles) -->
+                <polygon id="tree-layer-1" points="200,80 80,200 320,200" fill="#0d5e3f" opacity="0.95"/>
+                <polygon id="tree-layer-2" points="200,160 60,280 340,280" fill="#0d5e3f" opacity="0.9"/>
+                <polygon id="tree-layer-3" points="200,240 40,360 360,360" fill="#0d5e3f" opacity="0.85"/>
+                <!-- Star on top -->
+                <polygon id="tree-star" points="200,40 210,65 237,65 215,80 223,105 200,90 177,105 185,80 163,65 190,65" fill="#d4af37"/>
+                <!-- Ornament positions will be added by JS -->
+                <g id="ornament-positions"></g>
+            </svg>
+            <div id="tree-loading" class="tree-loading">Loading tree…</div>
+            <div class="tree-name" id="tree-name"></div>
+        </div>
+
+        <div class="ornament-section">
+            <h2>Messages on This Tree</h2>
+            <div id="ornaments-container" class="ornaments-container">
+                <!-- Ornaments rendered here -->
+            </div>
+            <div class="pagination-controls">
+                <button id="prev-page" class="back-btn">← Previous</button>
+                <span class="page-indicator">Page <span id="current-page">1</span> / <span id="total-pages">1</span></span>
+                <button id="next-page" class="back-btn">Next →</button>
+            </div>
+        </div>
+
+        <div class="action-buttons">
+            <button id="add-ornament-btn" class="primary">✨ Add Your Ornament</button>
+            <button id="share-tree-btn" class="primary" style="margin-left:8px;display:none">🔗 Share Tree</button>
+        </div>
+    </main>
+
+    <!-- Add Ornament Modal -->
+    <div id="add-ornament-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Add an Ornament</h2>
+            <label>Choose Ornament Design:
+                <div class="ornament-picker">
+                    <button type="button" data-emoji="🎄" data-type="classic">🎄 Tree</button>
+                    <button type="button" data-emoji="🎅" data-type="animated-pulse">🎅 Santa</button>
+                    <button type="button" data-emoji="🎁">🎁 Gift</button>
+                    <button type="button" data-emoji="❄️" data-type="sparkle">❄️ Snowflake</button>
+                    <button type="button" data-emoji="⛄">⛄ Snowman</button>
+                    <button type="button" data-emoji="🔔">🔔 Bell</button>
+                    <button type="button" data-emoji="💝">💝 Heart</button>
+                    <button type="button" data-emoji="🌟">🌟 Star</button>
+                    <button type="button" data-emoji="✨">✨ Sparkle</button>
+                    <button type="button" data-emoji="🕯️">🕯️ Candle</button>
+                    <button type="button" data-emoji="🎉">🎉 Party</button>
+                    <button type="button" data-emoji="🧉">🧉 Candy</button>
+                    <button type="button" data-emoji="🍎">🍎 Apple</button>
+                    <button type="button" data-emoji="🔴">🔴 Ball</button>
+                    <button type="button" data-emoji="🟢">🟢 Green Ball</button>
+                    <button type="button" data-emoji="🌲">🌲 Tree 2</button>
+                    <button type="button" data-emoji="🪴">🪴 Plant</button>
+                    <button type="button" data-emoji="💫">💫 Dizzy</button>
+                    <button type="button" data-emoji="⭐" data-type="sparkle">⭐ Gold Star</button>
+                    <button type="button" data-emoji="👼" data-type="sway">👼 Angel</button>
+                </div>
+            </label>
+            <input type="hidden" id="selected-emoji" value="🎄">
+            <label>Your Message:
+                <textarea id="ornament-text" maxlength="500" placeholder="Your message..." style="width:100%;height:100px;padding:8px;border-radius:8px;border:1px solid rgba(212,175,55,0.3);background:rgba(255,255,255,0.05);color:var(--cream);font-family:inherit"></textarea>
+            </label>
+            <label>
+                <input type="checkbox" id="ornament-public" checked> Public message (visible to everyone after Dec 25)
+            </label>
+            <div class="modal-buttons">
+                <button id="publish-ornament-btn" class="primary">Post Ornament</button>
+                <button id="cancel-ornament" class="cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Tree Modal (view) -->
+    <div id="share-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Share This Tree</h2>
+            <p>Invite friends by username (e.g. <em>First L</em>) or email.</p>
+            <label>Username or Email:
+                <input type="text" id="view-share-input" placeholder="First L or friend@lakesideschool.org" style="width:100%;padding:8px;margin:8px 0;border-radius:6px;border:1px solid rgba(212,175,55,0.3);background:rgba(255,255,255,0.05);color:var(--cream)">
+            </label>
+            <div id="view-invited-list" style="margin-top:12px;max-height:200px;overflow:auto"></div>
+            <div class="modal-buttons" style="margin-top:16px">
+                <button id="view-add-share" class="primary">Add</button>
+                <button id="view-close-share" class="cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
+        import { 
+            getAuth, 
+            GoogleAuthProvider, 
+            signInWithPopup, 
+            signOut, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            setDoc, 
+            getDoc, 
+            collection, 
+            getDocs, 
+            query, 
+            where, 
+            orderBy, 
+            serverTimestamp,
+            addDoc,
+            updateDoc,
+            deleteDoc,
+            arrayUnion,
+            arrayRemove
+        } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyARY96nrH2Aio8rOiLkewSXtTS40TZLrAw",
+            authDomain: "nerd-mini-events.firebaseapp.com",
+            projectId: "nerd-mini-events",
+            storageBucket: "nerd-mini-events.firebasestorage.app",
+            messagingSenderId: "974357416633",
+            appId: "1:974357416633:web:e190de60553d03e968",
+            measurementId: "G-V9NGCSEY8J"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.firebaseApp = app;
+        window.firebaseAuth = auth;
+        window.firebaseDb = db;
+        window.firebaseSignOut = signOut;
+        window.firebaseOnAuthStateChanged = onAuthStateChanged;
+        window.firebaseDoc = doc;
+        window.firebaseSetDoc = setDoc;
+        window.firebaseGetDoc = getDoc;
+        window.firebaseCollection = collection;
+        window.firebaseGetDocs = getDocs;
+        window.firebaseQuery = query;
+        window.firebaseWhere = where;
+        window.firebaseOrderBy = orderBy;
+        window.firebaseServerTimestamp = serverTimestamp;
+        window.firebaseAddDoc = addDoc;
+        window.firebaseUpdateDoc = updateDoc;
+        window.firebaseDeleteDoc = deleteDoc;
+        window.firebaseArrayUnion = arrayUnion;
+        window.firebaseArrayRemove = arrayRemove;
+
+        window.firebaseReady = true;
+        if (window.initTreeView) window.initTreeView();
+    </script>
+
+    <script src="decomytree_view.js"></script>
+</body>
+</html>

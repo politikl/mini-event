@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Public Trees - DecomyTree</title>
+    <link rel="stylesheet" href="decomytree.css">
+    <link rel="stylesheet" href="decomytree_picker.css">
+</head>
+<body>
+    <div class="background-trees"></div>
+    <div class="celestial-body sun"></div>
+    <div id="auth-container">
+        <div id="user-info" class="hidden">
+            <span id="username-display"></span>
+            <button id="sign-out-btn">Sign Out</button>
+        </div>
+    </div>
+
+    <main class="container">
+        <div class="picker-header">
+            <button id="back-btn" class="back-btn">← Back</button>
+            <h1>Find a Tree</h1>
+            <div class="search-box">
+                <input type="search" id="search-input" placeholder="Search trees...">
+            </div>
+            <p style="font-size:0.85em;color:rgba(245,240,232,0.6);margin-top:8px">(Your own tree is hidden)</p>
+        </div>
+
+        <div id="trees-grid" class="trees-grid">
+            <!-- Public trees listed here -->
+        </div>
+    </main>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
+        import { 
+            getAuth, 
+            GoogleAuthProvider, 
+            signInWithPopup, 
+            signOut, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            getDocs, 
+            query, 
+            where, 
+            orderBy
+        } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyARY96nrH2Aio8rOiLkewSXtTS40TZLrAw",
+            authDomain: "nerd-mini-events.firebaseapp.com",
+            projectId: "nerd-mini-events",
+            storageBucket: "nerd-mini-events.firebasestorage.app",
+            messagingSenderId: "974357416633",
+            appId: "1:974357416633:web:e190de60553d03e968",
+            measurementId: "G-V9NGCSEY8J"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.firebaseAuth = auth;
+        window.firebaseDb = db;
+        window.firebaseSignOut = signOut;
+        window.firebaseOnAuthStateChanged = onAuthStateChanged;
+        window.firebaseCollection = collection;
+        window.firebaseGetDocs = getDocs;
+        window.firebaseQuery = query;
+        window.firebaseWhere = where;
+        window.firebaseOrderBy = orderBy;
+
+        window.firebaseReady = true;
+        if (window.initTreePicker) window.initTreePicker();
+    </script>
+
+    <script src="decomytree_picker.js"></script>
+</body>
+</html>
