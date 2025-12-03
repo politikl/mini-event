@@ -48,6 +48,14 @@
         return emojis[design] || '🎄';
     }
 
+    // Apply menu background theme to document
+    function applyMenuBackground(theme){
+        // Remove all scene classes
+        document.body.classList.remove('scene-default', 'scene-colorful', 'scene-snowy', 'scene-aurora', 'scene-sunset', 'scene-midnight', 'scene-forest', 'scene-cosmic');
+        // Add the selected theme
+        if (theme) document.body.classList.add(theme);
+    }
+
     async function loadPublicTrees(){
         try{
             const db = window.firebaseDb;
@@ -190,9 +198,24 @@
     }
 
     function init(){
+        // Apply saved menu background on page load
+        const savedBackground = localStorage.getItem('decomytree-menu-background') || 'scene-default';
+        applyMenuBackground(savedBackground);
+        
         const backBtn = $('#back-btn');
         const signOutBtn = $('#sign-out-btn');
         const searchInput = $('#search-input');
+        const bgSelect = $('#menu-bg-select');
+
+        // Handle background selector
+        if (bgSelect) {
+            bgSelect.value = savedBackground;
+            bgSelect.addEventListener('change', (e) => {
+                const selected = e.target.value;
+                localStorage.setItem('decomytree-menu-background', selected);
+                applyMenuBackground(selected);
+            });
+        }
 
         if (backBtn) backBtn.addEventListener('click', () => {
             window.location.href = 'decomytree.html';

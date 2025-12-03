@@ -293,10 +293,9 @@
             const nameEl = $('#tree-name');
             const visualEl = $('#tree-visual');
             
-            // Set title with ornament count
-            const ornamentCount = ornaments.length > 0 ? ` (${ornaments.length} ornament${ornaments.length === 1 ? '' : 's'})` : '';
-            if (titleEl) titleEl.textContent = ownerName + "'s Tree" + ornamentCount;
-            if (nameEl) nameEl.textContent = ownerName + "'s Tree" + ornamentCount;
+            // Title will be set after ornaments load with count
+            if (titleEl) titleEl.textContent = ownerName + "'s Tree";
+            if (nameEl) nameEl.textContent = ownerName + "'s Tree";
 
             const treeEmoji = getTreeEmoji(treeData.design || 'classic');
             if (visualEl) visualEl.textContent = treeEmoji;
@@ -313,7 +312,7 @@
             // Apply scene theme to body for background variations
             try{
                 const theme = treeData.theme || 'scene-default';
-                document.body.classList.remove('scene-default','scene-colorful','scene-snowy');
+                document.body.classList.remove('scene-default','scene-colorful','scene-snowy','scene-aurora','scene-sunset','scene-midnight','scene-forest','scene-cosmic');
                 if (theme) document.body.classList.add(theme);
             }catch(e){}
             
@@ -355,6 +354,17 @@
                 ornaments.push({id: doc.id, ...doc.data()});
             });
             currentPage = 1;
+            
+            // Update title with ornament count
+            if (treeData) {
+                const ownerName = formatAuthorName(treeData.ownerEmail);
+                const ornamentCount = ornaments.length > 0 ? ` (${ornaments.length} ornament${ornaments.length === 1 ? '' : 's'})` : '';
+                const titleEl = $('#tree-title');
+                const nameEl = $('#tree-name');
+                if (titleEl) titleEl.textContent = ownerName + "'s Tree" + ornamentCount;
+                if (nameEl) nameEl.textContent = ownerName + "'s Tree" + ornamentCount;
+            }
+            
             renderOrnaments();
         }catch(e){
             console.error(e);
@@ -466,7 +476,8 @@
             santa.remove();
         }, 8000);
     }
-    
+
+    function setupTreeInteractions(){
         const treeSvg = document.getElementById('tree-svg');
         if (!treeSvg) return;
         
@@ -524,7 +535,8 @@
             }, 500);
         });
     }
-    
+
+    function renderOrnaments(){
         const container = $('#ornaments-container');
         const ornamentPositions = $('#ornament-positions');
         const released = isReleased();

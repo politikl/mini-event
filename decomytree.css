@@ -501,7 +501,7 @@ input[type="checkbox"] {
 /* Auth Container */
 #auth-container {
     position: fixed;
-    top: 80px;
+    top: 12px;
     right: 16px;
     z-index: 2500;
     background: linear-gradient(135deg, rgba(13, 94, 63, 0.3), rgba(5, 31, 26, 0.3));

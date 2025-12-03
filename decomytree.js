@@ -94,7 +94,19 @@
         show($('#sign-in-btn'));
     }
 
+    // Apply menu background theme to document
+    function applyMenuBackground(theme){
+        // Remove all scene classes
+        document.body.classList.remove('scene-default', 'scene-colorful', 'scene-snowy', 'scene-aurora', 'scene-sunset', 'scene-midnight', 'scene-forest', 'scene-cosmic');
+        // Add the selected theme
+        if (theme) document.body.classList.add(theme);
+    }
+
     async function init(){
+        // Apply saved menu background on page load
+        const savedBackground = localStorage.getItem('decomytree-menu-background') || 'scene-default';
+        applyMenuBackground(savedBackground);
+        
         const signInBtn = $('#sign-in-btn');
         const signOutBtn = $('#sign-out-btn');
         const forceSignBtn = $('#force-signin-btn');
@@ -106,7 +118,13 @@
         const publishBtn = $('#publish-tree-btn');
         const cancelCreate = $('#cancel-create-tree');
 
-        function openCreateModal(){ show(createModal); }
+        function openCreateModal(){ 
+            show(createModal);
+            // Pre-select saved menu background choice
+            const savedBackground = localStorage.getItem('decomytree-menu-background') || 'scene-default';
+            const bgRadio = document.querySelector(`input[name="menu-background"][value="${savedBackground}"]`);
+            if (bgRadio) bgRadio.checked = true;
+        }
         function closeCreateModal(){ hide(createModal); }
 
         signInBtn && signInBtn.addEventListener('click', async ()=>{
@@ -151,6 +169,7 @@
             const color = document.querySelector('input[name="color"]:checked').value;
             const star = document.querySelector('input[name="star"]:checked').value || 'star';
             const theme = (document.querySelector('input[name="theme"]:checked') || {}).value || 'scene-default';
+            const menuBackground = (document.querySelector('input[name="menu-background"]:checked') || {}).value || 'scene-default';
             const isPublic = !!$('#tree-public').checked;
             if (!currentUser) return notify('No user', 'error');
             try{
@@ -162,9 +181,13 @@
                     ownerEmail: currentUser.email,
                     design, color, star, public: !!isPublic,
                     theme: theme,
+                    menuBackground: menuBackground,
                     createdAt: window.firebaseServerTimestamp()
                 });
                 currentTreeId = newRef.id;
+                // Save menu background preference to localStorage
+                localStorage.setItem('decomytree-menu-background', menuBackground);
+                applyMenuBackground(menuBackground);
                 closeCreateModal();
                 show($('#has-tree'));
                 hide($('#no-tree'));

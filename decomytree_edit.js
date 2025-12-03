@@ -35,6 +35,14 @@
     let treeData = null;
     let isInitialized = false;
 
+    // Apply menu background theme to document
+    function applyMenuBackground(theme){
+        // Remove all scene classes
+        document.body.classList.remove('scene-default', 'scene-colorful', 'scene-snowy', 'scene-aurora', 'scene-sunset', 'scene-midnight', 'scene-forest', 'scene-cosmic');
+        // Add the selected theme
+        if (theme) document.body.classList.add(theme);
+    }
+
     function formatAuthorName(email){
         const local = email.split('@')[0];
         const m = local.match(/^([a-z]+)([a-z])\d*$/i);
@@ -83,6 +91,9 @@
             const themeRadios = document.querySelectorAll('input[name="theme"]');
             themeRadios.forEach(r => { r.checked = r.value === (treeData.theme || 'scene-default'); });
 
+            const menuBgRadios = document.querySelectorAll('input[name="menu-background"]');
+            menuBgRadios.forEach(r => { r.checked = r.value === (treeData.menuBackground || 'scene-default'); });
+
             $('#tree-public').checked = treeData.public === true;
         }catch(e){
             console.error(e);
@@ -91,6 +102,10 @@
     }
 
     function init(){
+        // Apply saved menu background on page load
+        const savedBackground = localStorage.getItem('decomytree-menu-background') || 'scene-default';
+        applyMenuBackground(savedBackground);
+        
         const backBtn = $('#back-btn');
         const backViewBtn = $('#back-to-view');
         const signOutBtn = $('#sign-out-btn');
@@ -191,6 +206,7 @@
             const color = document.querySelector('input[name="color"]:checked').value;
             const isPublic = $('#tree-public').checked;
             const theme = (document.querySelector('input[name="theme"]:checked') || {}).value || 'scene-default';
+            const menuBackground = (document.querySelector('input[name="menu-background"]:checked') || {}).value || 'scene-default';
 
             try{
                 const db = window.firebaseDb;
@@ -198,8 +214,12 @@
                 await window.firebaseUpdateDoc(treeRef, {
                     design, color, public: isPublic,
                     theme: theme,
+                    menuBackground: menuBackground,
                     updatedAt: window.firebaseServerTimestamp()
                 });
+                // Save menu background preference to localStorage
+                localStorage.setItem('decomytree-menu-background', menuBackground);
+                applyMenuBackground(menuBackground);
                 notify('🎄 Tree updated!', 'success');
                 setTimeout(() => window.location.href = 'decomytree.html', 1500);
             }catch(e){
