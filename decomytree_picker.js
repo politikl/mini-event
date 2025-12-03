@@ -101,6 +101,27 @@
             // attach meta
             allTrees = allTrees.map(t => ({...t, _already: ornamentedTreeIds.has(t.id), _invited: currentUser ? (Array.isArray(t.sharedWith) && t.sharedWith.includes((currentUser.email||'').toLowerCase()) ) || (Array.isArray(t.sharedWithUsernames) && t.sharedWithUsernames.includes(formatAuthorName((currentUser.email||'').toLowerCase()))) : false }));
 
+            // Query ornament counts for all trees
+            try {
+                const colO = window.firebaseCollection(window.firebaseDb, 'ornaments');
+                const ornamentCountMap = new Map();
+                
+                for (const tree of allTrees) {
+                    try {
+                        const qCount = window.firebaseQuery(colO, window.firebaseWhere('treeId', '==', tree.id));
+                        const snapCount = await window.firebaseGetDocs(qCount);
+                        ornamentCountMap.set(tree.id, snapCount.size);
+                    } catch (e) {
+                        ornamentCountMap.set(tree.id, 0);
+                    }
+                }
+                
+                allTrees = allTrees.map(t => ({...t, _ornCount: ornamentCountMap.get(t.id) || 0}));
+            } catch (e) {
+                console.error('Failed to get ornament counts', e);
+                allTrees = allTrees.map(t => ({...t, _ornCount: 0}));
+            }
+
             filteredTrees = [...allTrees];
             renderTrees();
         }catch(e){
@@ -134,7 +155,8 @@
 
             const ornCount = document.createElement('div');
             ornCount.className = 'tree-ornaments';
-            ornCount.textContent = tree._already ? '✅ You left a note' : '✨ Add an ornament';
+            const countText = tree._ornCount ? `${tree._ornCount} ornament${tree._ornCount === 1 ? '' : 's'}` : '0 ornaments';
+            ornCount.textContent = (tree._already ? '✅ You left a note • ' : '✨ ') + countText;
             if (tree._already) ornCount.classList.add('already');
 
             if (tree._invited){

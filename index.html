@@ -26,6 +26,25 @@
     <!-- Sun/Moon display -->
     <div id="celestial-body"></div>
 
+    <!-- Website Background Settings -->
+    <div id="bg-settings-btn" class="bg-settings-btn">⚙️</div>
+    <div id="bg-settings-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Website Background</h2>
+            <p>Choose your preferred background for the main page:</p>
+            <div class="designs" id="bg-theme-options">
+                <label><input type="radio" name="bg-theme" value="default" checked> <span>Classic</span></label>
+                <label><input type="radio" name="bg-theme" value="colorful"> <span>Colorful</span></label>
+                <label><input type="radio" name="bg-theme" value="snowy"> <span>Snowy</span></label>
+                <label><input type="radio" name="bg-theme" value="aurora"> <span>Aurora</span></label>
+                <label><input type="radio" name="bg-theme" value="sunset"> <span>Sunset</span></label>
+            </div>
+            <div class="modal-buttons">
+                <button id="close-bg-settings" class="cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Corner countdown displays -->
     <div id="countdowns-corners">
         <div class="corner-countdown" id="christmas-corner">

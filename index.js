@@ -291,6 +291,45 @@ function setupButtonHandlers() {
     if (collatzBtn) collatzBtn.addEventListener('click', (e) => { e.preventDefault(); openRelease(); });
     if (hexBtn) hexBtn.addEventListener('click', (e) => { e.preventDefault(); openRelease(); });
     if (closeRelease) closeRelease.addEventListener('click', () => releaseModal.classList.add('hidden'));
+
+    // Background settings
+    const bgSettingsBtn = document.getElementById('bg-settings-btn');
+    const bgSettingsModal = document.getElementById('bg-settings-modal');
+    const closeBgSettings = document.getElementById('close-bg-settings');
+    const bgThemeOptions = document.querySelectorAll('input[name="bg-theme"]');
+
+    if (bgSettingsBtn) {
+        bgSettingsBtn.addEventListener('click', () => {
+            bgSettingsModal.classList.remove('hidden');
+            // Load saved preference
+            const saved = localStorage.getItem('websiteBgTheme') || 'default';
+            const radio = document.querySelector(`input[name="bg-theme"][value="${saved}"]`);
+            if (radio) radio.checked = true;
+        });
+    }
+
+    if (closeBgSettings) {
+        closeBgSettings.addEventListener('click', () => {
+            bgSettingsModal.classList.add('hidden');
+        });
+    }
+
+    bgThemeOptions.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const theme = e.target.value;
+            localStorage.setItem('websiteBgTheme', theme);
+            
+            // Remove all theme classes
+            document.body.classList.remove('bg-default', 'bg-colorful', 'bg-snowy', 'bg-aurora', 'bg-sunset');
+            
+            // Add selected theme
+            if (theme === 'default') {
+                // Default, no class needed
+            } else {
+                document.body.classList.add('bg-' + theme);
+            }
+        });
+    });
 }
 
 // ==================== Notification System ==================== 
@@ -379,6 +418,12 @@ window.addEventListener('load', () => {
     initSnowflakes();
     createStars();
     createFloatingOrnaments();
+    
+    // Load saved background preference
+    const savedBgTheme = localStorage.getItem('websiteBgTheme') || 'default';
+    if (savedBgTheme !== 'default') {
+        document.body.classList.add('bg-' + savedBgTheme);
+    }
     
     animateSnow();
     updateDayNightCycle();

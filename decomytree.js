@@ -149,6 +149,7 @@
             isPublishing = true;
             const design = document.querySelector('input[name="design"]:checked').value;
             const color = document.querySelector('input[name="color"]:checked').value;
+            const star = document.querySelector('input[name="star"]:checked').value || 'star';
             const theme = (document.querySelector('input[name="theme"]:checked') || {}).value || 'scene-default';
             const isPublic = !!$('#tree-public').checked;
             if (!currentUser) return notify('No user', 'error');
@@ -159,7 +160,7 @@
                 await window.firebaseSetDoc(newRef, {
                     ownerUid: currentUser.uid,
                     ownerEmail: currentUser.email,
-                    design, color, public: !!isPublic,
+                    design, color, star, public: !!isPublic,
                     theme: theme,
                     createdAt: window.firebaseServerTimestamp()
                 });

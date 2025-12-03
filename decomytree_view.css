@@ -40,7 +40,7 @@
     position: fixed;
     top: 20px;
     right: 20px;
-    z-index: 1000;
+    z-index: 3000;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -180,6 +180,44 @@
     height: auto;
     filter: drop-shadow(0 0 20px rgba(212, 175, 55, 0.4));
     margin-bottom: 20px;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+}
+
+.tree-svg.tree-shake {
+    animation: treeShake 0.5s ease-in-out;
+}
+
+@keyframes treeShake {
+    0%, 100% { transform: translateX(0) rotateZ(0deg); }
+    10% { transform: translateX(-8px) rotateZ(-1deg); }
+    20% { transform: translateX(8px) rotateZ(1deg); }
+    30% { transform: translateX(-6px) rotateZ(-0.8deg); }
+    40% { transform: translateX(6px) rotateZ(0.8deg); }
+    50% { transform: translateX(-4px) rotateZ(-0.5deg); }
+    60% { transform: translateX(4px) rotateZ(0.5deg); }
+    70% { transform: translateX(-2px) rotateZ(-0.3deg); }
+    80% { transform: translateX(2px) rotateZ(0.3deg); }
+}
+
+.falling-leaf, .falling-snow {
+    animation: fallingParticle 2s ease-in forwards;
+}
+
+@keyframes fallingParticle {
+    0% {
+        opacity: 1;
+        transform: translateY(0) rotateZ(0deg) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(500px) rotateZ(360deg) scale(0.5);
+    }
+}
+
+/* Ornament sway on tree impact */
+.ornament-circle.tree-impact-sway {
+    animation: ornamentImpactSway 0.6s ease-in-out;
 }
 
 .tree-svg polygon,
@@ -197,10 +235,22 @@
     filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.4));
     transition: all 0.3s ease;
     cursor: pointer;
+    transform-origin: center;
 }
 
 .ornament-circle:hover {
     filter: drop-shadow(0 0 16px rgba(212, 175, 55, 0.8));
+}
+
+.ornament-circle.tree-impact-sway {
+    animation: ornamentImpactSway 0.8s ease-in-out;
+}
+
+@keyframes ornamentImpactSway {
+    0%, 100% { transform: rotateZ(0deg) scale(1); }
+    25% { transform: rotateZ(-8deg) scale(1.05); }
+    50% { transform: rotateZ(6deg) scale(1.03); }
+    75% { transform: rotateZ(-4deg) scale(1.02); }
 }
 
 .ornament-text {
@@ -318,6 +368,140 @@ textarea {
 
 .cancel:hover {
     background: rgba(100, 100, 100, 0.3) !important;
+}
+
+/* Ornament Display Modal */
+#ornament-display-modal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 4000;
+}
+
+.ornament-display-content {
+    position: relative;
+    width: 90%;
+    max-width: 500px;
+}
+
+.ornament-display-letter {
+    background: linear-gradient(135deg, #fef8f0 0%, #fef3e6 100%);
+    border: 3px solid #d4a574;
+    border-radius: 8px;
+    padding: 40px 30px;
+    box-shadow: 
+        0 20px 60px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8),
+        0 0 0 1px rgba(212, 175, 55, 0.3);
+    font-family: 'Caveat', cursive;
+    position: relative;
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.ornament-display-letter::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        repeating-linear-gradient(
+            90deg,
+            transparent,
+            transparent 2px,
+            rgba(212, 175, 55, 0.03) 2px,
+            rgba(212, 175, 55, 0.03) 4px
+        ),
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(212, 175, 55, 0.03) 2px,
+            rgba(212, 175, 55, 0.03) 4px
+        );
+    border-radius: 5px;
+    pointer-events: none;
+}
+
+.ornament-emoji-large {
+    font-size: 80px;
+    margin-bottom: 20px;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+.ornament-text-display {
+    font-size: 28px;
+    color: #5a4a3a;
+    margin-bottom: 20px;
+    font-weight: 700;
+    line-height: 1.6;
+    position: relative;
+    z-index: 1;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.ornament-author-display {
+    font-size: 18px;
+    color: #8b7355;
+    margin-top: 20px;
+    position: relative;
+    z-index: 1;
+    font-style: italic;
+}
+
+.close-ornament-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(212, 175, 55, 0.2);
+    border: 2px solid rgba(212, 175, 55, 0.5);
+    color: rgba(212, 175, 55, 0.8);
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1.2em;
+    z-index: 10;
+    transition: all 0.2s;
+}
+
+.close-ornament-btn:hover {
+    background: rgba(212, 175, 55, 0.3);
+    border-color: rgba(212, 175, 55, 0.7);
+    color: var(--gold);
+}
+
+/* Ornament Privacy Controls */
+.ornament-privacy-controls {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 2px solid rgba(212, 175, 55, 0.2);
+    text-align: center;
+}
+
+.privacy-toggle-btn {
+    background: rgba(212, 175, 55, 0.2);
+    border: 2px solid rgba(212, 175, 55, 0.5);
+    color: #5a4a3a;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s;
+    font-family: 'Caveat', cursive;
+    font-size: 18px;
+}
+
+.privacy-toggle-btn:hover {
+    background: rgba(212, 175, 55, 0.3);
+    border-color: rgba(212, 175, 55, 0.7);
 }
 
 /* Responsive */

@@ -1,9 +1,9 @@
-/* Global notification system */
+/* Notification System */
 .notification-container {
     position: fixed;
     top: 20px;
     right: 20px;
-    z-index: 1000;
+    z-index: 3000;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -200,6 +200,13 @@ body::after {
 .celestial-body.moon {
     background: radial-gradient(circle at 30% 30%, #f0f0f0, #dcdcdc);
     box-shadow: 0 0 30px rgba(200, 200, 255, 0.3);
+}
+
+/* Hide sun for snowy, aurora, and sunset themes */
+body.scene-snowy .celestial-body,
+body.scene-aurora .celestial-body,
+body.scene-sunset .celestial-body {
+    display: none;
 }
 
 @keyframes sunGlow {
@@ -494,7 +501,7 @@ input[type="checkbox"] {
 /* Auth Container */
 #auth-container {
     position: fixed;
-    top: 16px;
+    top: 80px;
     right: 16px;
     z-index: 2500;
     background: linear-gradient(135deg, rgba(13, 94, 63, 0.3), rgba(5, 31, 26, 0.3));
@@ -598,13 +605,92 @@ input[type="checkbox"] {
 }
 
 /* Scene themes: colorful landscape and snowy landscape */
-.scene-colorful::before {
-    background: radial-gradient(circle at 10% 10%, rgba(255,220,150,0.12), transparent 25%), radial-gradient(circle at 90% 20%, rgba(180,220,255,0.08), transparent 35%);
+/* Default scene theme */
+body.scene-default {
+    background: linear-gradient(180deg, #0a2d1a 0%, #1a3a2d 40%, #2d5a3d 100%);
 }
-.scene-colorful .background-trees { opacity: 0.25; }
 
-.scene-snowy::before { background: radial-gradient(circle at 50% 10%, rgba(230,240,255,0.08), transparent 35%); }
-.scene-snowy body::after { opacity: 0.5; }
+body.scene-default::before {
+    background: 
+        radial-gradient(circle at 20% 10%, rgba(255, 200, 100, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(135, 206, 235, 0.08) 0%, transparent 50%);
+}
+
+/* Colorful scene theme */
+body.scene-colorful {
+    background: linear-gradient(180deg, #1a3a2d 0%, #2d5a4d 40%, #3d7a5d 100%);
+}
+
+body.scene-colorful::before {
+    background: radial-gradient(circle at 10% 10%, rgba(255, 200, 100, 0.2), transparent 25%), radial-gradient(circle at 90% 20%, rgba(100, 200, 255, 0.15), transparent 35%);
+}
+
+body.scene-colorful .background-trees { opacity: 0.3; }
+
+/* Snowy scene theme */
+body.scene-snowy {
+    background: linear-gradient(180deg, #1a3a5a 0%, #2a4a6a 40%, #3a5a7a 100%);
+}
+
+body.scene-snowy::before { 
+    background: radial-gradient(circle at 50% 10%, rgba(230, 240, 255, 0.15), transparent 35%); 
+}
+
+body.scene-snowy::after { 
+    opacity: 0.5; 
+}
+
+/* Aurora scene theme */
+body.scene-aurora {
+    background: linear-gradient(180deg, #0a0d2a 0%, #1a1a4a 40%, #2a2a5a 100%);
+}
+
+body.scene-aurora::before {
+    background: 
+        radial-gradient(circle at 50% 10%, rgba(0, 255, 200, 0.15), transparent 40%),
+        radial-gradient(circle at 30% 20%, rgba(150, 100, 255, 0.1), transparent 35%);
+}
+
+/* Sunset scene theme */
+body.scene-sunset {
+    background: linear-gradient(180deg, #4a3a2a 0%, #5a4a3a 40%, #6a5a4a 100%);
+}
+
+body.scene-sunset::before {
+    background: 
+        radial-gradient(circle at 20% 10%, rgba(255, 150, 100, 0.2), transparent 35%),
+        radial-gradient(circle at 80% 20%, rgba(255, 100, 50, 0.15), transparent 40%);
+}
+
+/* Midnight scene theme */
+body.scene-midnight {
+    background: linear-gradient(180deg, #0a0a1a 0%, #1a1a3a 40%, #2a2a4a 100%);
+}
+
+body.scene-midnight::before {
+    background: radial-gradient(circle at 50% 10%, rgba(100, 100, 200, 0.1), transparent 40%);
+}
+
+/* Forest scene theme */
+body.scene-forest {
+    background: linear-gradient(180deg, #1a3a1a 0%, #2a4a2a 40%, #3a5a3a 100%);
+}
+
+body.scene-forest::before {
+    background: radial-gradient(circle at 50% 10%, rgba(100, 200, 100, 0.12), transparent 40%);
+}
+
+/* Cosmic scene theme */
+body.scene-cosmic {
+    background: linear-gradient(180deg, #0a0a2a 0%, #1a0a4a 40%, #2a1a6a 100%);
+}
+
+body.scene-cosmic::before {
+    background: 
+        radial-gradient(circle at 10% 20%, rgba(255, 100, 200, 0.1), transparent 30%),
+        radial-gradient(circle at 90% 30%, rgba(100, 200, 255, 0.1), transparent 35%),
+        radial-gradient(circle at 50% 80%, rgba(200, 100, 255, 0.08), transparent 40%);
+}
 
 /* Decorative hills and trees at page bottom */
 .landscape-hills {
@@ -624,3 +710,23 @@ input[type="checkbox"] {
 .landscape-hills .santa { position: absolute; bottom: 40px; right: 12%; font-size: 56px; opacity: 0.9; transform: translateY(0); animation: santa-float 6s ease-in-out infinite; }
 
 @keyframes santa-float { 0% { transform: translateY(0); } 50% { transform: translateY(-6px); } 100% { transform: translateY(0); } }
+
+/* Christmas Santa ride animation */
+.christmas-santa {
+    position: fixed;
+    bottom: 100px;
+    left: -100px;
+    font-size: 80px;
+    z-index: 50;
+    animation: santaRide 8s linear forwards;
+    pointer-events: none;
+}
+
+@keyframes santaRide {
+    0% {
+        left: -100px;
+    }
+    100% {
+        left: calc(100% + 100px);
+    }
+}

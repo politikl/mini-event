@@ -6,6 +6,7 @@
     <title>Tree View - DecomyTree</title>
     <link rel="stylesheet" href="decomytree.css">
     <link rel="stylesheet" href="decomytree_view.css">
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="background-trees"></div>
@@ -16,7 +17,6 @@
         <div class="tree-emoji" style="left:8%">🎄</div>
         <div class="tree-emoji" style="left:24%">🌲</div>
         <div class="tree-emoji" style="left:44%">🎄</div>
-        <div class="santa">🎅</div>
     </div>
     
     <!-- Countdown Timer -->
@@ -42,24 +42,25 @@
         </div>
 
         <div class="tree-container loading">
-            <svg id="tree-svg" class="tree-svg" viewBox="0 0 400 500" width="400" height="500">
+            <svg id="tree-svg" class="tree-svg" viewBox="0 0 400 500" width="500" height="625">
                 <!-- Trunk -->
                 <rect id="tree-trunk" x="175" y="350" width="50" height="100" fill="#8B4513" rx="5"/>
-                <!-- Tree layers (triangles) -->
-                <polygon id="tree-layer-1" points="200,80 80,200 320,200" fill="#0d5e3f" opacity="0.95"/>
-                <polygon id="tree-layer-2" points="200,160 60,280 340,280" fill="#0d5e3f" opacity="0.9"/>
-                <polygon id="tree-layer-3" points="200,240 40,360 360,360" fill="#0d5e3f" opacity="0.85"/>
+                
+                <!-- Tree layers - will be rendered by JS based on design -->
+                <g id="tree-design"></g>
+                
                 <!-- Star on top -->
-                <polygon id="tree-star" points="200,40 210,65 237,65 215,80 223,105 200,90 177,105 185,80 163,65 190,65" fill="#d4af37"/>
+                <g id="tree-top-decoration">
+                    <polygon id="tree-star" points="200,40 210,65 237,65 215,80 223,105 200,90 177,105 185,80 163,65 190,65" fill="#d4af37"/>
+                </g>
+                
                 <!-- Ornament positions will be added by JS -->
                 <g id="ornament-positions"></g>
             </svg>
             <div id="tree-loading" class="tree-loading">Loading tree…</div>
-            <div class="tree-name" id="tree-name"></div>
         </div>
 
         <div class="ornament-section">
-            <h2>Messages on This Tree</h2>
             <div id="ornaments-container" class="ornaments-container">
                 <!-- Ornaments rendered here -->
             </div>
@@ -90,7 +91,7 @@
                     <button type="button" data-emoji="🔔">🔔 Bell</button>
                     <button type="button" data-emoji="💝">💝 Heart</button>
                     <button type="button" data-emoji="🌟">🌟 Star</button>
-                    <button type="button" data-emoji="✨">✨ Sparkle</button>
+                    <button type="button" data-emoji="✨" data-type="sparkle">✨ Sparkle</button>
                     <button type="button" data-emoji="🕯️">🕯️ Candle</button>
                     <button type="button" data-emoji="🎉">🎉 Party</button>
                     <button type="button" data-emoji="🧉">🧉 Candy</button>
@@ -99,9 +100,14 @@
                     <button type="button" data-emoji="🟢">🟢 Green Ball</button>
                     <button type="button" data-emoji="🌲">🌲 Tree 2</button>
                     <button type="button" data-emoji="🪴">🪴 Plant</button>
-                    <button type="button" data-emoji="💫">💫 Dizzy</button>
+                    <button type="button" data-emoji="💫" data-type="sparkle">💫 Dizzy</button>
                     <button type="button" data-emoji="⭐" data-type="sparkle">⭐ Gold Star</button>
                     <button type="button" data-emoji="👼" data-type="sway">👼 Angel</button>
+                    <button type="button" data-emoji="🕯️" data-type="animated-pulse">🕯️ Candle Glow</button>
+                    <button type="button" data-emoji="🎀">🎀 Bow</button>
+                    <button type="button" data-emoji="🦌" data-type="sway">🦌 Reindeer</button>
+                    <button type="button" data-emoji="🔶">🔶 Orange Orb</button>
+                    <button type="button" data-emoji="🩷" data-type="animated-pulse">🩷 Pink Heart</button>
                 </div>
             </label>
             <input type="hidden" id="selected-emoji" value="🎄">
@@ -130,6 +136,21 @@
             <div class="modal-buttons" style="margin-top:16px">
                 <button id="view-add-share" class="primary">Add</button>
                 <button id="view-close-share" class="cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ornament Display Modal -->
+    <div id="ornament-display-modal" class="modal hidden">
+        <div class="ornament-display-content">
+            <button id="close-ornament-display" class="close-ornament-btn">✕</button>
+            <div class="ornament-display-letter">
+                <div class="ornament-emoji-large" id="ornament-emoji-display"></div>
+                <div class="ornament-text-display" id="ornament-text-display"></div>
+                <div class="ornament-author-display" id="ornament-author-display"></div>
+                <div id="ornament-privacy-controls" class="ornament-privacy-controls hidden">
+                    <button id="toggle-privacy-btn" class="privacy-toggle-btn">🔓 Make Private</button>
+                </div>
             </div>
         </div>
     </div>
