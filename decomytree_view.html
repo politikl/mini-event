@@ -68,6 +68,9 @@
                 <button id="prev-page" class="back-btn">← Previous</button>
                 <span class="page-indicator">Page <span id="current-page">1</span> / <span id="total-pages">1</span></span>
                 <button id="next-page" class="back-btn">Next →</button>
+                <div style="text-align:center;color:rgba(245,240,232,0.7);font-size:0.9em;margin-top:8px">
+                    <span id="ornament-count-display">0 ornaments</span>
+                </div>
             </div>
         </div>
 
@@ -84,30 +87,33 @@
             <label>Choose Ornament Design:
                 <div class="ornament-picker">
                     <button type="button" data-emoji="🎄" data-type="classic">🎄 Tree</button>
-                    <button type="button" data-emoji="🎅" data-type="animated-pulse">🎅 Santa</button>
-                    <button type="button" data-emoji="🎁">🎁 Gift</button>
+                    <button type="button" data-emoji="🎅" data-type="pulse">🎅 Santa</button>
+                    <button type="button" data-emoji="🎁" data-type="shimmer">🎁 Gift</button>
                     <button type="button" data-emoji="❄️" data-type="sparkle">❄️ Snowflake</button>
-                    <button type="button" data-emoji="⛄">⛄ Snowman</button>
-                    <button type="button" data-emoji="🔔">🔔 Bell</button>
-                    <button type="button" data-emoji="💝">💝 Heart</button>
-                    <button type="button" data-emoji="🌟">🌟 Star</button>
+                    <button type="button" data-emoji="⛄" data-type="glow">⛄ Snowman</button>
+                    <button type="button" data-emoji="🔔" data-type="jingle">🔔 Bell</button>
+                    <button type="button" data-emoji="💝" data-type="pulse">💝 Heart</button>
+                    <button type="button" data-emoji="🌟" data-type="sparkle">🌟 Star</button>
                     <button type="button" data-emoji="✨" data-type="sparkle">✨ Sparkle</button>
-                    <button type="button" data-emoji="🕯️">🕯️ Candle</button>
-                    <button type="button" data-emoji="🎉">🎉 Party</button>
-                    <button type="button" data-emoji="🧉">🧉 Candy</button>
-                    <button type="button" data-emoji="🍎">🍎 Apple</button>
-                    <button type="button" data-emoji="🔴">🔴 Ball</button>
-                    <button type="button" data-emoji="🟢">🟢 Green Ball</button>
-                    <button type="button" data-emoji="🌲">🌲 Tree 2</button>
-                    <button type="button" data-emoji="🪴">🪴 Plant</button>
+                    <button type="button" data-emoji="🕯️" data-type="flicker">🕯️ Candle</button>
+                    <button type="button" data-emoji="🎉" data-type="bounce">🎉 Party</button>
+                    <button type="button" data-emoji="🍬" data-type="shimmer">🍬 Candy</button>
+                    <button type="button" data-emoji="🍎" data-type="classic">🍎 Apple</button>
+                    <button type="button" data-emoji="🔴" data-type="glow">🔴 Red Ball</button>
+                    <button type="button" data-emoji="🟢" data-type="glow">🟢 Green Ball</button>
+                    <button type="button" data-emoji="🌲" data-type="classic">🌲 Evergreen</button>
+                    <button type="button" data-emoji="🪴" data-type="bounce">🪴 Plant</button>
                     <button type="button" data-emoji="💫" data-type="sparkle">💫 Dizzy</button>
                     <button type="button" data-emoji="⭐" data-type="sparkle">⭐ Gold Star</button>
-                    <button type="button" data-emoji="👼" data-type="sway">👼 Angel</button>
-                    <button type="button" data-emoji="🕯️" data-type="animated-pulse">🕯️ Candle Glow</button>
-                    <button type="button" data-emoji="🎀">🎀 Bow</button>
-                    <button type="button" data-emoji="🦌" data-type="sway">🦌 Reindeer</button>
-                    <button type="button" data-emoji="🔶">🔶 Orange Orb</button>
-                    <button type="button" data-emoji="🩷" data-type="animated-pulse">🩷 Pink Heart</button>
+                    <button type="button" data-emoji="👼" data-type="float">👼 Angel</button>
+                    <button type="button" data-emoji="🕯️" data-type="flicker">🕯️ Glow Candle</button>
+                    <button type="button" data-emoji="🎀" data-type="shimmer">🎀 Bow</button>
+                    <button type="button" data-emoji="🦌" data-type="float">🦌 Reindeer</button>
+                    <button type="button" data-emoji="🔶" data-type="glow">🔶 Orb</button>
+                    <button type="button" data-emoji="🩷" data-type="pulse">🩷 Pink Heart</button>
+                    <button type="button" data-emoji="🌈" data-type="shimmer">🌈 Rainbow</button>
+                    <button type="button" data-emoji="💎" data-type="sparkle">💎 Jewel</button>
+                    <button type="button" data-emoji="🎪" data-type="bounce">🎪 Ornament</button>
                 </div>
             </label>
             <input type="hidden" id="selected-emoji" value="🎄">

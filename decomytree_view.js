@@ -46,6 +46,14 @@
         return now >= releaseDate;
     }
 
+    // Apply menu background theme to document
+    function applyMenuBackground(theme){
+        // Remove all scene classes
+        document.body.classList.remove('scene-default', 'scene-colorful', 'scene-snowy', 'scene-aurora', 'scene-sunset', 'scene-midnight', 'scene-forest', 'scene-cosmic');
+        // Add the selected theme
+        if (theme) document.body.classList.add(theme);
+    }
+
     // Countdown timer
     function updateCountdown(){
         const countdownEl = $('#countdown-text');
@@ -93,6 +101,16 @@
         
         treeDesignGroup.innerHTML = ''; // Clear previous tree
         
+        // Remove previous color effect classes from body
+        document.body.classList.forEach(cls => {
+            if (cls.startsWith('tree-color-')) {
+                document.body.classList.remove(cls);
+            }
+        });
+        
+        // Add the new color effect class
+        document.body.classList.add(`tree-color-${color}`);
+        
         const colorMap = {
             green: ['#0d5e3f','#0b4c34','#08372a'],
             blue: ['#1f6fa8','#195b85','#12415d'],
@@ -109,128 +127,29 @@
         };
         const cols = colorMap[color] || colorMap['green'];
         
-        if (design === 'classic') {
-            // Classic simple triangles
-            const layer1 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            layer1.setAttribute('points', '200,80 80,200 320,200');
-            layer1.setAttribute('fill', cols[0]);
-            layer1.setAttribute('opacity', '1');
-            
-            const layer2 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            layer2.setAttribute('points', '200,160 60,280 340,280');
-            layer2.setAttribute('fill', cols[1]);
-            layer2.setAttribute('opacity', '1');
-            
-            const layer3 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            layer3.setAttribute('points', '200,240 40,360 360,360');
-            layer3.setAttribute('fill', cols[2]);
-            layer3.setAttribute('opacity', '1');
-            
-            treeDesignGroup.appendChild(layer1);
-            treeDesignGroup.appendChild(layer2);
-            treeDesignGroup.appendChild(layer3);
-        } 
-        else if (design === 'modern') {
-            // Modern design: overlapping circles/rounded shapes
-            for (let i = 0; i < 4; i++) {
-                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                circle.setAttribute('cx', '200');
-                circle.setAttribute('cy', 120 + i * 70);
-                circle.setAttribute('r', 60 + i * 15);
-                circle.setAttribute('fill', cols[i % cols.length]);
-                circle.setAttribute('opacity', '0.9');
-                treeDesignGroup.appendChild(circle);
-            }
-        } 
-        else if (design === 'snowy') {
-            // Snowy design: more complex shape with details
-            const layer1 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            layer1.setAttribute('points', '200,60 60,170 140,170 100,220 180,220 120,280 200,240 280,280 220,220 300,170 260,170');
-            layer1.setAttribute('fill', cols[0]);
-            layer1.setAttribute('opacity', '0.95');
-            
-            const layer2 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            layer2.setAttribute('points', '200,150 40,280 140,280 80,340 180,340 90,400 200,350 310,400 220,340 320,280 260,280');
-            layer2.setAttribute('fill', cols[1]);
-            layer2.setAttribute('opacity', '0.92');
-            
-            treeDesignGroup.appendChild(layer1);
-            treeDesignGroup.appendChild(layer2);
-        }
-        else if (design === 'tall') {
-            // Tall and slim design
-            const layer1 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            layer1.setAttribute('points', '200,70 120,150 280,150');
-            layer1.setAttribute('fill', cols[0]);
-            layer1.setAttribute('opacity', '1');
-            
-            const layer2 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            layer2.setAttribute('points', '200,140 90,240 310,240');
-            layer2.setAttribute('fill', cols[1]);
-            layer2.setAttribute('opacity', '1');
-            
-            const layer3 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            layer3.setAttribute('points', '200,210 60,340 340,340');
-            layer3.setAttribute('fill', cols[2]);
-            layer3.setAttribute('opacity', '1');
-            
-            treeDesignGroup.appendChild(layer1);
-            treeDesignGroup.appendChild(layer2);
-            treeDesignGroup.appendChild(layer3);
-        }
-        else if (design === 'bushy') {
-            // Bushy design with wider base
-            const layer1 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            layer1.setAttribute('points', '200,80 50,180 350,180');
-            layer1.setAttribute('fill', cols[0]);
-            layer1.setAttribute('opacity', '1');
-            
-            const layer2 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            layer2.setAttribute('points', '200,150 20,290 380,290');
-            layer2.setAttribute('fill', cols[1]);
-            layer2.setAttribute('opacity', '1');
-            
-            const layer3 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            layer3.setAttribute('points', '200,240 10,380 390,380');
-            layer3.setAttribute('fill', cols[2]);
-            layer3.setAttribute('opacity', '1');
-            
-            treeDesignGroup.appendChild(layer1);
-            treeDesignGroup.appendChild(layer2);
-            treeDesignGroup.appendChild(layer3);
-        }
-        else if (design === 'round') {
-            // Round/ball-shaped tree
-            for (let i = 0; i < 3; i++) {
-                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                circle.setAttribute('cx', '200');
-                circle.setAttribute('cy', 130 + i * 80);
-                circle.setAttribute('r', 70 - i * 10);
-                circle.setAttribute('fill', cols[i]);
-                circle.setAttribute('opacity', '0.95');
-                treeDesignGroup.appendChild(circle);
-            }
-        }
-        else if (design === 'zigzag') {
-            // Zigzag/staircase pattern
-            const points = [
-                ['200,60 100,140 300,140'],
-                ['200,135 70,220 330,220'],
-                ['200,220 40,310 360,310']
-            ];
-            
-            points.forEach((point, i) => {
-                const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                polygon.setAttribute('points', point);
-                polygon.setAttribute('fill', cols[i % cols.length]);
-                polygon.setAttribute('opacity', '1');
-                treeDesignGroup.appendChild(polygon);
-            });
-        }
+        // Classic simple triangles (only design)
+        const layer1 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        layer1.setAttribute('points', '200,80 80,200 320,200');
+        layer1.setAttribute('fill', cols[0]);
+        layer1.setAttribute('opacity', '1');
+        
+        const layer2 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        layer2.setAttribute('points', '200,160 60,280 340,280');
+        layer2.setAttribute('fill', cols[1]);
+        layer2.setAttribute('opacity', '1');
+        
+        const layer3 = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        layer3.setAttribute('points', '200,240 40,360 360,360');
+        layer3.setAttribute('fill', cols[2]);
+        layer3.setAttribute('opacity', '1');
+        
+        treeDesignGroup.appendChild(layer1);
+        treeDesignGroup.appendChild(layer2);
+        treeDesignGroup.appendChild(layer3);
         
         // Update trunk color based on design
         if (trunk) {
-            trunk.setAttribute('fill', design === 'modern' ? '#6b3f2b' : '#8B4513');
+            trunk.setAttribute('fill', '#8B4513');
         }
         
         // Update star/top decoration
@@ -240,11 +159,11 @@
             // Create SVG text element for the star
             const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             text.setAttribute('x', '200');
-            text.setAttribute('y', '50');
+            text.setAttribute('y', '65');
             text.setAttribute('text-anchor', 'middle');
-            text.setAttribute('dominant-baseline', 'central');
-            text.setAttribute('font-size', '40');
+            text.setAttribute('font-size', '45');
             text.style.pointerEvents = 'none';
+            text.style.userSelect = 'none';
             
             // Map star preferences to emojis
             const starMap = {
@@ -287,8 +206,20 @@
             }
 
             treeData = snap.data();
-            const ownerName = formatAuthorName(treeData.ownerEmail);
+            
+            // Check permissions: must be owner, tree must be public, or user must be in sharedWithUsernames list
             const isOwnTree = currentUser && treeData.ownerUid === (currentUser && currentUser.uid);
+            const isPublic = treeData.public === true;
+            const currentUserUsername = currentUser ? formatAuthorName(currentUser.email) : null;
+            const isShared = currentUserUsername && treeData.sharedWithUsernames && Array.isArray(treeData.sharedWithUsernames) && treeData.sharedWithUsernames.includes(currentUserUsername);
+            
+            if (!isOwnTree && !isPublic && !isShared) {
+                notify('You do not have permission to view this tree', 'error');
+                setTimeout(() => window.location.href = 'decomytree.html', 2000);
+                return;
+            }
+            
+            const ownerName = formatAuthorName(treeData.ownerEmail);
             const titleEl = $('#tree-title');
             const nameEl = $('#tree-name');
             const visualEl = $('#tree-visual');
@@ -300,12 +231,13 @@
             const treeEmoji = getTreeEmoji(treeData.design || 'classic');
             if (visualEl) visualEl.textContent = treeEmoji;
 
+            // Extract color early so it can be used later
+            const color = (treeData.color || 'green');
+            const design = (treeData.design || 'classic');
+            const star = (treeData.star || 'star');
+
             // Apply customization to SVG tree layers
             try{
-                const color = (treeData.color || 'green');
-                const design = (treeData.design || 'classic');
-                const star = (treeData.star || 'star');
-                
                 // Render tree design
                 renderTreeDesign(design, color, star);
             }catch(e){/* non-fatal if SVG not present */}
@@ -323,6 +255,9 @@
             } else if (addBtn) {
                 addBtn.style.display = '';
             }
+
+            // Setup tree interactions with color for leaf particles
+            setupTreeInteractions(color);
 
             // Show share button only to owner
             const shareBtn = $('#share-tree-btn');
@@ -355,14 +290,11 @@
             });
             currentPage = 1;
             
-            // Update title with ornament count
-            if (treeData) {
-                const ownerName = formatAuthorName(treeData.ownerEmail);
-                const ornamentCount = ornaments.length > 0 ? ` (${ornaments.length} ornament${ornaments.length === 1 ? '' : 's'})` : '';
-                const titleEl = $('#tree-title');
-                const nameEl = $('#tree-name');
-                if (titleEl) titleEl.textContent = ownerName + "'s Tree" + ornamentCount;
-                if (nameEl) nameEl.textContent = ownerName + "'s Tree" + ornamentCount;
+            // Update ornament count display
+            const countDisplay = $('#ornament-count-display');
+            if (countDisplay) {
+                const count = ornaments.length;
+                countDisplay.textContent = `${count} ornament${count === 1 ? '' : 's'}`;
             }
             
             renderOrnaments();
@@ -477,7 +409,7 @@
         }, 8000);
     }
 
-    function setupTreeInteractions(){
+    function setupTreeInteractions(treeColor = 'green'){
         const treeSvg = document.getElementById('tree-svg');
         if (!treeSvg) return;
         
@@ -489,20 +421,45 @@
             const theme = document.body.className;
             const isSnowy = theme.includes('snowy');
             
-            // Trigger ornament sway animations
-            const ornaments = document.querySelectorAll('.ornament-circle');
-            ornaments.forEach(orn => {
-                orn.classList.add('tree-impact-sway');
+            // Trigger ornament sway animations with more swing
+            const ornamentGroups = document.querySelectorAll('.ornament-group');
+            ornamentGroups.forEach(group => {
+                group.classList.add('tree-impact-sway');
+                // Add extra swing by applying a CSS custom property
+                group.style.setProperty('--swing-amount', Math.random() * 15 + 10 + 'px');
             });
             
-            // Drop particles
-            for (let i = 0; i < 8; i++) {
+            // Drop particles centered on tree (tree SVG is at center)
+            // Tree SVG appears to be centered around x=200 in viewport
+            const treeRect = treeSvg.getBoundingClientRect();
+            const treeCenterX = treeRect.left + treeRect.width / 2;
+            const treeCenterY = treeRect.top + treeRect.height * 0.3; // Upper portion where tree is
+            
+            // Color map for tree colors - use as text color filters
+            const colorFilterMap = {
+                green: 'hue-rotate(120deg) brightness(0.8)',
+                blue: 'hue-rotate(220deg)',
+                frost: 'brightness(1.2) saturate(0.5)',
+                emerald: 'hue-rotate(140deg) brightness(0.9)',
+                midnight: 'hue-rotate(200deg) brightness(0.6)',
+                forest: 'hue-rotate(100deg) brightness(0.75)',
+                gold: 'hue-rotate(40deg) brightness(1.1)',
+                silver: 'brightness(1.3) saturate(0)',
+                purple: 'hue-rotate(280deg)',
+                ruby: 'hue-rotate(0deg) brightness(0.85)',
+                copper: 'hue-rotate(20deg) brightness(0.9)',
+                jade: 'hue-rotate(150deg) brightness(1)'
+            };
+            
+            for (let i = 0; i < 12; i++) {
                 const particle = document.createElement('div');
                 particle.className = isSnowy ? 'falling-snow' : 'falling-leaf';
                 
-                // Random position around tree
-                const x = 200 + (Math.random() - 0.5) * 200;
-                const y = 100 + Math.random() * 200;
+                // Spawn centered on tree with some spread
+                const angle = (Math.random() * Math.PI * 2);
+                const distance = Math.random() * 80 + 20;
+                const x = treeCenterX + Math.cos(angle) * distance;
+                const y = treeCenterY + Math.sin(angle) * distance;
                 
                 particle.style.left = x + 'px';
                 particle.style.top = y + 'px';
@@ -510,6 +467,11 @@
                 particle.style.position = 'fixed';
                 particle.style.pointerEvents = 'none';
                 particle.style.zIndex = '5';
+                
+                // Apply color filter to leaf emoji based on tree color
+                if (!isSnowy) {
+                    particle.style.filter = colorFilterMap[treeColor] || colorFilterMap['green'];
+                }
                 
                 particle.textContent = isSnowy ? '❄️' : '🍂';
                 
@@ -523,14 +485,15 @@
                 // Remove after animation
                 setTimeout(() => {
                     particle.remove();
-                }, 2000);
+                }, 2500);
             }
             
             // Remove shake class after animation
             setTimeout(() => {
                 treeSvg.classList.remove('tree-shake');
-                ornaments.forEach(orn => {
-                    orn.classList.remove('tree-impact-sway');
+                ornamentGroups.forEach(group => {
+                    group.classList.remove('tree-impact-sway');
+                    group.style.removeProperty('--swing-amount');
                 });
             }, 500);
         });
@@ -593,6 +556,11 @@
             }
             const pos = spots[spotIndex] || spots[0];
 
+            // Create a group for ornament and text to move together
+            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            group.setAttribute('class', 'ornament-group');
+            group.style.cursor = 'pointer';
+            
             // Create ornament circle in SVG
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             circle.setAttribute('cx', pos.x);
@@ -601,7 +569,6 @@
             circle.setAttribute('fill', pos.color);
             const typeClass = orn.ornamentType ? (' ' + orn.ornamentType) : '';
             circle.setAttribute('class', 'ornament-circle' + typeClass + (!released && !canRead ? ' unread' : ''));
-            circle.style.cursor = 'pointer';
 
             const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             text.setAttribute('x', pos.x);
@@ -611,7 +578,8 @@
             text.textContent = orn.emoji || '🎄';
             text.style.pointerEvents = 'none';
 
-            circle.addEventListener('click', () => {
+            // Add click handler to group
+            group.addEventListener('click', () => {
                 if (released && canRead){
                     displayOrnamentModal(orn);
                 } else if (!released){
@@ -619,9 +587,12 @@
                 }
             });
 
+            // Append both circle and text to the group
+            group.appendChild(circle);
+            group.appendChild(text);
+
             if (ornamentPositions) {
-                ornamentPositions.appendChild(circle);
-                ornamentPositions.appendChild(text);
+                ornamentPositions.appendChild(group);
             } else if (container) {
                 // fallback: create a visual representation in the container
                 const wrapper = document.createElement('div');
@@ -757,6 +728,10 @@
     }
 
     function init(){
+        // Apply saved menu background on page load
+        const savedBackground = localStorage.getItem('decomytree-menu-background') || 'scene-default';
+        applyMenuBackground(savedBackground);
+        
         const backBtn = $('#back-btn');
         const addBtn = $('#add-ornament-btn');
         const signOutBtn = $('#sign-out-btn');
@@ -773,6 +748,17 @@
         const viewCloseShare = $('#view-close-share');
         const ornamentDisplayModal = $('#ornament-display-modal');
         const closeOrnamentBtn = $('#close-ornament-display');
+        const bgSelect = $('#menu-bg-select');
+
+        // Handle menu background selector
+        if (bgSelect) {
+            bgSelect.value = savedBackground;
+            bgSelect.addEventListener('change', (e) => {
+                const newBg = e.target.value;
+                localStorage.setItem('decomytree-menu-background', newBg);
+                applyMenuBackground(newBg);
+            });
+        }
 
         // Setup ornament modal close
         if (closeOrnamentBtn) {

@@ -443,13 +443,18 @@ button.cancel:hover {
     border-radius: 10px;
     background: rgba(212, 175, 55, 0.1);
     border: 2px solid rgba(212, 175, 55, 0.3);
-    transition: all 0.2s;
+    transition: all 0.2s ease-out;
+    user-select: none;
 }
 
 .designs label:hover {
     background: rgba(212, 175, 55, 0.2);
     border-color: rgba(212, 175, 55, 0.6);
-    transform: scale(1.05);
+    transform: scale(1.02);
+}
+
+.designs label:active {
+    transform: scale(0.98);
 }
 
 .designs label input[type="radio"]:checked + span {
@@ -459,6 +464,7 @@ button.cancel:hover {
 
 .designs input[type="radio"] {
     accent-color: var(--gold);
+    cursor: pointer;
 }
 
 label {
@@ -510,6 +516,22 @@ input[type="checkbox"] {
     border: 2px solid rgba(212, 175, 55, 0.3);
     backdrop-filter: blur(10px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Menu Background Selector */
+.menu-bg-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(13, 94, 63, 0.4);
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    backdrop-filter: blur(10px);
 }
 
 #user-info {
@@ -629,37 +651,127 @@ body.scene-colorful .background-trees { opacity: 0.3; }
 
 /* Snowy scene theme */
 body.scene-snowy {
-    background: linear-gradient(180deg, #1a3a5a 0%, #2a4a6a 40%, #3a5a7a 100%);
+    background: linear-gradient(180deg, #e0f4ff 0%, #c8e9ff 50%, #f0f4ff 100%);
 }
 
 body.scene-snowy::before { 
-    background: radial-gradient(circle at 50% 10%, rgba(230, 240, 255, 0.15), transparent 35%); 
+    background: 
+        radial-gradient(circle at 50% 10%, rgba(230, 240, 255, 0.35), transparent 35%),
+        /* snow particles - much larger and more visible */
+        radial-gradient(2.5px 2.5px at 15% 20%, rgba(255,255,255,0.95), rgba(255,255,255,0)),
+        radial-gradient(2px 2px at 35% 10%, rgba(255,255,255,0.9), rgba(255,255,255,0)),
+        radial-gradient(2.2px 2.2px at 60% 35%, rgba(255,255,255,0.95), rgba(255,255,255,0)),
+        radial-gradient(1.8px 1.8px at 75% 15%, rgba(255,255,255,0.85), rgba(255,255,255,0)),
+        radial-gradient(2px 2px at 20% 60%, rgba(255,255,255,0.9), rgba(255,255,255,0)),
+        radial-gradient(2.3px 2.3px at 50% 75%, rgba(255,255,255,0.95), rgba(255,255,255,0)),
+        radial-gradient(2px 2px at 80% 60%, rgba(255,255,255,0.9), rgba(255,255,255,0)),
+        radial-gradient(1.9px 1.9px at 40% 45%, rgba(255,255,255,0.85), rgba(255,255,255,0));
+    animation: snowfallHeavy 8s linear infinite;
+}
+
+@keyframes snowfallHeavy {
+    0% { transform: translateY(-100%) translateX(0px); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(100vh) translateX(50px); opacity: 0; }
 }
 
 body.scene-snowy::after { 
-    opacity: 0.5; 
+    background: 
+        /* second layer of snow with smaller particles */
+        radial-gradient(1.2px 1.2px at 10% 30%, rgba(255,255,255,0.95), rgba(255,255,255,0)),
+        radial-gradient(1px 1px at 45% 20%, rgba(255,255,255,0.9), rgba(255,255,255,0)),
+        radial-gradient(1.1px 1.1px at 70% 50%, rgba(255,255,255,0.95), rgba(255,255,255,0)),
+        radial-gradient(1.2px 1.2px at 25% 70%, rgba(255,255,255,0.9), rgba(255,255,255,0)),
+        radial-gradient(1px 1px at 85% 40%, rgba(255,255,255,0.85), rgba(255,255,255,0));
+    animation: snowfallFast 6s linear infinite;
+}
+
+.landscape-hills.snowy-theme::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.3) 100%);
 }
 
 /* Aurora scene theme */
 body.scene-aurora {
     background: linear-gradient(180deg, #0a0d2a 0%, #1a1a4a 40%, #2a2a5a 100%);
+    position: relative;
+    overflow: hidden;
 }
 
 body.scene-aurora::before {
     background: 
-        radial-gradient(circle at 50% 10%, rgba(0, 255, 200, 0.15), transparent 40%),
-        radial-gradient(circle at 30% 20%, rgba(150, 100, 255, 0.1), transparent 35%);
+        radial-gradient(circle at 50% 10%, rgba(0, 255, 200, 0.35), transparent 35%),
+        radial-gradient(circle at 30% 20%, rgba(150, 100, 255, 0.3), transparent 30%),
+        radial-gradient(circle at 70% 15%, rgba(0, 200, 255, 0.25), transparent 35%);
+    animation: auroraWave 6s ease-in-out infinite;
+}
+
+body.scene-aurora::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    background: 
+        linear-gradient(90deg, transparent 0%, rgba(0, 255, 200, 0.4) 20%, rgba(0, 255, 200, 0.3) 30%, transparent 50%, rgba(150, 100, 255, 0.3) 70%, rgba(150, 100, 255, 0.4) 80%, transparent 100%),
+        linear-gradient(45deg, transparent 0%, rgba(100, 200, 255, 0.2) 50%, transparent 100%);
+    animation: auroraShift 8s linear infinite;
+    z-index: 0;
+}
+
+@keyframes auroraWave {
+    0%, 100% { filter: hue-rotate(0deg) brightness(0.8); }
+    50% { filter: hue-rotate(40deg) brightness(1.1); }
+}
+
+@keyframes auroraShift {
+    0% { transform: translateX(-100%) translateY(-20px); }
+    50% { transform: translateX(50%) translateY(20px); }
+    100% { transform: translateX(100%) translateY(-20px); }
 }
 
 /* Sunset scene theme */
 body.scene-sunset {
-    background: linear-gradient(180deg, #4a3a2a 0%, #5a4a3a 40%, #6a5a4a 100%);
+    background: linear-gradient(180deg, #ff6a3a 0%, #ff8a5a 40%, #ffaa7a 100%);
 }
 
 body.scene-sunset::before {
     background: 
-        radial-gradient(circle at 20% 10%, rgba(255, 150, 100, 0.2), transparent 35%),
-        radial-gradient(circle at 80% 20%, rgba(255, 100, 50, 0.15), transparent 40%);
+        radial-gradient(ellipse 80% 60% at 30% 15%, rgba(255, 180, 100, 0.5), transparent 40%),
+        radial-gradient(ellipse 100% 70% at 70% 25%, rgba(255, 140, 50, 0.4), transparent 45%),
+        radial-gradient(circle at 50% 80%, rgba(255, 100, 0, 0.2), transparent 50%);
+    animation: sunsetGlowEnhanced 5s ease-in-out infinite;
+}
+
+body.scene-sunset::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    background: 
+        linear-gradient(180deg, rgba(255, 200, 100, 0.25) 0%, rgba(255, 150, 50, 0.15) 50%, transparent 100%);
+    animation: sunsetWarmth 4s ease-in-out infinite;
+}
+
+@keyframes sunsetGlowEnhanced {
+    0%, 100% { filter: brightness(0.9) saturate(1.1); }
+    50% { filter: brightness(1.3) saturate(1.4); }
+}
+
+@keyframes sunsetWarmth {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
 }
 
 /* Midnight scene theme */
@@ -668,16 +780,81 @@ body.scene-midnight {
 }
 
 body.scene-midnight::before {
-    background: radial-gradient(circle at 50% 10%, rgba(100, 100, 200, 0.1), transparent 40%);
+    background: 
+        radial-gradient(circle at 50% 10%, rgba(100, 100, 200, 0.25), transparent 40%),
+        /* twinkling stars - more visible */
+        radial-gradient(1.5px 1.5px at 15% 20%, rgba(255,255,255,0.95), rgba(255,255,255,0)),
+        radial-gradient(1.2px 1.2px at 85% 15%, rgba(255,255,255,0.9), rgba(255,255,255,0)),
+        radial-gradient(1.3px 1.3px at 40% 30%, rgba(255,255,255,0.9), rgba(255,255,255,0)),
+        radial-gradient(1px 1px at 25% 50%, rgba(200,200,255,0.85), rgba(255,255,255,0)),
+        radial-gradient(1.2px 1.2px at 70% 60%, rgba(255,255,200,0.85), rgba(255,255,255,0)),
+        radial-gradient(1.1px 1.1px at 50% 40%, rgba(200,255,255,0.9), rgba(255,255,255,0));
+    animation: starsTwinkle 2s ease-in-out infinite;
+}
+
+body.scene-midnight::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    background: 
+        radial-gradient(0.8px 0.8px at 8% 8%, rgba(255,255,255,0.8), rgba(255,255,255,0)),
+        radial-gradient(0.8px 0.8px at 92% 25%, rgba(255,200,100,0.75), rgba(255,255,255,0)),
+        radial-gradient(0.7px 0.7px at 45% 15%, rgba(200,255,255,0.8), rgba(255,255,255,0)),
+        radial-gradient(0.9px 0.9px at 75% 75%, rgba(255,255,150,0.75), rgba(255,255,255,0));
+    animation: starsTwinkleFast 1.5s ease-in-out infinite;
+}
+
+@keyframes starsTwinkle {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
+@keyframes starsTwinkleFast {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 0.85; }
 }
 
 /* Forest scene theme */
 body.scene-forest {
-    background: linear-gradient(180deg, #1a3a1a 0%, #2a4a2a 40%, #3a5a3a 100%);
+    background: linear-gradient(180deg, #0a2a0a 0%, #1a3a1a 40%, #2a5a2a 100%);
 }
 
 body.scene-forest::before {
-    background: radial-gradient(circle at 50% 10%, rgba(100, 200, 100, 0.12), transparent 40%);
+    background: 
+        radial-gradient(circle at 50% 10%, rgba(100, 200, 100, 0.35), transparent 40%),
+        /* forest mist - more visible */
+        linear-gradient(90deg, transparent 0%, rgba(100, 150, 100, 0.25) 25%, rgba(100, 150, 100, 0.25) 75%, transparent 100%),
+        /* misty glow points */
+        radial-gradient(15% 20% at 20% 30%, rgba(150, 200, 150, 0.3), transparent);
+    animation: forestMist 12s ease-in-out infinite;
+}
+
+body.scene-forest::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    background: 
+        linear-gradient(90deg, transparent 0%, rgba(100, 180, 100, 0.2) 50%, transparent 100%),
+        radial-gradient(circle at 50% 50%, transparent 0%, rgba(80, 120, 80, 0.15) 100%);
+    animation: forestGlow 8s ease-in-out infinite;
+}
+
+@keyframes forestMist {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+}
+
+@keyframes forestGlow {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.7; }
 }
 
 /* Cosmic scene theme */
@@ -687,9 +864,50 @@ body.scene-cosmic {
 
 body.scene-cosmic::before {
     background: 
-        radial-gradient(circle at 10% 20%, rgba(255, 100, 200, 0.1), transparent 30%),
-        radial-gradient(circle at 90% 30%, rgba(100, 200, 255, 0.1), transparent 35%),
-        radial-gradient(circle at 50% 80%, rgba(200, 100, 255, 0.08), transparent 40%);
+        radial-gradient(circle at 10% 20%, rgba(255, 100, 200, 0.25), transparent 25%),
+        radial-gradient(circle at 90% 30%, rgba(100, 200, 255, 0.25), transparent 30%),
+        radial-gradient(circle at 50% 80%, rgba(200, 100, 255, 0.2), transparent 35%),
+        /* glowing stars - more stars for better effect */
+        radial-gradient(2px 2px at 20% 25%, rgba(255, 200, 100, 1), rgba(255,255,255,0)),
+        radial-gradient(1.5px 1.5px at 75% 15%, rgba(100, 200, 255, 0.95), rgba(255,255,255,0)),
+        radial-gradient(2px 2px at 50% 35%, rgba(200, 150, 255, 0.9), rgba(255,255,255,0)),
+        radial-gradient(1.5px 1.5px at 85% 60%, rgba(255, 100, 150, 0.85), rgba(255,255,255,0)),
+        radial-gradient(1.5px 1.5px at 30% 70%, rgba(150, 200, 255, 0.85), rgba(255,255,255,0)),
+        radial-gradient(1.5px 1.5px at 15% 45%, rgba(200, 200, 255, 0.9), rgba(255,255,255,0)),
+        radial-gradient(1px 1px at 60% 50%, rgba(255, 255, 150, 0.8), rgba(255,255,255,0)),
+        radial-gradient(1.5px 1.5px at 42% 20%, rgba(150, 255, 200, 0.85), rgba(255,255,255,0)),
+        radial-gradient(2px 2px at 70% 80%, rgba(255, 150, 200, 0.9), rgba(255,255,255,0));
+    animation: cosmicGlow 3s ease-in-out infinite;
+}
+
+body.scene-cosmic::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    background: 
+        radial-gradient(0.8px 0.8px at 12% 8%, rgba(255,255,200,0.8), rgba(255,255,255,0)),
+        radial-gradient(0.8px 0.8px at 35% 12%, rgba(200,255,255,0.7), rgba(255,255,255,0)),
+        radial-gradient(0.8px 0.8px at 65% 8%, rgba(255,200,255,0.8), rgba(255,255,255,0)),
+        radial-gradient(0.8px 0.8px at 88% 22%, rgba(255,255,150,0.7), rgba(255,255,255,0)),
+        radial-gradient(0.8px 0.8px at 25% 35%, rgba(200,200,255,0.8), rgba(255,255,255,0)),
+        radial-gradient(0.8px 0.8px at 78% 45%, rgba(255,200,100,0.7), rgba(255,255,255,0)),
+        radial-gradient(0.8px 0.8px at 8% 62%, rgba(200,255,200,0.75), rgba(255,255,255,0)),
+        radial-gradient(0.8px 0.8px at 92% 75%, rgba(255,150,255,0.7), rgba(255,255,255,0));
+    animation: starsTwinkleMulti 2s ease-in-out infinite;
+}
+
+@keyframes cosmicGlow {
+    0%, 100% { filter: brightness(0.7); }
+    50% { filter: brightness(1.4); }
+}
+
+@keyframes starsTwinkleMulti {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
 }
 
 /* Decorative hills and trees at page bottom */

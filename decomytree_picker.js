@@ -130,6 +130,16 @@
                 allTrees = allTrees.map(t => ({...t, _ornCount: 0}));
             }
 
+            // Sort by: public trees first, then invited trees, then by createdAt
+            allTrees.sort((a, b) => {
+                // Public trees first
+                if (a.public !== b.public) return b.public ? 1 : -1;
+                // Then invited trees
+                if (a._invited !== b._invited) return a._invited ? -1 : 1;
+                // Then by creation date (newest first)
+                return (b.createdAt && a.createdAt) ? b.createdAt.seconds - a.createdAt.seconds : 0;
+            });
+
             filteredTrees = [...allTrees];
             renderTrees();
         }catch(e){

@@ -10,6 +10,22 @@
 <body>
     <div class="background-trees"></div>
     <div class="celestial-body sun"></div>
+    
+    <!-- Menu Background Selector -->
+    <div id="menu-bg-container" class="menu-bg-container">
+        <label for="menu-bg-select" style="color:rgba(245,240,232,0.7);font-size:0.85em;margin-right:8px;display:flex;align-items:center;height:32px">Background:</label>
+        <select id="menu-bg-select" style="padding:6px;border-radius:4px;border:1px solid rgba(212,175,55,0.3);background:rgba(51,51,51,0.8);color:var(--cream);cursor:pointer;font-size:0.85em;height:32px">
+            <option value="scene-default">Classic</option>
+            <option value="scene-colorful">Colorful</option>
+            <option value="scene-snowy">Snowy</option>
+            <option value="scene-aurora">Aurora</option>
+            <option value="scene-sunset">Sunset</option>
+            <option value="scene-midnight">Midnight</option>
+            <option value="scene-forest">Forest</option>
+            <option value="scene-cosmic">Cosmic</option>
+        </select>
+    </div>
+    
     <div id="auth-container">
         <div id="user-info" class="hidden">
             <span id="username-display"></span>
@@ -24,17 +40,6 @@
         </div>
 
         <div class="edit-panel panel">
-            <label>Tree Style:</label>
-            <div class="designs">
-                <label><input type="radio" name="design" value="classic"> <span>🎄 Classic</span></label>
-                <label><input type="radio" name="design" value="modern"> <span>✨ Modern</span></label>
-                <label><input type="radio" name="design" value="snowy"> <span>❄️ Snowy</span></label>
-                <label><input type="radio" name="design" value="tall"> <span>📏 Tall & Slim</span></label>
-                <label><input type="radio" name="design" value="bushy"> <span>🌳 Bushy</span></label>
-                <label><input type="radio" name="design" value="round"> <span>⭕ Round</span></label>
-                <label><input type="radio" name="design" value="zigzag"> <span>⚡ Zigzag</span></label>
-            </div>
-
             <label>Tree Color:</label>
             <div class="designs">
                 <label><input type="radio" name="color" value="green"> <span>🟢 Green</span></label>
@@ -49,12 +54,15 @@
                 <label><input type="radio" name="color" value="ruby"> <span>❤️ Ruby</span></label>
                 <label><input type="radio" name="color" value="copper"> <span>🌰 Copper</span></label>
                 <label><input type="radio" name="color" value="jade"> <span>🟢 Jade</span></label>
+                <label><input type="radio" name="color" value="rose"> <span>🌹 Rose</span></label>
+                <label><input type="radio" name="color" value="bronze"> <span>🪙 Bronze</span></label>
+                <label><input type="radio" name="color" value="pearl"> <span>⚪ Pearl</span></label>
             </div>
 
             <label style="margin-top:12px">Top Star Style:</label>
             <div class="designs">
-                <label><input type="radio" name="star" value="star"> <span>⭐ Classic Star</span></label>
-                <label><input type="radio" name="star" value="gold-star"> <span>🌟 Gold Star</span></label>
+                <label><input type="radio" name="star" value="star"> <span>⭐ Star</span></label>
+                <label><input type="radio" name="star" value="gold-star"> <span>🌟 Gold</span></label>
                 <label><input type="radio" name="star" value="angel"> <span>👼 Angel</span></label>
                 <label><input type="radio" name="star" value="snowflake"> <span>❄️ Snowflake</span></label>
                 <label><input type="radio" name="star" value="sparkle"> <span>✨ Sparkle</span></label>
@@ -76,18 +84,6 @@
                 <label><input type="radio" name="theme" value="scene-cosmic"> <span>Cosmic</span></label>
             </div>
 
-            <label style="margin-top:12px">Menu Background:</label>
-            <div class="designs">
-                <label><input type="radio" name="menu-background" value="scene-default"> <span>Classic</span></label>
-                <label><input type="radio" name="menu-background" value="scene-colorful"> <span>Colorful</span></label>
-                <label><input type="radio" name="menu-background" value="scene-snowy"> <span>Snowy</span></label>
-                <label><input type="radio" name="menu-background" value="scene-aurora"> <span>Aurora</span></label>
-                <label><input type="radio" name="menu-background" value="scene-sunset"> <span>Sunset</span></label>
-                <label><input type="radio" name="menu-background" value="scene-midnight"> <span>Midnight</span></label>
-                <label><input type="radio" name="menu-background" value="scene-forest"> <span>Forest</span></label>
-                <label><input type="radio" name="menu-background" value="scene-cosmic"> <span>Cosmic</span></label>
-            </div>
-
             <label style="margin-top:16px"><input type="checkbox" id="tree-public"> Make this tree <strong>public</strong></label>
 
             <div class="modal-buttons" style="margin-top:20px">
@@ -102,11 +98,14 @@
     <div id="share-modal" class="modal hidden">
         <div class="modal-content">
             <h2>Share Your Tree</h2>
-            <p>Add friends to your private tree by their username (e.g. <em>First L</em>) or by email. Use usernames to invite without exposing emails.</p>
+            <p>Add friends to your private tree by their username.</p>
             
-            <label>Friend's Username or Email:
-                <input type="text" id="share-email" placeholder="First L or friend@lakesideschool.org" style="width:100%;padding:8px;margin:8px 0;border-radius:6px;border:1px solid rgba(212,175,55,0.3);background:rgba(255,255,255,0.05);color:var(--cream)">
-            </label>
+            <div style="position:relative">
+                <label>Friend's Username:
+                    <input type="text" id="share-email" placeholder="First L" style="width:100%;padding:8px;margin:8px 0;border-radius:6px;border:1px solid rgba(212,175,55,0.3);background:rgba(255,255,255,0.05);color:var(--cream)">
+                </label>
+                <div id="share-suggestions" style="position:absolute;top:100%;left:0;right:0;background:rgba(13,94,63,0.8);border:1px solid rgba(212,175,55,0.3);border-radius:6px;max-height:150px;overflow-y:auto;z-index:100;display:none;margin-top:-4px"></div>
+            </div>
 
             <div id="invited-users" style="margin-top:16px">
                 <h3 style="color:var(--gold);margin-bottom:8px">Invited Users:</h3>

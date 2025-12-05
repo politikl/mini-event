@@ -88,11 +88,13 @@
                 r.checked = r.value === (treeData.color || 'green');
             });
 
+            const starRadios = document.querySelectorAll('input[name="star"]');
+            starRadios.forEach(r => {
+                r.checked = r.value === (treeData.star || 'star');
+            });
+
             const themeRadios = document.querySelectorAll('input[name="theme"]');
             themeRadios.forEach(r => { r.checked = r.value === (treeData.theme || 'scene-default'); });
-
-            const menuBgRadios = document.querySelectorAll('input[name="menu-background"]');
-            menuBgRadios.forEach(r => { r.checked = r.value === (treeData.menuBackground || 'scene-default'); });
 
             $('#tree-public').checked = treeData.public === true;
         }catch(e){
@@ -115,6 +117,17 @@
         const closeShareBtn = $('#close-share-btn');
         const addUserBtn = $('#add-user-btn');
         const shareEmail = $('#share-email');
+        const bgSelect = $('#menu-bg-select');
+
+        // Handle menu background selector
+        if (bgSelect) {
+            bgSelect.value = savedBackground;
+            bgSelect.addEventListener('change', (e) => {
+                const newBg = e.target.value;
+                localStorage.setItem('decomytree-menu-background', newBg);
+                applyMenuBackground(newBg);
+            });
+        }
 
         if (backBtn) backBtn.addEventListener('click', () => {
             window.location.href = 'decomytree.html';
@@ -137,89 +150,122 @@
             hide(shareModal);
         });
 
+        // Handle share email input with suggestions
+        if (shareEmail) {
+            shareEmail.addEventListener('input', async (e) => {
+                const input = e.target.value.trim().toLowerCase();
+                const suggestionsDiv = $('#share-suggestions');
+                
+                if (!input || input.length < 1) {
+                    suggestionsDiv.style.display = 'none';
+                    return;
+                }
+
+                // Query all users from Firestore
+                try {
+                    const db = window.firebaseDb;
+                    const usersCol = window.firebaseCollection(db, 'trees');
+                    const snap = await window.firebaseGetDocs(usersCol);
+                    
+                    const usernames = new Set();
+                    snap.docs.forEach(doc => {
+                        const email = doc.data().ownerEmail;
+                        if (email && email !== currentUser.email) {
+                            // Convert email to username format (e.g., "johnsmith" -> "John S")
+                            const username = formatAuthorName(email);
+                            if (username.toLowerCase().includes(input)) {
+                                usernames.add(username);
+                            }
+                        }
+                    });
+
+                    suggestionsDiv.innerHTML = '';
+                    
+                    if (usernames.size === 0) {
+                        suggestionsDiv.style.display = 'none';
+                        return;
+                    }
+
+                    const sorted = Array.from(usernames).sort();
+                    sorted.forEach(username => {
+                        const item = document.createElement('div');
+                        item.style.cssText = 'padding:8px 12px;color:var(--cream);cursor:pointer;border-bottom:1px solid rgba(212,175,55,0.1);font-size:0.9em';
+                        item.textContent = username;
+                        item.addEventListener('click', () => {
+                            shareEmail.value = username;
+                            suggestionsDiv.style.display = 'none';
+                        });
+                        item.addEventListener('mouseenter', () => {
+                            item.style.background = 'rgba(212,175,55,0.2)';
+                        });
+                        item.addEventListener('mouseleave', () => {
+                            item.style.background = '';
+                        });
+                        suggestionsDiv.appendChild(item);
+                    });
+
+                    suggestionsDiv.style.display = 'block';
+                } catch(e) {
+                    console.error(e);
+                }
+            });
+        }
+
         if (addUserBtn) addUserBtn.addEventListener('click', async () => {
             const raw = shareEmail.value.trim();
             if (!raw) {
-                notify('Please enter a username or email', 'warning');
+                notify('Please enter a username', 'warning');
                 return;
             }
 
-            // Normalize
-            const isEmail = raw.includes('@');
-            if (isEmail) {
-                const email = raw.toLowerCase();
-                if (!email.endsWith('@lakesideschool.org')) {
-                    notify('Only @lakesideschool.org emails are allowed', 'warning');
-                    return;
-                }
-                if (email === (currentUser && currentUser.email)) {
-                    notify('You cannot share with yourself', 'warning');
-                    return;
-                }
+            // Validate it's a username (not an email)
+            const username = raw;
+            if (username === formatAuthorName(currentUser.email)) {
+                notify('You cannot share with yourself', 'warning');
+                return;
+            }
 
-                try {
-                    const db = window.firebaseDb;
-                    const treeRef = window.firebaseDoc(db, 'trees', treeId);
-                    await window.firebaseUpdateDoc(treeRef, {
-                        sharedWith: window.firebaseArrayUnion(email),
-                        updatedAt: window.firebaseServerTimestamp()
-                    });
-                    shareEmail.value = '';
-                    notify('✅ Email added to shared list', 'success');
-                    // refresh treeData
-                    const snap = await window.firebaseGetDoc(treeRef);
-                    treeData = snap.data();
-                    loadInvitedUsers();
-                } catch(e) {
-                    console.error(e);
-                    notify('Failed to add user: ' + (e.message||e), 'error');
-                }
-            } else {
-                // Treat input as username (e.g., "First L"). Store in sharedWithUsernames array.
-                const username = raw;
-                if (username === formatAuthorName(currentUser.email)) {
-                    notify('You cannot share with yourself', 'warning');
-                    return;
-                }
-                try {
-                    const db = window.firebaseDb;
-                    const treeRef = window.firebaseDoc(db, 'trees', treeId);
-                    await window.firebaseUpdateDoc(treeRef, {
-                        sharedWithUsernames: window.firebaseArrayUnion(username),
-                        updatedAt: window.firebaseServerTimestamp()
-                    });
-                    shareEmail.value = '';
-                    notify('✅ Username added to shared list', 'success');
-                    const snap = await window.firebaseGetDoc(treeRef);
-                    treeData = snap.data();
-                    loadInvitedUsers();
-                } catch(e) {
-                    console.error(e);
-                    notify('Failed to add username: ' + (e.message||e), 'error');
-                }
+            try {
+                const db = window.firebaseDb;
+                const treeRef = window.firebaseDoc(db, 'trees', treeId);
+                await window.firebaseUpdateDoc(treeRef, {
+                    sharedWithUsernames: window.firebaseArrayUnion(username),
+                    updatedAt: window.firebaseServerTimestamp()
+                });
+                shareEmail.value = '';
+                $('#share-suggestions').style.display = 'none';
+                notify('✅ Username added - tree is now shared!', 'success');
+                // refresh treeData
+                const snap = await window.firebaseGetDoc(treeRef);
+                treeData = snap.data();
+                loadInvitedUsers();
+            } catch(e) {
+                console.error(e);
+                notify('Failed to add user: ' + (e.message||e), 'error');
             }
         });
 
         if (saveBtn) saveBtn.addEventListener('click', async () => {
             if (!treeId) return notify('No tree loaded', 'error');
-            const design = document.querySelector('input[name="design"]:checked').value;
             const color = document.querySelector('input[name="color"]:checked').value;
+            const star = document.querySelector('input[name="star"]:checked').value || 'star';
             const isPublic = $('#tree-public').checked;
             const theme = (document.querySelector('input[name="theme"]:checked') || {}).value || 'scene-default';
-            const menuBackground = (document.querySelector('input[name="menu-background"]:checked') || {}).value || 'scene-default';
 
             try{
                 const db = window.firebaseDb;
                 const treeRef = window.firebaseDoc(db, 'trees', treeId);
                 await window.firebaseUpdateDoc(treeRef, {
-                    design, color, public: isPublic,
+                    design: 'classic',
+                    color,
+                    star,
+                    public: isPublic,
                     theme: theme,
-                    menuBackground: menuBackground,
                     updatedAt: window.firebaseServerTimestamp()
                 });
                 // Save menu background preference to localStorage
-                localStorage.setItem('decomytree-menu-background', menuBackground);
-                applyMenuBackground(menuBackground);
+                localStorage.setItem('decomytree-menu-background', savedBackground);
+                applyMenuBackground(savedBackground);
                 notify('🎄 Tree updated!', 'success');
                 setTimeout(() => window.location.href = 'decomytree.html', 1500);
             }catch(e){
@@ -253,21 +299,20 @@
         const list = $('#invited-list');
         list.innerHTML = '';
 
-        const hasEmails = treeData && Array.isArray(treeData.sharedWith) && treeData.sharedWith.length > 0;
         const hasUsernames = treeData && Array.isArray(treeData.sharedWithUsernames) && treeData.sharedWithUsernames.length > 0;
 
-        if (!hasEmails && !hasUsernames) {
+        if (!hasUsernames) {
             list.innerHTML = '<p style="color:rgba(245,240,232,0.6)">No users invited yet</p>';
             return;
         }
 
-        // Render invited emails
-        if (hasEmails) {
-            for (const email of treeData.sharedWith) {
+        // Render invited usernames
+        if (hasUsernames) {
+            for (const username of treeData.sharedWithUsernames) {
                 const userItem = document.createElement('div');
                 userItem.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid rgba(212,175,55,0.2);color:var(--cream);font-size:0.9em';
                 const nameEl = document.createElement('span');
-                nameEl.textContent = email + ' (email)';
+                nameEl.textContent = username;
                 const removeBtn = document.createElement('button');
                 removeBtn.textContent = '✕';
                 removeBtn.style.cssText = 'background:rgba(196,30,58,0.3);border:1px solid rgba(196,30,58,0.5);color:#ff6b6b;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.8em';
@@ -276,7 +321,7 @@
                         const db = window.firebaseDb;
                         const treeRef = window.firebaseDoc(db, 'trees', treeId);
                         await window.firebaseUpdateDoc(treeRef, {
-                            sharedWith: window.firebaseArrayRemove(email),
+                            sharedWithUsernames: window.firebaseArrayRemove(username),
                             updatedAt: window.firebaseServerTimestamp()
                         });
                         const snap = await window.firebaseGetDoc(treeRef);
@@ -286,39 +331,6 @@
                     } catch(e) {
                         console.error(e);
                         notify('Failed to remove user', 'error');
-                    }
-                });
-                userItem.appendChild(nameEl);
-                userItem.appendChild(removeBtn);
-                list.appendChild(userItem);
-            }
-        }
-
-        // Render invited usernames
-        if (hasUsernames) {
-            for (const uname of treeData.sharedWithUsernames) {
-                const userItem = document.createElement('div');
-                userItem.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid rgba(212,175,55,0.2);color:var(--cream);font-size:0.9em';
-                const nameEl = document.createElement('span');
-                nameEl.textContent = uname + ' (username)';
-                const removeBtn = document.createElement('button');
-                removeBtn.textContent = '✕';
-                removeBtn.style.cssText = 'background:rgba(196,30,58,0.3);border:1px solid rgba(196,30,58,0.5);color:#ff6b6b;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.8em';
-                removeBtn.addEventListener('click', async () => {
-                    try {
-                        const db = window.firebaseDb;
-                        const treeRef = window.firebaseDoc(db, 'trees', treeId);
-                        await window.firebaseUpdateDoc(treeRef, {
-                            sharedWithUsernames: window.firebaseArrayRemove(uname),
-                            updatedAt: window.firebaseServerTimestamp()
-                        });
-                        const snap = await window.firebaseGetDoc(treeRef);
-                        treeData = snap.data();
-                        notify('✅ Username removed', 'success');
-                        loadInvitedUsers();
-                    } catch(e) {
-                        console.error(e);
-                        notify('Failed to remove username', 'error');
                     }
                 });
                 userItem.appendChild(nameEl);

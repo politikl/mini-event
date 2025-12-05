@@ -163,10 +163,22 @@
 /* Animated ornament variants */
 .ornament-circle.animated-pulse { animation: pulse 2s infinite; }
 .ornament-circle.sparkle { filter: drop-shadow(0 0 10px rgba(255,255,200,0.6)); animation: sparkle 3s infinite; }
-.ornament-circle.sway { transform-origin: center; animation: sway 4s ease-in-out infinite; }
+.ornament-circle.pulse { animation: pulse 1.5s ease-in-out infinite; }
+.ornament-circle.shimmer { animation: shimmer 2.5s ease-in-out infinite; }
+.ornament-circle.glow { filter: drop-shadow(0 0 8px rgba(255,100,100,0.7)); animation: glow 2s ease-in-out infinite; }
+.ornament-circle.flicker { animation: flicker 0.15s infinite; }
+.ornament-circle.bounce { animation: ornamentBounce 1s ease-in-out infinite; }
+.ornament-circle.float { animation: ornamentFloat 3s ease-in-out infinite; }
+.ornament-circle.jingle { animation: jingle 0.3s infinite; }
 
 @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.09); } 100% { transform: scale(1); } }
 @keyframes sparkle { 0% { opacity: 0.8; } 50% { opacity: 1; filter: drop-shadow(0 0 16px rgba(255,255,200,0.9)); } 100% { opacity: 0.8; } }
+@keyframes shimmer { 0% { filter: brightness(1); } 50% { filter: brightness(1.3) drop-shadow(0 0 8px rgba(200,200,255,0.6)); } 100% { filter: brightness(1); } }
+@keyframes glow { 0% { filter: drop-shadow(0 0 8px rgba(255,100,100,0.7)); } 50% { filter: drop-shadow(0 0 16px rgba(255,100,100,1)); } 100% { filter: drop-shadow(0 0 8px rgba(255,100,100,0.7)); } }
+@keyframes flicker { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+@keyframes ornamentBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes ornamentFloat { 0%, 100% { transform: translateY(-3px); } 50% { transform: translateY(3px); } }
+@keyframes jingle { 0%, 100% { transform: rotateZ(0deg); } 25% { transform: rotateZ(-5deg); } 75% { transform: rotateZ(5deg); } }
 
 /* Landscape theme variants (applied to body as .scene-*) */
 .scene-colorful::before {
@@ -244,13 +256,14 @@
 
 .ornament-circle.tree-impact-sway {
     animation: ornamentImpactSway 0.8s ease-in-out;
+    transform-origin: center;
 }
 
 @keyframes ornamentImpactSway {
-    0%, 100% { transform: rotateZ(0deg) scale(1); }
-    25% { transform: rotateZ(-8deg) scale(1.05); }
-    50% { transform: rotateZ(6deg) scale(1.03); }
-    75% { transform: rotateZ(-4deg) scale(1.02); }
+    0%, 100% { transform: translate(0, 0) rotateZ(0deg) scale(1); }
+    25% { transform: translate(calc(var(--swing-amount, 15px) * -1), -5px) rotateZ(-12deg) scale(1.08); }
+    50% { transform: translate(var(--swing-amount, 15px), -3px) rotateZ(10deg) scale(1.06); }
+    75% { transform: translate(calc(var(--swing-amount, 15px) * -0.5), -2px) rotateZ(-6deg) scale(1.03); }
 }
 
 .ornament-text {
@@ -502,6 +515,137 @@ textarea {
 .privacy-toggle-btn:hover {
     background: rgba(212, 175, 55, 0.3);
     border-color: rgba(212, 175, 55, 0.7);
+}
+
+/* Tree Color Particle Effects */
+/* Each tree color has unique particle effects for visual depth */
+
+#tree-design polygon {
+    transition: filter 0.3s ease;
+}
+
+/* Green - Forest shimmer effect */
+body.tree-color-green #tree-design polygon {
+    filter: drop-shadow(0 0 3px rgba(13, 94, 63, 0.4));
+}
+
+body.tree-color-green #tree-design polygon:nth-child(1) {
+    animation: greenShimmer 3s ease-in-out infinite;
+}
+
+@keyframes greenShimmer {
+    0%, 100% { filter: drop-shadow(0 0 3px rgba(13, 94, 63, 0.4)); }
+    50% { filter: drop-shadow(0 0 8px rgba(34, 139, 34, 0.6)); }
+}
+
+/* Blue - Crystalline glow */
+body.tree-color-blue #tree-design polygon:nth-child(1) {
+    animation: blueCrystal 2.5s ease-in-out infinite;
+}
+
+@keyframes blueCrystal {
+    0%, 100% { filter: drop-shadow(0 0 4px rgba(31, 111, 168, 0.5)); }
+    50% { filter: drop-shadow(0 0 10px rgba(100, 200, 255, 0.7)); }
+}
+
+/* Frost - Icy sparkle effect */
+body.tree-color-frost #tree-design polygon:nth-child(2) {
+    animation: frostSparkle 2s ease-in-out infinite;
+}
+
+@keyframes frostSparkle {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 2px rgba(230, 243, 247, 0.6)); }
+    50% { filter: brightness(1.2) drop-shadow(0 0 8px rgba(200, 230, 255, 0.8)); }
+}
+
+/* Emerald - Deep glow effect */
+body.tree-color-emerald #tree-design polygon:nth-child(1) {
+    animation: emeraldGlow 3s ease-in-out infinite;
+}
+
+@keyframes emeraldGlow {
+    0%, 100% { filter: drop-shadow(0 0 3px rgba(15, 107, 77, 0.4)); }
+    50% { filter: drop-shadow(0 0 12px rgba(0, 255, 136, 0.5)); }
+}
+
+/* Midnight - Subtle pulse with dark glow */
+body.tree-color-midnight #tree-design polygon:nth-child(2) {
+    animation: midnightPulse 3.5s ease-in-out infinite;
+}
+
+@keyframes midnightPulse {
+    0%, 100% { filter: drop-shadow(0 0 2px rgba(26, 42, 64, 0.3)); }
+    50% { filter: drop-shadow(0 0 8px rgba(100, 150, 200, 0.5)); }
+}
+
+/* Forest - Verdant shimmer */
+body.tree-color-forest #tree-design polygon:nth-child(1) {
+    animation: forestVerdant 2.8s ease-in-out infinite;
+}
+
+@keyframes forestVerdant {
+    0%, 100% { filter: drop-shadow(0 0 2px rgba(26, 77, 46, 0.4)); }
+    50% { filter: drop-shadow(0 0 10px rgba(34, 200, 60, 0.6)); }
+}
+
+/* Gold - Radiant shimmer with brightness */
+body.tree-color-gold #tree-design polygon:nth-child(1) {
+    animation: goldRadiance 2s ease-in-out infinite;
+}
+
+@keyframes goldRadiance {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 4px rgba(212, 160, 23, 0.6)); }
+    50% { filter: brightness(1.15) drop-shadow(0 0 12px rgba(255, 215, 0, 0.7)); }
+}
+
+/* Silver - Cool metallic gleam */
+body.tree-color-silver #tree-design polygon:nth-child(2) {
+    animation: silverGleam 2.3s ease-in-out infinite;
+}
+
+@keyframes silverGleam {
+    0%, 100% { filter: drop-shadow(0 0 3px rgba(192, 192, 192, 0.5)); }
+    50% { filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.6)) brightness(1.1); }
+}
+
+/* Purple - Ethereal glow */
+body.tree-color-purple #tree-design polygon:nth-child(1) {
+    animation: purpleEthereal 3s ease-in-out infinite;
+}
+
+@keyframes purpleEthereal {
+    0%, 100% { filter: drop-shadow(0 0 3px rgba(75, 0, 130, 0.4)); }
+    50% { filter: drop-shadow(0 0 12px rgba(186, 85, 211, 0.6)); }
+}
+
+/* Ruby - Deep crimson glow with intensity */
+body.tree-color-ruby #tree-design polygon:nth-child(1) {
+    animation: rubyCrimson 2.5s ease-in-out infinite;
+}
+
+@keyframes rubyCrimson {
+    0%, 100% { filter: drop-shadow(0 0 3px rgba(139, 0, 0, 0.4)); }
+    50% { filter: drop-shadow(0 0 10px rgba(227, 25, 55, 0.7)) brightness(1.05); }
+}
+
+/* Copper - Warm metallic shimmer */
+body.tree-color-copper #tree-design polygon:nth-child(2) {
+    animation: copperWarmth 2.8s ease-in-out infinite;
+}
+
+@keyframes copperWarmth {
+    0%, 100% { filter: drop-shadow(0 0 2px rgba(184, 115, 51, 0.5)); }
+    50% { filter: drop-shadow(0 0 10px rgba(220, 140, 70, 0.6)) brightness(1.08); }
+}
+
+/* Jade - Serene deep glow */
+body.tree-color-jade #tree-design polygon:nth-child(1) {
+    animation: jadeSerene 3.2s ease-in-out infinite;
+}
+
+@keyframes jadeSerene {
+    0%, 100% { filter: drop-shadow(0 0 2px rgba(0, 168, 107, 0.4)); }
+    50% { filter: drop-shadow(0 0 11px rgba(0, 220, 120, 0.6)); }
 }
 
 /* Responsive */

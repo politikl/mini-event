@@ -117,6 +117,17 @@
         const createModal = $('#create-tree-modal');
         const publishBtn = $('#publish-tree-btn');
         const cancelCreate = $('#cancel-create-tree');
+        const bgSelect = $('#menu-bg-select');
+
+        // Handle menu background selector
+        if (bgSelect) {
+            bgSelect.value = savedBackground;
+            bgSelect.addEventListener('change', (e) => {
+                const newBg = e.target.value;
+                localStorage.setItem('decomytree-menu-background', newBg);
+                applyMenuBackground(newBg);
+            });
+        }
 
         function openCreateModal(){ 
             show(createModal);
@@ -165,29 +176,42 @@
         publishBtn && publishBtn.addEventListener('click', async ()=>{
             if (isPublishing) return; // Prevent double submission
             isPublishing = true;
-            const design = document.querySelector('input[name="design"]:checked').value;
             const color = document.querySelector('input[name="color"]:checked').value;
             const star = document.querySelector('input[name="star"]:checked').value || 'star';
             const theme = (document.querySelector('input[name="theme"]:checked') || {}).value || 'scene-default';
-            const menuBackground = (document.querySelector('input[name="menu-background"]:checked') || {}).value || 'scene-default';
             const isPublic = !!$('#tree-public').checked;
             if (!currentUser) return notify('No user', 'error');
             try{
                 const db = window.firebaseDb;
                 const col = window.firebaseCollection(db, 'trees');
+                
+                // Check for existing trees by this user
+                const q = window.firebaseQuery(col, window.firebaseWhere('ownerUid','==', currentUser.uid));
+                const snap = await window.firebaseGetDocs(q);
+                
+                // If user already has a tree, don't create a new one
+                if (!snap.empty) {
+                    currentTreeId = snap.docs[0].id;
+                    notify('You already have a tree!', 'warning');
+                    isPublishing = false;
+                    return;
+                }
+                
                 const newRef = window.firebaseDoc(col); // auto-id
                 await window.firebaseSetDoc(newRef, {
                     ownerUid: currentUser.uid,
                     ownerEmail: currentUser.email,
-                    design, color, star, public: !!isPublic,
+                    design: 'classic',
+                    color,
+                    star,
+                    public: !!isPublic,
                     theme: theme,
-                    menuBackground: menuBackground,
                     createdAt: window.firebaseServerTimestamp()
                 });
                 currentTreeId = newRef.id;
                 // Save menu background preference to localStorage
-                localStorage.setItem('decomytree-menu-background', menuBackground);
-                applyMenuBackground(menuBackground);
+                localStorage.setItem('decomytree-menu-background', savedBackground);
+                applyMenuBackground(savedBackground);
                 closeCreateModal();
                 show($('#has-tree'));
                 hide($('#no-tree'));
