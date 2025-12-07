@@ -35,6 +35,8 @@
     let currentTreeId = null;
     let selectedDesign = 'classic';
     let selectedColor = 'green';
+    // Guard to ensure init() only runs once (prevents double event bindings)
+    let _decomyTreeInitialized = false;
 
     async function enforceDomainAndSetDisplay(user){
         if (!user || !user.email) return false;
@@ -103,6 +105,8 @@
     }
 
     async function init(){
+        if (_decomyTreeInitialized) return;
+        _decomyTreeInitialized = true;
         // Apply saved menu background on page load
         const savedBackground = localStorage.getItem('decomytree-menu-background') || 'scene-default';
         applyMenuBackground(savedBackground);
@@ -266,6 +270,13 @@
                     }
                 }catch(e){ console.warn('color maintenance skipped', e); }
 
+                // Defensive: ensure only a single tree exists for this user (async, non-blocking)
+                try{
+                    ensureSingleTreeForUser(currentUser.uid).then(r=>{
+                        if (r && r.deleted && r.deleted.length) console.log('Single-tree enforcement removed extras:', r);
+                    }).catch(err=>console.warn('single-tree enforcement failed', err));
+                }catch(e){ console.warn('single-tree enforcement skipped', e); }
+
                 // check if user already has a tree
                 const tree = await checkUserTree(user.uid);
                 if (tree){
@@ -368,4 +379,51 @@ window.runColorMaintenance = async function(dryRun = true){
         console.log('Color maintenance report:', r);
         return r;
     }catch(e){ console.error('runColorMaintenance failed', e); throw e; }
+};
+
+// Defensive: ensure a user has at most one tree. Keeps the newest and deletes extras.
+async function ensureSingleTreeForUser(uid, options = { dryRun: false }){
+    const report = { uid, examined: 0, deleted: [], kept: null, warnings: [] };
+    if (!uid) { report.warnings.push('no-uid'); return report; }
+    if (!window.firebaseReady || !window.firebaseDb) { report.warnings.push('firebase-not-ready'); return report; }
+    const dryRun = !!options.dryRun;
+    try{
+        const db = window.firebaseDb;
+        const col = window.firebaseCollection(db, 'trees');
+        const q = window.firebaseQuery(col, window.firebaseWhere('ownerUid','==', uid));
+        const snap = await window.firebaseGetDocs(q);
+        if (snap.empty) return report;
+
+        report.examined = snap.size;
+        // Sort by createdAt descending (newest first)
+        const docs = snap.docs.slice().sort((a,b)=>{
+            const ad = a.data().createdAt || { seconds: 0 };
+            const bd = b.data().createdAt || { seconds: 0 };
+            return (bd.seconds || 0) - (ad.seconds || 0);
+        });
+
+        // Keep first (newest), delete rest
+        if (docs.length > 0) report.kept = docs[0].id;
+        for (let i = 1; i < docs.length; i++){
+            const doc = docs[i];
+            report.deleted.push({ treeId: doc.id, color: doc.data().color || 'unknown' });
+            if (!dryRun){
+                try{ await window.firebaseDeleteDoc(window.firebaseDoc(db, 'trees', doc.id)); }
+                catch(e){ report.warnings.push('delete-failed:'+doc.id); }
+            }
+        }
+        return report;
+    }catch(e){ report.warnings.push(String(e)); return report; }
+}
+
+// Expose helper to run from console
+window.runEnsureSingleTree = async function(dryRun = false){
+    try{
+        if (!window.firebaseAuth) throw new Error('firebase not initialized');
+        const user = window.firebaseAuth.currentUser;
+        if (!user) throw new Error('no-signed-in-user');
+        const r = await ensureSingleTreeForUser(user.uid, { dryRun });
+        console.log('Single-tree enforcement report:', r);
+        return r;
+    }catch(e){ console.error('runEnsureSingleTree failed', e); throw e; }
 };
