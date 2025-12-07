@@ -705,11 +705,17 @@ body.scene-aurora {
 }
 
 body.scene-aurora::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 0;
     background: 
-        radial-gradient(circle at 50% 10%, rgba(0, 255, 200, 0.35), transparent 35%),
-        radial-gradient(circle at 30% 20%, rgba(150, 100, 255, 0.3), transparent 30%),
-        radial-gradient(circle at 70% 15%, rgba(0, 200, 255, 0.25), transparent 35%);
-    animation: auroraWave 6s ease-in-out infinite;
+        radial-gradient(40% 18% at 50% 10%, rgba(0, 255, 200, 0.12), transparent 35%),
+        radial-gradient(30% 14% at 30% 20%, rgba(150, 100, 255, 0.09), transparent 30%),
+        radial-gradient(35% 16% at 70% 15%, rgba(0, 200, 255, 0.08), transparent 35%);
+    filter: blur(18px) saturate(1.1) contrast(1.05);
+    animation: auroraWave 8s ease-in-out infinite;
 }
 
 body.scene-aurora::after {
@@ -723,7 +729,8 @@ body.scene-aurora::after {
     background: 
         linear-gradient(90deg, transparent 0%, rgba(0, 255, 200, 0.4) 20%, rgba(0, 255, 200, 0.3) 30%, transparent 50%, rgba(150, 100, 255, 0.3) 70%, rgba(150, 100, 255, 0.4) 80%, transparent 100%),
         linear-gradient(45deg, transparent 0%, rgba(100, 200, 255, 0.2) 50%, transparent 100%);
-    animation: auroraShift 8s linear infinite;
+    /* Disable the large translate animation to avoid rectangular artifacts in menus */
+    animation: none !important;
     z-index: 0;
 }
 
@@ -933,18 +940,15 @@ body.scene-cosmic::after {
 .christmas-santa {
     position: fixed;
     bottom: 100px;
-    left: -100px;
+    left: 0; /* position managed with transform for smoother animation */
     font-size: 80px;
     z-index: 50;
-    animation: santaRide 8s linear forwards;
     pointer-events: none;
+    will-change: transform;
+    animation: santaRide 8s linear forwards;
 }
 
 @keyframes santaRide {
-    0% {
-        left: -100px;
-    }
-    100% {
-        left: calc(100% + 100px);
-    }
+    0% { transform: translate3d(-150px, 0, 0); }
+    100% { transform: translate3d(calc(100vw + 250px), 0, 0); }
 }

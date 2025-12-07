@@ -188,6 +188,118 @@ function createStars() {
         star.style.animation = `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite`;
         starsContainer.appendChild(star);
     }
+    // Parallax: store star elements with depth
+    const starElems = Array.from(starsContainer.children);
+    starElems.forEach((el) => {
+        el.dataset.depth = (Math.random() * 0.7 + 0.3).toFixed(2); // 0.3 - 1.0
+    });
+}
+
+// Small parallax response to cursor for stars
+function initStarsParallax(){
+    const starsContainer = document.getElementById('stars-container');
+    if (!starsContainer) return;
+    window.addEventListener('mousemove', (e) => {
+        const cx = window.innerWidth/2;
+        const cy = window.innerHeight/2;
+        const dx = (e.clientX - cx) / cx; // -1..1
+        const dy = (e.clientY - cy) / cy;
+        Array.from(starsContainer.children).forEach(s => {
+            const depth = parseFloat(s.dataset.depth || '0.5');
+            const tx = (dx * 10 * (1 - depth));
+            const ty = (dy * 8 * (1 - depth));
+            s.style.transform = `translate(${tx}px, ${ty}px)`;
+        });
+    });
+}
+
+// ==================== Weather Canvas (Aurora / Rain) ====================
+const weatherCanvas = document.getElementById('weather-canvas');
+let wctx = null;
+let weatherWidth = 0, weatherHeight = 0;
+let auroraPhase = 0;
+let rainDrops = [];
+let rainEnabled = false;
+
+function initWeatherCanvas(){
+    if (!weatherCanvas) return;
+    wctx = weatherCanvas.getContext('2d');
+    weatherCanvas.width = window.innerWidth;
+    weatherCanvas.height = window.innerHeight;
+    weatherWidth = weatherCanvas.width; weatherHeight = weatherCanvas.height;
+}
+
+function resizeWeatherCanvas(){
+    if (!weatherCanvas) return;
+    weatherCanvas.width = window.innerWidth;
+    weatherCanvas.height = window.innerHeight;
+    weatherWidth = weatherCanvas.width; weatherHeight = weatherCanvas.height;
+}
+
+function drawAurora(){
+    if (!wctx) return;
+    wctx.clearRect(0,0,weatherWidth,weatherHeight);
+    // soft layered bands
+    const bands = 5;
+    for (let b=0;b<bands;b++){
+        const hue = 160 + b*10; // greenish to teal
+        const alpha = 0.06 + 0.02*b;
+        wctx.fillStyle = `rgba(${Math.floor(30 + b*30)}, ${Math.floor(160 - b*10)}, ${Math.floor(140 + b*20)}, ${alpha})`;
+        wctx.globalCompositeOperation = 'lighter';
+        wctx.beginPath();
+        const offset = Math.sin(auroraPhase * (0.6 + b*0.1) + b) * (40 + b*30);
+        const height = 120 + b*30;
+        const baseY = weatherHeight * 0.2 + b*30 + offset;
+        wctx.moveTo(0, baseY);
+        for (let x=0;x<=weatherWidth;x+=20){
+            const y = baseY + Math.sin((x/200) + auroraPhase* (0.6 + b*0.02) + b*0.2) * (20 + b*6);
+            wctx.lineTo(x, y);
+        }
+        wctx.lineTo(weatherWidth, baseY + 400);
+        wctx.lineTo(0, baseY + 400);
+        wctx.closePath();
+        wctx.fill();
+    }
+    wctx.globalCompositeOperation = 'source-over';
+}
+
+function animateWeather(){
+    auroraPhase += 0.01;
+    // draw aurora when enabled
+    if (document.body.classList.contains('bg-aurora') || document.body.classList.contains('scene-aurora')){
+        drawAurora();
+    } else {
+        if (wctx) wctx.clearRect(0,0,weatherWidth,weatherHeight);
+    }
+
+    // rain
+    if (rainEnabled){
+        // update drops
+        wctx.save();
+        wctx.strokeStyle = 'rgba(200,220,255,0.35)';
+        wctx.lineWidth = 1;
+        wctx.beginPath();
+        for (let i=rainDrops.length-1;i>=0;i--){
+            const d = rainDrops[i];
+            d.x += d.vx; d.y += d.vy;
+            wctx.moveTo(d.x, d.y);
+            wctx.lineTo(d.x - d.vx*2, d.y - d.vy*2);
+            if (d.y > weatherHeight + 50) { rainDrops.splice(i,1); }
+        }
+        wctx.stroke();
+        wctx.restore();
+        // spawn new
+        while (rainDrops.length < Math.floor(weatherWidth/12)){
+            rainDrops.push({ x: Math.random()*weatherWidth, y: Math.random()*-200, vx: -1 - Math.random()*1.5, vy: 8+Math.random()*8 });
+        }
+    }
+
+    requestAnimationFrame(animateWeather);
+}
+
+function enableRain(enable){
+    rainEnabled = !!enable;
+    if (!rainEnabled) rainDrops = [];
 }
 
 // ==================== Floating Ornaments ==================== 
@@ -418,12 +530,17 @@ window.addEventListener('load', () => {
     initSnowflakes();
     createStars();
     createFloatingOrnaments();
+    initWeatherCanvas();
+    initStarsParallax();
+    animateWeather();
     
     // Load saved background preference
     const savedBgTheme = localStorage.getItem('websiteBgTheme') || 'default';
     if (savedBgTheme !== 'default') {
         document.body.classList.add('bg-' + savedBgTheme);
     }
+    // Turn on rain for sunset theme as a tasteful effect; can be toggled via API
+    if (savedBgTheme === 'sunset') enableRain(true);
     
     animateSnow();
     updateDayNightCycle();
@@ -442,4 +559,8 @@ window.addEventListener('load', () => {
 window.addEventListener('resize', () => {
     resizeCanvas();
     createFloatingOrnaments();
+    resizeWeatherCanvas();
 });
+
+// Expose simple API to toggle rain manually (useful for themes or debugging)
+window.enableWeatherRain = enableRain;

@@ -39,6 +39,8 @@
         // Check for debug mode in URL: ?debug=christmas
         const params = new URLSearchParams(window.location.search);
         if (params.get('debug') === 'christmas') return true;
+        // Also support malformed URLs where debug is appended incorrectly (e.g. id=XXX?debug=christmas)
+        if (/[?&]debug=christmas/i.test(window.location.href)) return true;
         
         const now = new Date();
         const releaseDate = new Date(2025, 11, 25);
@@ -124,6 +126,11 @@
             ruby: ['#8b0000','#c41e3a','#e31937'],
             copper: ['#b87333','#996633','#7a6333'],
             jade: ['#00a86b','#228b22','#0d5d2d']
+            ,
+            // Additional distinct palette entries (match inputs in create modal)
+            pearl: ['#f6f4ef','#e9e7e3','#dcd9d3'],
+            rose: ['#f5c6d1','#e89fb1','#d46f88'],
+            bronze: ['#b5793a','#8f5f2e','#6f4823']
         };
         const cols = colorMap[color] || colorMap['green'];
         
@@ -185,7 +192,17 @@
 
     async function loadTree(){
         const params = new URLSearchParams(window.location.search);
+        // Robustly extract `id` param. Some users may paste malformed URLs like
+        // `?id=XYZ?debug=christmas` (note extra '?'). Handle that by sanitizing.
         treeId = params.get('id');
+        if (treeId && treeId.includes('?')) {
+            treeId = treeId.split('?')[0];
+        }
+        // If still missing, try to extract from the full href (e.g., poorly formed query)
+        if (!treeId){
+            const m = window.location.href.match(/[?&]id=([^&?#]+)/);
+            if (m) treeId = decodeURIComponent(m[1]);
+        }
         if (!treeId){
             notify('No tree ID provided', 'error');
             setTimeout(() => window.location.href = 'decomytree.html', 2000);
@@ -313,11 +330,209 @@
         const togglePrivacyBtn = $('#toggle-privacy-btn');
         
         if (emojiEl) emojiEl.textContent = ornament.emoji || '🎄';
-        if (textEl) textEl.textContent = ornament.text || '';
-        if (authorEl) {
-            const author = formatAuthorName(ornament.createdByEmail || 'Anonymous');
-            authorEl.textContent = '— ' + author;
+        // Support multi-page long messages: split into pages by rendered height (no scrollbars)
+        const raw = ornament.text || '';
+        const maxToken = 20; // break extremely long words into chunks
+        const pages = [];
+
+        // compute content box size from the actual rendered paper element so hyphenation
+        // and pagination remain correct even if CSS (width/aspect-ratio) changes
+        const paperEl = modal.querySelector('.ornament-display-letter');
+        let paperW = Math.floor(window.innerWidth * 0.75);
+        let paperH = Math.floor(window.innerHeight * 0.75);
+        if (paperEl) {
+            const r = paperEl.getBoundingClientRect();
+            if (r && r.width && r.height){ paperW = Math.floor(r.width); paperH = Math.floor(r.height); }
         }
+        // paddings used in CSS: vertical ~56px total, horizontal ~52px total
+        const verticalPadding = 56; // top+bottom
+        const horizontalPadding = 52; // left+right
+        // reserve space for emoji/heading and footer controls
+        const reserved = 140; // emoji + author + spacing
+        const contentW = Math.max(240, paperW - horizontalPadding);
+        const contentH = Math.max(120, paperH - verticalPadding - reserved);
+
+        // offscreen measurer
+        const meas = document.createElement('div');
+        meas.style.position = 'absolute';
+        meas.style.left = '-9999px';
+        meas.style.top = '0';
+        meas.style.width = contentW + 'px';
+        // Use the same font metrics as the visible text area so measurements match
+        const computed = window.getComputedStyle(textEl || paperEl || document.body);
+        meas.style.fontFamily = computed.fontFamily || "'Caveat', 'Segoe UI', sans-serif";
+        meas.style.fontSize = computed.fontSize || '28px';
+        meas.style.lineHeight = computed.lineHeight || '1.45';
+        meas.style.whiteSpace = 'pre-wrap';
+        meas.style.wordWrap = 'break-word';
+        meas.style.visibility = 'hidden';
+        document.body.appendChild(meas);
+
+        // Tokenize preserving whitespace sequences (spaces/newlines)
+        const tokens = raw.match(/(\S+\s*)/g) || [''];
+        let current = '';
+        // helper: insert soft-hyphens at reasonable syllable-like boundaries for long tokens
+        function insertSoftHyphensIntoToken(word, maxLen){
+            if (!word || word.length <= maxLen) return word;
+            const vowels = /[aeiouyAEIOUY]/;
+            const L = word.length;
+            // find candidate split positions based on V-C-V patterns
+            const candidates = [];
+            for (let i = 1; i < L - 1; i++){
+                if (vowels.test(word[i-1]) && !vowels.test(word[i]) && vowels.test(word[i+1])){
+                    candidates.push(i);
+                }
+            }
+            // fallback: allow splits after vowels if none found
+            if (candidates.length === 0){
+                for (let i = 1; i < L - 1; i++){
+                    if (vowels.test(word[i-1]) && vowels.test(word[i]) === false){ candidates.push(i); }
+                }
+            }
+
+            // build with soft hyphens greedily using candidates near maxLen
+            let out = '';
+            let idx = 0;
+            while (idx < L){
+                if (L - idx <= maxLen){ out += word.slice(idx); break; }
+                // find rightmost candidate within (idx+maxLen) and at least idx+2
+                let limit = Math.min(L-2, idx + maxLen);
+                let split = -1;
+                for (let k = candidates.length - 1; k >= 0; k--){ if (candidates[k] > idx + 1 && candidates[k] <= limit){ split = candidates[k]; break; } }
+                if (split === -1){ // no candidate found: hard split at maxLen
+                    split = idx + maxLen;
+                }
+                out += word.slice(idx, split) + '\u00AD';
+                idx = split;
+            }
+            return out;
+        }
+        for (let t of tokens){
+            // hyphenate extremely long tokens so they can be split if needed
+            if (/\S{40,}/.test(t)){
+                // insert soft-hyphens using a syllable-aware heuristic
+                // preserve trailing whitespace
+                const m = t.match(/(\S+)(\s*)/);
+                if (m){
+                    const word = m[1];
+                    const space = m[2] || '';
+                    t = insertSoftHyphensIntoToken(word, 12) + space;
+                } else {
+                    t = insertSoftHyphensIntoToken(t, 12);
+                }
+            }
+            meas.innerText = current + t;
+            if (meas.scrollHeight > contentH){
+                // push current as a page (trim trailing whitespace)
+                pages.push(current.trimEnd());
+                // start new page with token (trim leading whitespace)
+                current = t.trimStart();
+                meas.innerText = current;
+                // if single token alone too big, force-split it with hyphenation chunks
+                if (meas.scrollHeight > contentH){
+                    // split by fixed chunks
+                    const chunkSize = 200;
+                    let i = 0;
+                    while (i < current.length){
+                        const chunk = current.slice(i, i + chunkSize);
+                        pages.push(chunk);
+                        i += chunkSize;
+                    }
+                    current = '';
+                }
+            } else {
+                current += t;
+            }
+        }
+        if (current.trim().length > 0) pages.push(current.trimEnd());
+
+        // cleanup measurer
+        meas.remove();
+
+        // Page state stored on modal element
+        modal._ornamentPages = pages;
+        modal._ornamentPageIndex = 0;
+
+        function renderPage(idx, withFlip = true){
+            const content = pages[idx] || '';
+            if (!textEl) return;
+
+            // helper: escape HTML
+            function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+            // Prepare HTML: escape, replace newlines with <br>. Pages already have soft-hyphens inserted
+            let html = escapeHtml(content);
+            html = html.replace(/\r?\n/g, '<br>');
+
+            // Apply flip animation (visual only) while swapping content
+            textEl.classList.remove('page-flip-in','page-flip-out');
+            if (withFlip) textEl.classList.add('page-flip-out');
+            setTimeout(()=>{
+                textEl.innerHTML = html;
+                textEl.classList.remove('page-flip-out');
+                if (withFlip) textEl.classList.add('page-flip-in');
+
+                // show signature only on last page
+                if (authorEl){
+                    if (idx === modal._ornamentPages.length - 1){
+                        const author = formatAuthorName(ornament.createdByEmail || 'Anonymous');
+                        authorEl.textContent = '— ' + author;
+                        authorEl.style.display = '';
+                    } else {
+                        authorEl.textContent = '';
+                        authorEl.style.display = 'none';
+                    }
+                }
+            }, 120);
+
+            // page indicator
+            const pageControls = document.getElementById('ornament-page-indicator');
+            if (pageControls) pageControls.textContent = `${idx+1} / ${pages.length}`;
+        }
+
+        // expose the current render function on the modal so persistent controls
+        // (created once) will always call the latest renderPage implementation
+        modal._renderPage = renderPage;
+
+        // Build page controls area if not present
+        let controls = document.getElementById('ornament-page-controls');
+        if (!controls){
+            controls = document.createElement('div');
+            controls.id = 'ornament-page-controls';
+            controls.className = 'ornament-page-controls';
+            const prev = document.createElement('button'); prev.className = 'ornament-page-btn'; prev.textContent = '← Prev';
+            const next = document.createElement('button'); next.className = 'ornament-page-btn'; next.textContent = 'Next →';
+            const indicator = document.createElement('span'); indicator.id = 'ornament-page-indicator'; indicator.style.marginLeft = '8px'; indicator.style.color = 'var(--cream)';
+            prev.addEventListener('click', ()=>{
+                const m = document.getElementById('ornament-display-modal');
+                if (!m) return;
+                if (m._ornamentPageIndex > 0){
+                    m._ornamentPageIndex -= 1;
+                    if (typeof m._renderPage === 'function') m._renderPage(m._ornamentPageIndex);
+                }
+            });
+            next.addEventListener('click', ()=>{
+                const m = document.getElementById('ornament-display-modal');
+                if (!m) return;
+                if (m._ornamentPageIndex < (m._ornamentPages ? m._ornamentPages.length - 1 : -1)){
+                    m._ornamentPageIndex += 1;
+                    if (typeof m._renderPage === 'function') m._renderPage(m._ornamentPageIndex);
+                }
+            });
+            controls.appendChild(prev); controls.appendChild(next); controls.appendChild(indicator);
+            // Place controls beneath the paper, in the modal content footer
+            let footer = document.querySelector('.ornament-display-footer');
+            if (!footer){
+                footer = document.createElement('div');
+                footer.className = 'ornament-display-footer';
+                const container = document.querySelector('.ornament-display-content');
+                if (container) container.appendChild(footer);
+            }
+            footer.appendChild(controls);
+        }
+
+        // Render initial page (renderPage will show signature only on last page)
+        renderPage(0, false);
         
         // Mark as read by tree owner if they're viewing it
         if (currentUser && treeData && treeData.ownerUid === currentUser.uid && ornament.ownerHasRead !== true) {
@@ -409,11 +624,92 @@
         }, 8000);
     }
 
+    // --- Lightweight aurora/rain layer for tree view ---
+    let viewWeatherCanvas = null;
+    let viewWctx = null;
+    let viewWidth = 0, viewHeight = 0;
+    let viewAuroraPhase = 0;
+    let viewRain = [];
+    let viewRainEnabled = false;
+
+    function initViewWeather(){
+        viewWeatherCanvas = document.createElement('canvas');
+        viewWeatherCanvas.id = 'view-weather-canvas';
+        viewWeatherCanvas.style.position = 'fixed';
+        viewWeatherCanvas.style.left = '0';
+        viewWeatherCanvas.style.top = '0';
+        viewWeatherCanvas.style.width = '100%';
+        viewWeatherCanvas.style.height = '100%';
+        viewWeatherCanvas.style.pointerEvents = 'none';
+        viewWeatherCanvas.style.zIndex = '0';
+        document.body.appendChild(viewWeatherCanvas);
+        viewWctx = viewWeatherCanvas.getContext('2d');
+        resizeViewWeather();
+        requestAnimationFrame(animateViewWeather);
+    }
+
+    function resizeViewWeather(){
+        if (!viewWeatherCanvas) return;
+        viewWeatherCanvas.width = window.innerWidth;
+        viewWeatherCanvas.height = window.innerHeight;
+        viewWidth = viewWeatherCanvas.width; viewHeight = viewWeatherCanvas.height;
+    }
+
+    function drawViewAurora(){
+        if (!viewWctx) return;
+        viewWctx.clearRect(0,0,viewWidth,viewHeight);
+        const bands = 4;
+        for (let b=0;b<bands;b++){
+            const alpha = 0.05 + b*0.03;
+            viewWctx.fillStyle = `rgba(${20 + b*20}, ${140 + b*10}, ${150 + b*10}, ${alpha})`;
+            viewWctx.globalCompositeOperation = 'lighter';
+            viewWctx.beginPath();
+            const baseY = viewHeight * 0.18 + b*40 + Math.sin(viewAuroraPhase * (0.5 + b*0.1)) * (20 + b*10);
+            viewWctx.moveTo(0, baseY);
+            for (let x=0;x<=viewWidth;x+=30){
+                const y = baseY + Math.sin((x/250) + viewAuroraPhase*(0.4 + b*0.02) + b*0.1) * (18 + b*5);
+                viewWctx.lineTo(x, y);
+            }
+            viewWctx.lineTo(viewWidth, baseY + 300);
+            viewWctx.lineTo(0, baseY + 300);
+            viewWctx.closePath();
+            viewWctx.fill();
+        }
+        viewWctx.globalCompositeOperation = 'source-over';
+    }
+
+    function animateViewWeather(){
+        viewAuroraPhase += 0.008;
+        if (document.body.classList.contains('scene-aurora')){
+            drawViewAurora();
+        } else {
+            if (viewWctx) viewWctx.clearRect(0,0,viewWidth,viewHeight);
+        }
+
+        // rain (if enabled)
+        if (viewRainEnabled && viewWctx){
+            viewWctx.save();
+            viewWctx.strokeStyle = 'rgba(200,220,255,0.35)';
+            viewWctx.beginPath();
+            for (let i=viewRain.length-1;i>=0;i--){
+                const d = viewRain[i]; d.x += d.vx; d.y += d.vy; viewWctx.moveTo(d.x, d.y); viewWctx.lineTo(d.x - d.vx*2, d.y - d.vy*2);
+                if (d.y > viewHeight + 40) viewRain.splice(i,1);
+            }
+            viewWctx.stroke();
+            viewWctx.restore();
+            while (viewRain.length < Math.floor(viewWidth/14)) viewRain.push({ x: Math.random()*viewWidth, y: Math.random()*-200, vx: -1 - Math.random()*1.2, vy: 7+Math.random()*7 });
+        }
+
+        requestAnimationFrame(animateViewWeather);
+    }
+
+    function enableViewRain(on){ viewRainEnabled = !!on; if (!viewRainEnabled) viewRain = []; }
+
     function setupTreeInteractions(treeColor = 'green'){
         const treeSvg = document.getElementById('tree-svg');
         if (!treeSvg) return;
         
-        treeSvg.addEventListener('click', function() {
+        treeSvg.addEventListener('click', function(event) {
             // Shake the tree
             treeSvg.classList.add('tree-shake');
             
@@ -429,11 +725,9 @@
                 group.style.setProperty('--swing-amount', Math.random() * 15 + 10 + 'px');
             });
             
-            // Drop particles centered on tree (tree SVG is at center)
-            // Tree SVG appears to be centered around x=200 in viewport
-            const treeRect = treeSvg.getBoundingClientRect();
-            const treeCenterX = treeRect.left + treeRect.width / 2;
-            const treeCenterY = treeRect.top + treeRect.height * 0.3; // Upper portion where tree is
+            // Drop particles centered on the actual click position (better UX)
+            const clickX = (event && typeof event.clientX === 'number') ? event.clientX : (treeSvg.getBoundingClientRect().left + treeSvg.getBoundingClientRect().width/2);
+            const clickY = (event && typeof event.clientY === 'number') ? event.clientY : (treeSvg.getBoundingClientRect().top + treeSvg.getBoundingClientRect().height*0.3);
             
             // Color map for tree colors - use as text color filters
             const colorFilterMap = {
@@ -449,17 +743,22 @@
                 ruby: 'hue-rotate(0deg) brightness(0.85)',
                 copper: 'hue-rotate(20deg) brightness(0.9)',
                 jade: 'hue-rotate(150deg) brightness(1)'
+                ,
+                // Added mappings for additional palettes
+                pearl: 'brightness(1.05) saturate(0.6)',
+                rose: 'hue-rotate(-10deg) saturate(0.9) brightness(1)',
+                bronze: 'hue-rotate(25deg) saturate(0.9) brightness(0.95)'
             };
             
-            for (let i = 0; i < 12; i++) {
+            for (let i = 0; i < 16; i++) {
                 const particle = document.createElement('div');
                 particle.className = isSnowy ? 'falling-snow' : 'falling-leaf';
                 
                 // Spawn centered on tree with some spread
                 const angle = (Math.random() * Math.PI * 2);
-                const distance = Math.random() * 80 + 20;
-                const x = treeCenterX + Math.cos(angle) * distance;
-                const y = treeCenterY + Math.sin(angle) * distance;
+                const distance = Math.random() * 80 + 6;
+                const x = clickX + Math.cos(angle) * distance;
+                const y = clickY + Math.sin(angle) * distance;
                 
                 particle.style.left = x + 'px';
                 particle.style.top = y + 'px';
@@ -488,6 +787,13 @@
                 }, 2500);
             }
             
+            // Make the shake stronger and localized by adjusting the --swing-amount on ornaments
+            ornamentGroups.forEach(group => {
+                const swing = Math.random() * 40 + 30; // stronger swing: 30-70px
+                group.classList.add('tree-impact-sway');
+                group.style.setProperty('--swing-amount', swing + 'px');
+            });
+
             // Remove shake class after animation
             setTimeout(() => {
                 treeSvg.classList.remove('tree-shake');
@@ -495,7 +801,7 @@
                     group.classList.remove('tree-impact-sway');
                     group.style.removeProperty('--swing-amount');
                 });
-            }, 500);
+            }, 700);
         });
     }
 
@@ -568,7 +874,11 @@
             circle.setAttribute('r', '18');
             circle.setAttribute('fill', pos.color);
             const typeClass = orn.ornamentType ? (' ' + orn.ornamentType) : '';
-            circle.setAttribute('class', 'ornament-circle' + typeClass + (!released && !canRead ? ' unread' : ''));
+            // If this ornament type should not move as part of impact animations,
+            // add `no-move` so animations only change color/filters, not position.
+            const nonMovingTypes = new Set(['heart','star','snowflake','sparkle','bow']);
+            const noMoveClass = (orn.ornamentType && nonMovingTypes.has(orn.ornamentType)) ? ' no-move' : '';
+            circle.setAttribute('class', 'ornament-circle' + typeClass + noMoveClass + (!released && !canRead ? ' unread' : ''));
 
             const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             text.setAttribute('x', pos.x);
@@ -770,10 +1080,8 @@
             });
         }
 
-        // Play Santa animation on Christmas
-        if (isReleased()) {
-            playSantaAnimation();
-        }
+        // Play Santa animation on Christmas (disabled by request)
+        // if (isReleased()) { playSantaAnimation(); }
 
         // Start countdown timer
         updateCountdown();
@@ -782,6 +1090,10 @@
         if (backBtn) backBtn.addEventListener('click', () => {
             window.location.href = 'decomytree.html';
         });
+
+        // Initialize view weather canvas for aurora/rain
+        initViewWeather();
+        window.addEventListener('resize', resizeViewWeather);
 
         if (addBtn) addBtn.addEventListener('click', () => {
             show(modal);
@@ -828,6 +1140,14 @@
                 selectedType = btn.dataset.type || 'classic';
                 $('#selected-emoji').value = selectedEmoji;
                 updateEmojiPicker();
+            });
+            // Add hover handlers to avoid sibling selection bleed-through
+            btn.addEventListener('mouseenter', (e) => {
+                emojiPicker.forEach(b => b.classList.remove('hovering'));
+                btn.classList.add('hovering');
+            });
+            btn.addEventListener('mouseleave', (e) => {
+                btn.classList.remove('hovering');
             });
         });
 

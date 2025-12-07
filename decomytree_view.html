@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="decomytree.css">
     <link rel="stylesheet" href="decomytree_view.css">
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Satisfy&family=Allura&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="background-trees"></div>
@@ -118,7 +119,7 @@
             </label>
             <input type="hidden" id="selected-emoji" value="🎄">
             <label>Your Message:
-                <textarea id="ornament-text" maxlength="500" placeholder="Your message..." style="width:100%;height:100px;padding:8px;border-radius:8px;border:1px solid rgba(212,175,55,0.3);background:rgba(255,255,255,0.05);color:var(--cream);font-family:inherit"></textarea>
+                <textarea id="ornament-text" class="ornament-editor" placeholder="Your message... (press Enter for new lines)" ></textarea>
             </label>
             <label>
                 <input type="checkbox" id="ornament-public" checked> Public message (visible to everyone after Dec 25)
@@ -149,8 +150,8 @@
     <!-- Ornament Display Modal -->
     <div id="ornament-display-modal" class="modal hidden">
         <div class="ornament-display-content">
-            <button id="close-ornament-display" class="close-ornament-btn">✕</button>
             <div class="ornament-display-letter">
+                <button id="close-ornament-display" class="close-ornament-btn">✕</button>
                 <div class="ornament-emoji-large" id="ornament-emoji-display"></div>
                 <div class="ornament-text-display" id="ornament-text-display"></div>
                 <div class="ornament-author-display" id="ornament-author-display"></div>

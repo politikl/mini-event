@@ -64,6 +64,17 @@ body.night-mode {
     transition: opacity 8s ease-in-out;
 }
 
+/* Aurora / weather canvas: sits above background but below content */
+#weather-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+}
+
 body.night-mode #stars-container {
     opacity: 1;
 }
@@ -73,6 +84,18 @@ body.night-mode #stars-container {
     background: var(--snow-white);
     border-radius: 50%;
     box-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+    will-change: transform, opacity;
+}
+
+/* Small subtle twinkle variations are handled inline through style.animation on each star */
+
+/* Rain effect (canvas-drawn), but provide a fallback subtle CSS shimmer for low-end devices */
+.rain-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image: linear-gradient(transparent, rgba(255,255,255,0.02));
 }
 
 #floating-elements {
@@ -84,19 +107,21 @@ body.night-mode #stars-container {
 .floating-ornament {
     position: absolute;
     font-size: 2rem;
-    animation: float-gentle 4s ease-in-out infinite;
+    /* Floating ornaments disabled to prevent movement (user requested static ornaments) */
+    animation: none !important;
     filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
     transition: all 0.2s ease;
 }
 
 .floating-ornament:hover {
-    transform: scale(1.1) !important;
+    /* No transform on hover either to avoid any motion */
+    transform: none !important;
     filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.3));
 }
 
 @keyframes float-gentle {
     0%, 100% { transform: translateY(0px) rotateZ(0deg); }
-    50% { transform: translateY(-20px) rotateZ(5deg); }
+    50% { transform: translateY(0px) rotateZ(0deg); }
 }
 
 /* ==================== Sky Overlay (Day/Night) ==================== */

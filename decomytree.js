@@ -209,6 +209,25 @@
                     createdAt: window.firebaseServerTimestamp()
                 });
                 currentTreeId = newRef.id;
+
+                // Safety: If concurrent requests created multiple trees for this user,
+                // remove extras and keep the most recent one.
+                try {
+                    const qAll = window.firebaseQuery(col, window.firebaseWhere('ownerUid','==', currentUser.uid));
+                    const snapAll = await window.firebaseGetDocs(qAll);
+                    if (!snapAll.empty && snapAll.size > 1) {
+                        // Sort docs by createdAt (newest first) and keep the newest
+                        const docs = snapAll.docs.slice().sort((a,b)=> {
+                            const ad = a.data().createdAt || { seconds: 0 };
+                            const bd = b.data().createdAt || { seconds: 0 };
+                            return (bd.seconds || 0) - (ad.seconds || 0);
+                        });
+                        // Keep first (newest), delete the rest
+                        for (let i = 1; i < docs.length; i++){
+                            try { await window.firebaseDeleteDoc(window.firebaseDoc(window.firebaseDb, 'trees', docs[i].id)); }catch(e){console.warn('failed to delete extra tree', e);}
+                        }
+                    }
+                } catch(e) { console.warn('cleanup check failed', e); }
                 // Save menu background preference to localStorage
                 localStorage.setItem('decomytree-menu-background', savedBackground);
                 applyMenuBackground(savedBackground);
@@ -238,6 +257,14 @@
                 hide($('#force-signin-modal'));
                 show($('#user-info'));
                 hide($('#sign-in-btn'));
+                // Run debug maintenance to ensure unique/non-default tree colors when debug flag is present
+                try{
+                    const params = new URLSearchParams(window.location.search);
+                    if (params.get('debug') === 'christmas' || /[?&]debug=christmas/i.test(window.location.href)){
+                        // async but don't block UI
+                        ensureUniqueTreeColorsForUser(currentUser.uid).catch(err=>console.warn('color maintenance failed',err));
+                    }
+                }catch(e){ console.warn('color maintenance skipped', e); }
 
                 // check if user already has a tree
                 const tree = await checkUserTree(user.uid);
@@ -265,3 +292,80 @@
     }
 
 })();
+
+// ----------------- Debug maintenance helpers -----------------
+// Added: ensureUniqueTreeColorsForUser - supports dry-run reporting and optional apply
+async function ensureUniqueTreeColorsForUser(uid, options = { dryRun: true }){
+    const report = { uid, examined: 0, reassignments: [], deletions: [], warnings: [] };
+    if (!uid) { report.warnings.push('no-uid'); return report; }
+    if (!window.firebaseReady || !window.firebaseDb) { report.warnings.push('firebase-not-ready'); return report; }
+    const dryRun = !!options.dryRun;
+    try{
+        const db = window.firebaseDb;
+        const col = window.firebaseCollection(db, 'trees');
+        const q = window.firebaseQuery(col, window.firebaseWhere('ownerUid','==', uid));
+        const snap = await window.firebaseGetDocs(q);
+        if (snap.empty) return report;
+
+        const palette = ['green','blue','frost','emerald','midnight','forest','gold','silver','purple','ruby','copper','jade','pearl','rose','bronze'];
+
+        const colorBuckets = {};
+        snap.forEach(d => { const c = (d.data().color || 'green'); (colorBuckets[c] = colorBuckets[c]||[]).push(d); report.examined++; });
+
+        const used = new Set(Object.keys(colorBuckets));
+
+        for (const color in colorBuckets){
+            const arr = colorBuckets[color];
+            if (arr.length <= 1) continue;
+            // sort newest first
+            arr.sort((a,b)=>{ const ad=a.data().createdAt||{}; const bd=b.data().createdAt||{}; return (bd.seconds||0)-(ad.seconds||0); });
+            for (let i=1;i<arr.length;i++){
+                const doc = arr[i];
+                const avail = palette.find(p => !used.has(p));
+                if (avail){
+                    report.reassignments.push({ treeId: doc.id, from: color, to: avail });
+                    if (!dryRun){
+                        try{ await window.firebaseUpdateDoc(window.firebaseDoc(db,'trees',doc.id), { color: avail }); used.add(avail); }
+                        catch(e){ report.warnings.push('reassign-failed:'+doc.id); }
+                    } else {
+                        used.add(avail); // reserve it for dry-run accuracy
+                    }
+                } else {
+                    report.deletions.push({ treeId: doc.id, color });
+                    if (!dryRun){
+                        try{ await window.firebaseDeleteDoc(window.firebaseDoc(db,'trees',doc.id)); }
+                        catch(e){ report.warnings.push('delete-failed:'+doc.id); }
+                    }
+                }
+            }
+        }
+
+        // If all remaining trees are green, update the newest to a non-green color
+        const allDocs = snap.docs.slice().sort((a,b)=>{ const ad=a.data().createdAt||{}; const bd=b.data().createdAt||{}; return (bd.seconds||0)-(ad.seconds||0); });
+        const anyNonGreen = allDocs.some(d=> (d.data().color||'green') !== 'green');
+        if (!anyNonGreen && allDocs.length > 0){
+            const first = allDocs[0];
+            const alt = palette.find(p=>p!=='green');
+            if (alt){
+                report.reassignments.push({ treeId: first.id, from: 'green', to: alt });
+                if (!dryRun){
+                    try{ await window.firebaseUpdateDoc(window.firebaseDoc(db,'trees',first.id), { color: alt }); }
+                    catch(e){ report.warnings.push('update-default-failed:'+first.id); }
+                }
+            }
+        }
+        return report;
+    }catch(e){ report.warnings.push(String(e)); return report; }
+}
+
+// Expose a callable helper for debugging in the browser console
+window.runColorMaintenance = async function(dryRun = true){
+    try{
+        if (!window.firebaseAuth || !window.firebaseOnAuthStateChanged) throw new Error('firebase not initialized');
+        const user = window.firebaseAuth.currentUser;
+        if (!user) throw new Error('no-signed-in-user');
+        const r = await ensureUniqueTreeColorsForUser(user.uid, { dryRun });
+        console.log('Color maintenance report:', r);
+        return r;
+    }catch(e){ console.error('runColorMaintenance failed', e); throw e; }
+};
