@@ -33,14 +33,14 @@
     let selectedType = 'classic';
     let currentPage = 1;
     const ornamesPerPage = 10;
+    let isPublishingOrnament = false; // Flag to prevent double-click publishing
 
     // Check if it's after Dec 25 PT (or debug mode enabled)
     function isReleased(){
-        // Check for debug mode in URL: ?debug=christmas
+        // Check for debug mode in URL: ?debug=christmas (case-insensitive)
+        if (/[?&]debug=christmas/i.test(window.location.href)) return true;
         const params = new URLSearchParams(window.location.search);
         if (params.get('debug') === 'christmas') return true;
-        // Also support malformed URLs where debug is appended incorrectly (e.g. id=XXX?debug=christmas)
-        if (/[?&]debug=christmas/i.test(window.location.href)) return true;
         
         const now = new Date();
         const releaseDate = new Date(2025, 11, 25);
@@ -989,12 +989,32 @@
     }
 
     async function publishOrnament(){
-        if (!currentUser) return notify('Not logged in', 'error');
-        if (!treeData) return notify('No tree loaded', 'error');
+        // Prevent double-click by checking if already publishing
+        if (isPublishingOrnament) return;
+        isPublishingOrnament = true;
+        
+        const publishBtn = $('#publish-ornament-btn');
+        if (publishBtn) publishBtn.disabled = true;
+        
+        if (!currentUser) {
+            notify('Not logged in', 'error');
+            isPublishingOrnament = false;
+            if (publishBtn) publishBtn.disabled = false;
+            return;
+        }
+        if (!treeData) {
+            notify('No tree loaded', 'error');
+            isPublishingOrnament = false;
+            if (publishBtn) publishBtn.disabled = false;
+            return;
+        }
 
         const text = $('#ornament-text').value.trim();
         if (!text){
-            return notify('Please enter a message', 'warning');
+            notify('Please enter a message', 'warning');
+            isPublishingOrnament = false;
+            if (publishBtn) publishBtn.disabled = false;
+            return;
         }
 
         try{
@@ -1034,6 +1054,11 @@
         }catch(e){
             console.error(e);
             notify('Failed to add ornament: ' + (e.message||e), 'error');
+        }finally{
+            // Always unlock the button when done (success or error)
+            isPublishingOrnament = false;
+            const publishBtn = $('#publish-ornament-btn');
+            if (publishBtn) publishBtn.disabled = false;
         }
     }
 

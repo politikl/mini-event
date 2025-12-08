@@ -443,8 +443,8 @@ textarea {
         0 30px 80px rgba(0, 0, 0, 0.45),
         inset 0 0 40px rgba(255,255,255,0.03),
         0 0 0 1px rgba(212, 175, 55, 0.18);
-    /* use a more cursive handwriting for main text */
-    font-family: 'Satisfy', 'Dancing Script', 'Patrick Hand', 'Caveat', cursive;
+    /* Use readable handwriting font - Patrick Hand is cleaner than Satisfy */
+    font-family: 'Patrick Hand', 'Caveat', 'Segoe UI', sans-serif;
     position: relative;
     display: flex;
     flex-direction: column;
@@ -485,7 +485,7 @@ textarea {
 
 .ornament-text-display {
     /* Use same handwriting as the editor for consistent read/write */
-    font-family: 'Satisfy', 'Dancing Script', 'Patrick Hand', 'Caveat', sans-serif;
+    font-family: 'Patrick Hand', 'Caveat', 'Segoe UI', sans-serif;
     font-size: 26px;
     line-height: 1.55;
     color: #3b2f2b; /* ink-like */
@@ -597,7 +597,7 @@ textarea {
     border: 1px solid rgba(34,34,34,0.06);
     background: linear-gradient(180deg, rgba(255,255,255,0.985), rgba(249,244,239,0.985));
     box-shadow: inset 0 8px 26px rgba(0,0,0,0.04);
-    font-family: 'Satisfy', 'Dancing Script', 'Patrick Hand', 'Segoe UI', sans-serif;
+    font-family: 'Patrick Hand', 'Caveat', 'Segoe UI', sans-serif;
     font-size: 20px;
     line-height: 1.45;
     color: #2f251f;
@@ -608,8 +608,8 @@ textarea {
 }
 
 .ornament-author-display {
-    font-family: 'Allura', 'Great Vibes', 'Dancing Script', cursive;
-    font-size: 36px; /* larger, more cursive signature */
+    font-family: 'Caveat', 'Patrick Hand', cursive;
+    font-size: 32px; /* signature style but more readable than Allura */
     color: #6f4f34;
     margin-top: 12px;
     position: relative;
