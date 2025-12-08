@@ -848,7 +848,8 @@
             const isPrivate = orn.private === true;
             const isTreeOwner = currentUser && treeData && treeData.ownerUid === (currentUser && currentUser.uid);
             const isOwnerPublic = orn.ownerHasRead === true && orn.private !== true;
-            const canRead = released && (isTreeOwner || isOwner || isOwnerPublic);
+            // On Christmas/debug: tree owner can read ALL (private+public), others read only public messages
+            const canRead = released && (isOwner || isOwnerPublic || (isTreeOwner) || (!isPrivate && released));
             // determine spot index: prefer stored spotIndex, else pick first free, else fallback
             let spotIndex = (typeof orn.spotIndex === 'number') ? orn.spotIndex : null;
             if (spotIndex == null){
